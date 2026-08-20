@@ -1,0 +1,154 @@
+@import "tailwindcss";
+
+@theme {
+  --color-emmy-primary: #003399;
+  --color-emmy-secondary: #ef7305;
+  --color-emmy-primary-light: #1a4db3;
+  --color-emmy-primary-dark: #002266;
+  --color-emmy-secondary-light: #ff8f2b;
+  --color-emmy-secondary-dark: #cc5c00;
+}
+
+:root {
+  --emmy-blue: #032489;
+  --emmy-blue-dark: #021b68;
+  --emmy-yellow: #ffb100;
+  --emmy-bg: #f5f8ff;
+  --emmy-ink: #0f172a;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+body {
+  background: var(--emmy-bg);
+  color: var(--emmy-ink);
+  font-family: Arial, Helvetica, sans-serif;
+}
+button, a { font: inherit; }
+
+.ambassador-nav-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
+
+.ambassador-nav-scroll::-webkit-scrollbar { width: 5px; }
+.ambassador-nav-scroll::-webkit-scrollbar-track { background: transparent; }
+.ambassador-nav-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.bg-emmy-blue { background: var(--emmy-blue); }
+.bg-emmy-yellow { background: var(--emmy-yellow); }
+.text-emmy-blue { color: var(--emmy-blue); }
+.text-emmy-yellow { color: var(--emmy-yellow); }
+
+canvas { display: block; }
+
+.city-label {
+  position: relative;
+  min-width: 112px;
+  padding: 9px 14px;
+  border: 1px solid rgba(255,255,255,.75);
+  border-radius: 13px;
+  background: linear-gradient(180deg, rgba(5,48,157,.96), rgba(3,36,137,.98));
+  color: white;
+  box-shadow: 0 12px 30px rgba(3,36,137,.22), inset 0 1px 0 rgba(255,255,255,.18);
+  font: 800 13px/1 Arial, Helvetica, sans-serif;
+  text-align: center;
+  white-space: nowrap;
+  letter-spacing: -.01em;
+  backdrop-filter: blur(10px);
+}
+
+.city-label::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -7px;
+  width: 14px;
+  height: 14px;
+  background: #032489;
+  transform: translateX(-50%) rotate(45deg);
+  border-radius: 2px;
+  z-index: -1;
+}
+
+.city-label-yellow {
+  background: linear-gradient(180deg, #ffbd22, #ffab00);
+  color: #15213c;
+  border-color: rgba(255,255,255,.82);
+  box-shadow: 0 12px 30px rgba(255,177,0,.22), inset 0 1px 0 rgba(255,255,255,.3);
+}
+
+.city-label-yellow::after { background: #ffae00; }
+.city-label-hq { min-width: 130px; text-transform: uppercase; letter-spacing: .05em; font-size: 11px; }
+
+.level-marker {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 2px solid;
+  border-radius: 999px;
+  background: rgba(255,255,255,.94);
+  box-shadow: 0 7px 18px rgba(15,23,42,.18);
+  font: 900 10px/1 Arial, Helvetica, sans-serif;
+  backdrop-filter: blur(8px);
+}
+
+/* Append these styles to src/app/globals.css */
+.emmy-map-marker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(255,255,255,.8);
+  border-radius: 999px;
+  background: #032489;
+  color: white;
+  padding: 7px 10px 7px 7px;
+  box-shadow: 0 10px 28px rgba(3,36,137,.28);
+  cursor: pointer;
+  transform: translateY(-2px);
+  transition: transform .18s ease, box-shadow .18s ease;
+  font-family: Arial, Helvetica, sans-serif;
+}
+.emmy-map-marker:hover { transform: translateY(-6px) scale(1.03); box-shadow: 0 16px 34px rgba(3,36,137,.35); }
+.emmy-map-marker span {
+  display: grid;
+  min-width: 27px;
+  height: 27px;
+  place-items: center;
+  border-radius: 999px;
+  background: white;
+  color: #032489;
+  padding: 0 5px;
+  font-size: 9px;
+  font-weight: 900;
+}
+.emmy-map-marker strong { white-space: nowrap; font-size: 11px; font-weight: 900; }
+.emmy-map-marker-yellow { background: #ffb100; color: #172033; box-shadow: 0 10px 28px rgba(255,177,0,.26); }
+.emmy-map-marker-yellow span { color: #172033; }
+.maplibregl-ctrl-bottom-left, .maplibregl-ctrl-bottom-right { font-size: 9px; opacity: .7; }
+
+
+/* MapLibre city rendering */
+.maplibregl-map {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden;
+}
+
+.maplibregl-canvas-container,
+.maplibregl-canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.maplibregl-canvas {
+  position: absolute !important;
+  left: 0;
+  top: 0;
+}
