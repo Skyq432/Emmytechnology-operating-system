@@ -5,3 +5,7 @@ out/
 .env.local
 .DS_Store
 *.log
+
+.env.production
+_backup-crm-*/
+tsconfig.tsbuildinfo

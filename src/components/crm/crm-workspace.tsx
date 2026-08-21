@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Image from "next/image";
 import Link from "next/link";
@@ -124,9 +124,9 @@ type IdentityActivity = {
 
 function identityProfile(lead: Lead) {
   return {
-    email: lead.email ?? "—",
-    location: lead.location ?? "—",
-    firstSeen: lead.firstSeen ?? "—",
+    email: lead.email ?? "â€”",
+    location: lead.location ?? "â€”",
+    firstSeen: lead.firstSeen ?? "â€”",
     lastSeen: lead.age,
     mergeConfidence: lead.mergeConfidence ?? "Identity links from Supabase",
     sources: lead.identitySources?.length
@@ -253,7 +253,7 @@ export default function CrmWorkspace() {
   }, [query, leads]);
 
   const handoffs = leads.filter((lead) => lead.stage === 5);
-  const attention = leads.filter((lead) => lead.followupState === "due" || lead.coldLead || lead.atRisk);
+  const attention = leads.filter((lead) => lead.followupState === "due");
   const customers = leads.filter((lead) => lead.stage >= 6).length;
   const openTasks = leads.reduce((sum, lead) => sum + (lead.tasks?.filter((task) => task.status === "open").length ?? 0), 0);
 
@@ -334,7 +334,7 @@ export default function CrmWorkspace() {
         </header>
 
         <main className={styles.content}>
-          {loading ? <div className={styles.dbState}>Loading CRM identities from local Supabase…</div> : null}
+          {loading ? <div className={styles.dbState}>Loading CRM data...</div> : null}
           {dbError ? <div className={`${styles.dbState} ${styles.dbError}`}>Database connection error: {dbError}</div> : null}
           {!loading && !dbError && view === "dashboard" && (
             <Dashboard leads={leads} attention={attention.length} handoffs={handoffs.length} customers={customers} onOpenLead={setSelectedLead} />
@@ -380,7 +380,7 @@ function Dashboard({ leads, attention, handoffs, customers, onOpenLead }: { lead
 
       <section className={styles.metricsGrid}>
         <Metric label="Total people" value={String(leads.length)} helper="Across all CRM stages" icon={<Users size={20} />} tone="blue" />
-        <Metric label="Need attention" value={String(attention)} helper="High-priority next actions" icon={<Zap size={20} />} tone="orange" />
+        <Metric label="Need attention" value={String(attention)} helper="Actions due now" icon={<Zap size={20} />} tone="orange" />
         <Metric label="WhatsApp handoffs" value={String(handoffs)} helper="Outcome requires manual update" icon={<MessageCircle size={20} />} tone="green" />
         <Metric label="Customers" value={String(customers)} helper="Paid / onboarding and beyond" icon={<CheckCircle2 size={20} />} tone="purple" />
       </section>
@@ -414,10 +414,10 @@ function Dashboard({ leads, attention, handoffs, customers, onOpenLead }: { lead
         <section className={styles.panel}>
           <div className={styles.panelHeader}><div><h2>Needs attention</h2><p>The system should tell staff what to do next.</p></div><button className={styles.linkButton}>View all <ChevronRight size={15} /></button></div>
           <div className={styles.attentionList}>
-            {leads.filter((lead) => lead.followupState === "due" || lead.coldLead || lead.atRisk).map((lead) => (
+            {leads.filter((lead) => lead.followupState === "due").map((lead) => (
               <button type="button" className={styles.attentionRow} key={lead.id} onClick={() => onOpenLead(lead)}>
                 <div className={styles.attentionIcon}><Sparkles size={18} /></div>
-                <div className={styles.attentionCopy}><strong>{lead.name}</strong><span>{lead.stageName} · {lead.product}</span><p>{lead.coldLead ? (lead.coldReason || "Cold lead — recovery needed") : lead.atRisk ? `At risk · ${lead.stageAge || ""} in stage` : lead.nextAction}</p></div>
+                <div className={styles.attentionCopy}><strong>{lead.name}</strong><span>{lead.stageName} Â· {lead.product}</span><p>{lead.coldLead ? (lead.coldReason || "Cold lead â€” recovery needed") : lead.atRisk ? `At risk Â· ${lead.stageAge || ""} in stage` : lead.nextAction}</p></div>
                 <div className={styles.attentionMeta}><TrackingBadge type={lead.tracking} /><span>{lead.age}</span><ChevronRight size={15} /></div>
               </button>
             ))}
@@ -512,18 +512,18 @@ function LeadTable({ leads, onOpenLead }: { leads: Lead[]; onOpenLead: (lead: Le
                   {state === "due" && dueTask ? (
                     <>
                       <span className={styles.dueNowDot} />
-                      <span><strong>{dueTask.title}</strong><small>{dueTask.due}{dueTask.expires ? ` · ${dueTask.expires}` : ""}</small></span>
+                      <span><strong>{dueTask.title}</strong><small>{dueTask.due}{dueTask.expires ? ` Â· ${dueTask.expires}` : ""}</small></span>
                     </>
                   ) : state === "scheduled" ? (
                     <span className={`${styles.followupPill} ${styles.followupScheduled}`}>Scheduled</span>
                   ) : state === "at_risk" ? (
-                    <span className={`${styles.followupPill} ${styles.followupRisk}`}>At risk · {lead.stageAge || "stalled"}</span>
+                    <span className={`${styles.followupPill} ${styles.followupRisk}`}>At risk Â· {lead.stageAge || "stalled"}</span>
                   ) : state === "cold" ? (
-                    <span className={`${styles.followupPill} ${styles.followupCold}`}>Cold · {lead.stageAge || "stalled"}</span>
+                    <span className={`${styles.followupPill} ${styles.followupCold}`}>Cold Â· {lead.stageAge || "stalled"}</span>
                   ) : state === "customer" ? (
                     <span className={`${styles.followupPill} ${styles.followupCustomer}`}>Customer</span>
                   ) : (
-                    <span className={`${styles.followupPill} ${styles.followupHealthy}`}>Healthy · {lead.stageAge || "new"}</span>
+                    <span className={`${styles.followupPill} ${styles.followupHealthy}`}>Healthy Â· {lead.stageAge || "new"}</span>
                   )}
                 </div>
 
@@ -610,10 +610,10 @@ function TasksView({ leads, onOpenLead, onTaskOutcome }: { leads: Lead[]; onOpen
           </span>
           <span className={styles.taskSubline}>
             <span>{task.lead.name}</span>
-            <span>•</span>
+            <span>â€¢</span>
             <span>{task.due}</span>
-            {task.expires ? <><span>•</span><span className={styles.taskExpiry}>{task.expires}</span></> : null}
-            <span>•</span>
+            {task.expires ? <><span>â€¢</span><span className={styles.taskExpiry}>{task.expires}</span></> : null}
+            <span>â€¢</span>
             <span>{task.owner}</span>
           </span>
           <span className={styles.taskDescription}>{task.description || "Take the required follow-up action and record the outcome."}</span>
@@ -661,7 +661,7 @@ function NotesView({ leads, onOpenLead }: { leads: Lead[]; onOpenLead: (lead: Le
   const notes = leads.flatMap((lead) =>
     (lead.notes ?? []).map((note) => ({ ...note, lead })),
   );
-  return <><PageIntro title="Notes" copy="Human context that automatic tracking cannot capture: objections, preferences, promises and WhatsApp conversation outcomes." /><section className={styles.notesGrid}>{notes.length ? notes.map((note) => <button type="button" className={styles.noteCard} key={note.id} onClick={() => onOpenLead(note.lead)}><span>{note.lead.name.toUpperCase()} · {note.time}</span><h3>{note.author}</h3><p>{note.body}</p></button>) : <div className={styles.emptyStage}>No notes yet</div>}</section></>;
+  return <><PageIntro title="Notes" copy="Human context that automatic tracking cannot capture: objections, preferences, promises and WhatsApp conversation outcomes." /><section className={styles.notesGrid}>{notes.length ? notes.map((note) => <button type="button" className={styles.noteCard} key={note.id} onClick={() => onOpenLead(note.lead)}><span>{note.lead.name.toUpperCase()} Â· {note.time}</span><h3>{note.author}</h3><p>{note.body}</p></button>) : <div className={styles.emptyStage}>No notes yet</div>}</section></>;
 }
 
 function HandoffView({ leads, onOpenLead, onOutcome }: { leads: Lead[]; onOpenLead: (lead: Lead) => void; onOutcome: (lead: Lead, outcome: string) => Promise<void> }) {
@@ -726,9 +726,9 @@ function LeadDetailDrawer({ lead, onClose, onMoveStage, onAddNote, onTaskOutcome
           <div className={styles.drawerIdentity}>
             <div className={styles.drawerAvatar}>{initials}</div>
             <div>
-              <span className={styles.drawerEyebrow}>MERGED CUSTOMER IDENTITY · {lead.identityCode ?? lead.id.slice(0, 8).toUpperCase()}</span>
+              <span className={styles.drawerEyebrow}>MERGED CUSTOMER IDENTITY Â· {lead.identityCode ?? lead.id.slice(0, 8).toUpperCase()}</span>
               <h2>{lead.name}</h2>
-              <p>{lead.phone} · {profile.email}</p>
+              <p>{lead.phone} Â· {profile.email}</p>
             </div>
           </div>
           <button type="button" className={styles.closeButton} onClick={onClose} aria-label="Close"><X size={19} /></button>
@@ -741,7 +741,7 @@ function LeadDetailDrawer({ lead, onClose, onMoveStage, onAddNote, onTaskOutcome
             <div>
               <span className={styles.identityLabel}>Identity status</span>
               <strong>{profile.sources.length} records merged into one person</strong>
-              <p>{profile.mergeConfidence} · Last seen {profile.lastSeen}</p>
+              <p>{profile.mergeConfidence} Â· Last seen {profile.lastSeen}</p>
             </div>
             <div className={styles.identityStage}><span>Stage</span><strong>{lead.stage}</strong><small>{lead.stageName}</small></div>
           </section>
@@ -753,14 +753,14 @@ function LeadDetailDrawer({ lead, onClose, onMoveStage, onAddNote, onTaskOutcome
             <IdentityFact label="First seen" value={profile.firstSeen} />
             <IdentityFact label="Owner" value={lead.owner} />
             <IdentityFact label="Source" value={lead.source} />
-            <IdentityFact label="Referred by" value={lead.referrerName || "—"} />
-            <IdentityFact label="Referral generation" value={lead.generation ? `Generation ${lead.generation}` : "—"} />
-            <IdentityFact label="Original ambassador" value={lead.originalAmbassadorName || "—"} />
+            <IdentityFact label="Referred by" value={lead.referrerName || "â€”"} />
+            <IdentityFact label="Referral generation" value={lead.generation ? `Generation ${lead.generation}` : "â€”"} />
+            <IdentityFact label="Original ambassador" value={lead.originalAmbassadorName || "â€”"} />
             <IdentityFact label="Follow-up status" value={lead.coolingStatus || "Contact allowed"} />
             <IdentityFact label="Lead health" value={lead.stage >= 6 ? "Customer" : lead.coldLead ? "Cold" : lead.atRisk ? "At risk" : "Healthy"} />
-            <IdentityFact label="Time in stage" value={lead.stageAge || "—"} />
-            <IdentityFact label="Expected progress" value={lead.expectedProgress ? `Within ${lead.expectedProgress}` : "—"} />
-            <IdentityFact label="Cold threshold" value={lead.coldAfter ? `After ${lead.coldAfter}` : "—"} />
+            <IdentityFact label="Time in stage" value={lead.stageAge || "â€”"} />
+            <IdentityFact label="Expected progress" value={lead.expectedProgress ? `Within ${lead.expectedProgress}` : "â€”"} />
+            <IdentityFact label="Cold threshold" value={lead.coldAfter ? `After ${lead.coldAfter}` : "â€”"} />
             <IdentityFact label="Last human contact" value={lead.lastHumanContact ? `${lead.lastHumanContact} ago` : "No recorded contact"} />
           </section>
 
@@ -782,7 +782,7 @@ function LeadDetailDrawer({ lead, onClose, onMoveStage, onAddNote, onTaskOutcome
 
           <section className={`${styles.nextActionPanel} ${lead.coldLead ? styles.nextActionCold : lead.atRisk ? styles.nextActionRisk : ""}`}>
             <div className={styles.nextActionIcon}><Clock3 size={17} /></div>
-            <div><span>{lead.coldLead ? "Cold lead" : lead.atRisk ? "At risk" : lead.nextTaskDue ? "Action due" : "Follow-up status"}</span><strong>{lead.nextAction}</strong><p>{lead.nextTaskDue ? `${lead.nextTaskDue} · ` : ""}{lead.priority} priority · Owner: {lead.owner}</p><small>{lead.coolingStatus || "Contact allowed"} · {lead.contactAttempts ?? 0} contact attempt(s)</small>{lead.coldReason ? <em>{lead.coldReason}</em> : null}</div>
+            <div><span>{lead.coldLead ? "Cold lead" : lead.atRisk ? "At risk" : lead.nextTaskDue ? "Action due" : "Follow-up status"}</span><strong>{lead.nextAction}</strong><p>{lead.nextTaskDue ? `${lead.nextTaskDue} Â· ` : ""}{lead.priority} priority Â· Owner: {lead.owner}</p><small>{lead.coolingStatus || "Contact allowed"} Â· {lead.contactAttempts ?? 0} contact attempt(s)</small>{lead.coldReason ? <em>{lead.coldReason}</em> : null}</div>
           </section>
 
           {isBlindSpot ? (
@@ -796,7 +796,7 @@ function LeadDetailDrawer({ lead, onClose, onMoveStage, onAddNote, onTaskOutcome
             <div className={styles.drawerSectionHead}><div><h3>Follow-up tasks</h3><p>Tasks appear only when the follow-up window is due. Progress cancels stale tasks automatically.</p></div></div>
             <div className={styles.drawerTaskList}>
               {lead.tasks?.length ? lead.tasks.map((task) => <div className={styles.drawerTask} key={task.id}>
-                <div><strong>{task.title}</strong><span>{task.due}{task.expires ? ` · ${task.expires}` : ""} · {task.owner}</span><p>{task.description}</p></div>
+                <div><strong>{task.title}</strong><span>{task.due}{task.expires ? ` Â· ${task.expires}` : ""} Â· {task.owner}</span><p>{task.description}</p></div>
                 {task.status === "open" ? <div className={styles.drawerTaskActions}><button type="button" onClick={() => void onTaskOutcome(lead, task, "Contacted")}>Contacted</button><button type="button" onClick={() => void onTaskOutcome(lead, task, "No response")}>No response</button><button type="button" onClick={() => void onTaskOutcome(lead, task, "Completed")}>Done</button></div> : <span className={styles.taskOutcome}>{task.outcome || task.status}</span>}
               </div>) : <div className={styles.emptyStage}>No follow-up task is due yet.</div>}
             </div>
@@ -839,8 +839,8 @@ function LeadDetailDrawer({ lead, onClose, onMoveStage, onAddNote, onTaskOutcome
 
           {noteOpen ? <div className={styles.noteComposer}>
             <label htmlFor="crm-note">Add note</label>
-            <textarea id="crm-note" autoFocus value={noteText} onChange={(event) => setNoteText(event.target.value)} placeholder="Add objection, promise, preference or WhatsApp context…" />
-            <div><button type="button" onClick={() => { setNoteOpen(false); setNoteText(""); }}>Cancel</button><button type="button" disabled={saving || !noteText.trim()} onClick={() => void saveNote()}>{saving ? "Saving…" : "Save note"}</button></div>
+            <textarea id="crm-note" autoFocus value={noteText} onChange={(event) => setNoteText(event.target.value)} placeholder="Add objection, promise, preference or WhatsApp contextâ€¦" />
+            <div><button type="button" onClick={() => { setNoteOpen(false); setNoteText(""); }}>Cancel</button><button type="button" disabled={saving || !noteText.trim()} onClick={() => void saveNote()}>{saving ? "Savingâ€¦" : "Save note"}</button></div>
           </div> : null}
 
           <div className={styles.drawerActions}>
@@ -856,3 +856,5 @@ function LeadDetailDrawer({ lead, onClose, onMoveStage, onAddNote, onTaskOutcome
 function IdentityFact({ label, value }: { label: string; value: string }) {
   return <div className={styles.identityFact}><span>{label}</span><strong>{value}</strong></div>;
 }
+
+
