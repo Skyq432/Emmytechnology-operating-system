@@ -410,6 +410,14 @@ export async function GET() {
     });
   }
 
+  async function optionalWrite(operation: () => Promise<unknown>) {
+    try {
+      return await operation();
+    } catch {
+      return [];
+    }
+  }
+
   try {
     const [
       identities,
@@ -445,11 +453,11 @@ export async function GET() {
       fetchAll("product_interests", "id,identity_id,lead_id,product_id,interest_type,source,note,created_at", "created_at.desc", 5),
       fetchAll("website_events", "id,identity_id,lead_id,product_id,event_type,quantity,source_page,page_url,search_query,results_count,metadata,created_at", "created_at.desc", 5),
       fetchAll("products", "id,name,price,sale_price,category,status,created_at,updated_at", "updated_at.desc", 3),
-      fetchAll("sms_campaign_recipient_details", "id,identity_id,lead_id,first_name,full_name,phone_normalized,whatsapp_outreach_status,cash_off_balance,clicked_at,whatsapp_claimed_at,created_at", "created_at.desc", 5),
+      fetchAll("sms_campaign_recipient_details", "id,lead_id,first_name,full_name,phone_normalized,whatsapp_outreach_status,clicked_at,whatsapp_claimed_at,created_at", "created_at.desc", 5),
       fetchAll("spin_referrals", "id,referrer_identity_id,referred_identity_id,status,reward_granted,reward_spin_amount,created_at", "created_at.desc", 5),
       fetchAll("users", "id,name,email,role,created_at", "created_at.desc", 2),
-      fetchAll("crm_notes", "id,identity_id,body,author,created_at", "created_at.desc", 5),
-      fetchAll("crm_manual_updates", "id,identity_id,update_type,value,note,updated_by,created_at", "created_at.desc", 5),
+      fetchOptional("crm_notes", "id,identity_id,body,author,created_at", "created_at.desc", 5),
+      fetchOptional("crm_manual_updates", "id,identity_id,update_type,value,note,updated_by,created_at", "created_at.desc", 5),
       fetchOptional("crm_tasks", "*", "due_at.asc", 5),
       fetchOptional("crm_lead_ownership", "*", "updated_at.desc", 5),
       fetchOptional("crm_contact_state", "*", "updated_at.desc", 5),
@@ -469,7 +477,19 @@ export async function GET() {
     const leadsByIdentity = arrayByIdentity(leads);
     const interestsByIdentity = arrayByIdentity(productInterests);
     const webByIdentity = arrayByIdentity(websiteEvents);
-    const smsByIdentity = arrayByIdentity(smsRecipients);
+    const leadIdentityById = new Map(
+      leads
+        .filter((row) => row.id && row.identity_id)
+        .map((row) => [String(row.id), String(row.identity_id)])
+    );
+    const smsByIdentity = arrayByIdentity(
+      smsRecipients.map((row) => ({
+        ...row,
+        identity_id:
+          row.identity_id ||
+          (row.lead_id ? leadIdentityById.get(String(row.lead_id)) : null),
+      }))
+    );
     const crmNotesByIdentity = arrayByIdentity(crmNotes);
     const manualUpdatesByIdentity = arrayByIdentity(crmManualUpdates);
     const tasksByIdentityInitial = arrayByIdentity(crmTasksInitial);
@@ -623,7 +643,9 @@ export async function GET() {
         });
       }
     }
-    if (ownershipUpserts.length) await bulkInsert("crm_lead_ownership", ownershipUpserts, "identity_id");
+    if (ownershipUpserts.length) {
+      await optionalWrite(() => bulkInsert("crm_lead_ownership", ownershipUpserts, "identity_id"));
+    }
 
     const taskInserts: AnyRow[] = [];
     const taskCancelIds: string[] = [];
@@ -718,22 +740,26 @@ export async function GET() {
     }
 
     if (taskCancelIds.length) {
-      await bulkPatch("crm_tasks", taskCancelIds, {
+      await optionalWrite(() => bulkPatch("crm_tasks", taskCancelIds, {
         status: "cancelled",
         cancelled_at: new Date().toISOString(),
         cancel_reason: "Customer progressed to another funnel stage",
         updated_at: new Date().toISOString(),
-      });
+      }));
     }
     if (taskExpireIds.length) {
-      await bulkPatch("crm_tasks", taskExpireIds, {
+      await optionalWrite(() => bulkPatch("crm_tasks", taskExpireIds, {
         status: "expired",
         expired_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-      });
+      }));
     }
-    if (contactStateUpserts.length) await bulkInsert("crm_contact_state", contactStateUpserts, "identity_id");
-    if (taskInserts.length) await bulkInsert("crm_tasks", taskInserts, "dedupe_key");
+    if (contactStateUpserts.length) {
+      await optionalWrite(() => bulkInsert("crm_contact_state", contactStateUpserts, "identity_id"));
+    }
+    if (taskInserts.length) {
+      await optionalWrite(() => bulkInsert("crm_tasks", taskInserts, "dedupe_key"));
+    }
 
     const crmTasks = await fetchOptional("crm_tasks", "*", "due_at.asc", 5);
     const tasksByIdentity = arrayByIdentity(crmTasks);
