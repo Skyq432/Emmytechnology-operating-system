@@ -186,7 +186,7 @@ function stageRule(stage: number, rule?: AnyRow | null) {
 function stageFromText(value?: unknown) {
   const s = normalize(value);
   if (!s) return 0;
-  if (/(advocacy|ambassador|qualified.?referral)/.test(s)) return 10;
+  if (/(advocacy|qualified.?referral)/.test(s)) return 10;
   if (/(expansion|cross.?sell)/.test(s)) return 9;
   if (/(loyalty|repeat.?buyer|repeat.?purchase)/.test(s)) return 8;
   if (/(satisfaction|feedback|review)/.test(s)) return 7;
@@ -433,6 +433,7 @@ export async function GET() {
       products,
       smsRecipients,
       spinReferrals,
+      conversions,
       users,
       crmNotes,
       crmManualUpdates,
@@ -455,6 +456,7 @@ export async function GET() {
       fetchAll("products", "id,name,price,sale_price,category,status,created_at,updated_at", "updated_at.desc", 3),
       fetchAll("sms_campaign_recipient_details", "id,lead_id,first_name,full_name,phone_normalized,whatsapp_outreach_status,clicked_at,whatsapp_claimed_at,created_at", "created_at.desc", 5),
       fetchAll("spin_referrals", "id,referrer_identity_id,referred_identity_id,status,reward_granted,reward_spin_amount,created_at", "created_at.desc", 5),
+      fetchAll("conversions", "id,lead_id,ambassador_id,amount,approved_at,conversion_sequence,is_repeat_conversion,is_commissionable,internal_note", "approved_at.desc", 5),
       fetchAll("users", "id,name,email,role,created_at", "created_at.desc", 2),
       fetchOptional("crm_notes", "id,identity_id,body,author,created_at", "created_at.desc", 5),
       fetchOptional("crm_manual_updates", "id,identity_id,update_type,value,note,updated_by,created_at", "created_at.desc", 5),
@@ -482,6 +484,24 @@ export async function GET() {
         .filter((row) => row.id && row.identity_id)
         .map((row) => [String(row.id), String(row.identity_id)])
     );
+
+    const conversionRowsWithIdentity: AnyRow[] = (conversions as AnyRow[])
+      .map((row: AnyRow): AnyRow => ({
+        ...row,
+        identity_id: row.lead_id
+          ? leadIdentityById.get(String(row.lead_id)) ?? null
+          : null,
+      }))
+      .filter((row: AnyRow) => Boolean(row.identity_id));
+
+    const conversionsByIdentity = arrayByIdentity(conversionRowsWithIdentity);
+
+    const approvedConvertedIdentityIds = new Set(
+      conversionRowsWithIdentity
+        .filter((row) => Boolean(row.approved_at))
+        .map((row) => String(row.identity_id))
+    );
+
     const smsByIdentity = arrayByIdentity(
       smsRecipients.map((row) => ({
         ...row,
@@ -567,16 +587,75 @@ export async function GET() {
       const manualRows = manualUpdatesByIdentity.get(id) ?? [];
       const linkedLeadEvents = leadRows.flatMap((row) => leadEventsByLead.get(row.id) ?? []);
       const referralRows = referralsByIdentity.get(id) ?? [];
+      const conversionRows = conversionsByIdentity.get(id) ?? [];
+      const approvedConversions = conversionRows.filter((row) => Boolean(row.approved_at));
 
-      const leadStage = Math.max(0, ...leadRows.map((row) => stageFromText(row.funnel_stage)));
+      const hasApprovedConversion = approvedConversions.length > 0;
+      const hasRepeatConversion =
+        approvedConversions.some(
+          (row) =>
+            row.is_repeat_conversion === true ||
+            Number(row.conversion_sequence ?? 0) >= 2
+        ) ||
+        approvedConversions.length >= 2;
+
+      // Advocacy is customer advocacy, not simply being referred by an ambassador.
+      // A person qualifies automatically only when:
+      // 1. they are already a confirmed customer, and
+      // 2. someone they referred also has an approved conversion.
+      const hasConvertedReferral = referralRows.some(
+        (row) =>
+          String(row.referrer_identity_id ?? "") === String(id) &&
+          Boolean(row.referred_identity_id) &&
+          approvedConvertedIdentityIds.has(String(row.referred_identity_id))
+      );
+
+      const conversionStage = hasRepeatConversion ? 8 : hasApprovedConversion ? 6 : 0;
+      const advocacyStage = hasApprovedConversion && hasConvertedReferral ? 10 : 0;
+
+      // Text-derived data can establish stages 1-9, but Stage 10 requires
+      // explicit manual placement or verified customer + converted referral evidence.
+      const leadStage = Math.min(
+        9,
+        Math.max(0, ...leadRows.map((row) => stageFromText(row.funnel_stage)))
+      );
       const eventStage = Math.max(0, ...webRows.map((row) => websiteStage(row.event_type)));
-      const prizeStage = prizeRows.some((row) => row.claimed_at || normalize(row.status).includes("claim")) ? 2 : 0;
+      const prizeStage = prizeRows.some(
+        (row) => row.claimed_at || normalize(row.status).includes("claim")
+      ) ? 2 : 0;
       const spinStage = playerRows.length || logRows.length ? 1 : 0;
-      const identityEventStage = Math.max(0, ...(eventsByIdentity.get(id) ?? []).map((row) => stageFromText(`${row.event_type} ${row.title}`)));
-      const computedStage = Math.max(1, leadStage, eventStage, prizeStage, spinStage, identityEventStage);
-      const manualStageRow = latestByDate(manualRows.filter((row) => normalize(row.update_type) === "funnel_stage"));
+      const identityEventStage = Math.min(
+        9,
+        Math.max(
+          0,
+          ...(eventsByIdentity.get(id) ?? []).map((row) =>
+            stageFromText(`${row.event_type} ${row.title}`)
+          )
+        )
+      );
+
+      const computedStage = Math.max(
+        1,
+        leadStage,
+        eventStage,
+        prizeStage,
+        spinStage,
+        identityEventStage,
+        conversionStage,
+        advocacyStage
+      );
+
+      const manualStageRow = latestByDate(
+        manualRows.filter((row) => normalize(row.update_type) === "funnel_stage")
+      );
       const manualStage = Number(manualStageRow?.value);
-      const stage = Number.isInteger(manualStage) && manualStage >= 1 && manualStage <= 10 ? manualStage : computedStage;
+
+      // Manual correction may override behavioural stages, but confirmed
+      // purchase evidence must never be downgraded back into a prospect stage.
+      const stage =
+        Number.isInteger(manualStage) && manualStage >= 1 && manualStage <= 10
+          ? Math.max(manualStage, conversionStage, advocacyStage)
+          : computedStage;
 
       const product =
         productFrom(interestRows, productMap) ??
@@ -803,6 +882,22 @@ export async function GET() {
       for (const row of prizeRows.slice(0, 10)) {
         activities.push({ title: row.claimed_at ? "Voucher / prize claimed" : "Prize recorded", detail: row.prize_label || row.result_type || "Spin reward", at: row.claimed_at || row.created_at, tracking: "Automatic", tone: row.claimed_at ? "green" : "blue" });
       }
+      for (const row of (conversionsByIdentity.get(id) ?? [])
+        .filter((conversion) => Boolean(conversion.approved_at))
+        .slice(0, 10)) {
+        const repeat =
+          row.is_repeat_conversion === true ||
+          Number(row.conversion_sequence ?? 0) >= 2;
+
+        activities.push({
+          title: repeat ? "Repeat purchase approved" : "Purchase approved",
+          detail: `${money(row.amount)} confirmed conversion`,
+          at: row.approved_at,
+          tracking: "Manual",
+          tone: "green",
+        });
+      }
+
       for (const row of linkedLeadEvents.slice(0, 20)) {
         activities.push({ title: row.event_title || humanize(row.event_type), detail: row.event_description || humanize(row.event_type), at: row.created_at, tracking: "Manual", tone: "slate" });
       }
