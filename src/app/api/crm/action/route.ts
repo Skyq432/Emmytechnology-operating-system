@@ -29,8 +29,8 @@ const stageNames: Record<number, string> = {
 type Json = Record<string, unknown>;
 
 function config() {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SECRET_KEY;
+  const url = process.env.SUPABASE_URL?.trim();
+  const key = process.env.SUPABASE_SECRET_KEY?.trim();
   if (!url || !key) throw new Error("SUPABASE_URL and SUPABASE_SECRET_KEY are required");
   return { url, key };
 }

@@ -342,8 +342,8 @@ function triggerForStage(stage: number, ctx: Pick<Context, "webRows" | "interest
 }
 
 export async function GET() {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SECRET_KEY;
+  const url = process.env.SUPABASE_URL?.trim();
+  const key = process.env.SUPABASE_SECRET_KEY?.trim();
 
   if (!url || !key) {
     return NextResponse.json({ error: "SUPABASE_URL and SUPABASE_SECRET_KEY are required." }, { status: 500 });
