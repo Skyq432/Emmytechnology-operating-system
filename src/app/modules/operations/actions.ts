@@ -2,10 +2,16 @@
 
 import { revalidatePath } from 'next/cache';
 import {
+  changeOperationsOrderStatus,
   createInventoryItem,
   createOperationsOrder,
   createWebsiteProductLink,
 } from '@/lib/operations/server';
+import {
+  acknowledgeOperationsHandover,
+  createOperationsHandover,
+} from '@/lib/operations/tracking-server';
+import type { OrderStatus } from '@/lib/operations/domain';
 import type {
   OperationsPriority,
   OperationsSource,
@@ -54,6 +60,49 @@ export async function createOrderAction(
   }
 
   return { success: result.success, message: result.message };
+}
+
+export async function changeOrderStatusAction(formData: FormData) {
+  const orderId = String(formData.get('order_id') || '');
+  const status = String(formData.get('status') || '') as OrderStatus;
+  const note = String(formData.get('note') || '');
+  if (!orderId || !status) return;
+
+  const result = await changeOperationsOrderStatus(orderId, status, note);
+  if (!result.success) throw new Error(result.message);
+
+  revalidatePath('/modules/operations');
+  revalidatePath('/modules/operations/orders');
+  revalidatePath(`/modules/operations/orders/${orderId}`);
+}
+
+export async function createHandoverAction(formData: FormData) {
+  const orderId = String(formData.get('order_id') || '');
+  const toTeam = String(formData.get('to_team') || '').trim();
+  const toUserId = String(formData.get('to_user_id') || '') || null;
+  const note = String(formData.get('note') || '');
+  if (!orderId || !toTeam) return;
+
+  const result = await createOperationsHandover({ orderId, toTeam, toUserId, note });
+  if (!result.success) throw new Error(result.message);
+
+  revalidatePath('/modules/operations');
+  revalidatePath('/modules/operations/orders');
+  revalidatePath(`/modules/operations/orders/${orderId}`);
+}
+
+export async function acknowledgeHandoverAction(formData: FormData) {
+  const handoverId = String(formData.get('handover_id') || '');
+  const orderId = String(formData.get('order_id') || '');
+  const note = String(formData.get('note') || '');
+  if (!handoverId || !orderId) return;
+
+  const result = await acknowledgeOperationsHandover(handoverId, note);
+  if (!result.success) throw new Error(result.message);
+
+  revalidatePath('/modules/operations');
+  revalidatePath('/modules/operations/orders');
+  revalidatePath(`/modules/operations/orders/${orderId}`);
 }
 
 export async function createInventoryItemAction(
