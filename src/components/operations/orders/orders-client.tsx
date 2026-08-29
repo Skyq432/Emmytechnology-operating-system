@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useActionState, useMemo, useState } from 'react';
 import { ClipboardList, Plus, Search } from 'lucide-react';
 import { createOrderAction, type OperationsActionState } from '@/app/modules/operations/actions';
@@ -132,7 +133,7 @@ export function OrdersClient({
               <tbody className="divide-y divide-slate-100">
                 {filtered.map((order) => (
                   <tr key={order.id} className="hover:bg-slate-50/70">
-                    <td className="px-5 py-4 font-black text-[#032489]">{order.order_code}</td>
+                    <td className="px-5 py-4 font-black"><Link href={`/modules/operations/orders/${order.id}`} className="text-[#032489] hover:underline">{order.order_code}</Link></td>
                     <td className="px-5 py-4"><div className="font-bold text-slate-800">{order.customer_name || order.reference_label || 'Internal order'}</div><div className="mt-1 text-xs text-slate-400">{order.source_type}{order.source_reference ? ` · ${order.source_reference}` : ''}</div></td>
                     <td className="px-5 py-4"><span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-black text-emerald-800">{getOrderStatusLabel(order.status)}</span></td>
                     <td className="px-5 py-4 font-semibold text-slate-600">{order.current_team || 'Unassigned'}</td>
