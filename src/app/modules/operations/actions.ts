@@ -12,6 +12,12 @@ import {
   acknowledgeOperationsHandover,
   createOperationsHandover,
 } from '@/lib/operations/tracking-server';
+import { updateDraftOrderAttribution } from '@/lib/operations/attribution-server';
+import {
+  cancelOperationsTransfer,
+  receiveOperationsTransfer,
+  startOperationsTransfer,
+} from '@/lib/operations/transfer-server';
 import type { OrderStatus } from '@/lib/operations/domain';
 import type {
   FulfilmentSource,
@@ -19,6 +25,7 @@ import type {
   OperationsSource,
   WebsiteRelationshipType,
 } from '@/lib/operations/types';
+import type { TransferCarrierType } from '@/lib/operations/transfer';
 
 export type OperationsActionState = { success: boolean; message: string };
 
@@ -66,12 +73,25 @@ export async function createOrderAction(
       note: String(formData.get('item_note') || ''),
     }],
   });
-
   if (result.success) {
     revalidatePath('/modules/operations');
     revalidatePath('/modules/operations/orders');
   }
   return { success: result.success, message: result.message };
+}
+
+export async function updateDraftAttributionAction(formData: FormData) {
+  const orderId = String(formData.get('order_id') || '');
+  if (!orderId) return;
+  const result = await updateDraftOrderAttribution({
+    orderId,
+    ambassadorId: String(formData.get('ambassador_id') || '') || null,
+    commissionRate: Number(formData.get('commission_rate') || 0),
+    attributionSource: String(formData.get('attribution_source') || 'manual_admin') === 'automatic' ? 'automatic' : 'manual_admin',
+  });
+  if (!result.success) throw new Error(result.message);
+  revalidatePath('/modules/operations/orders');
+  revalidatePath(`/modules/operations/orders/${orderId}`);
 }
 
 export async function confirmOrderAction(formData: FormData) {
@@ -128,7 +148,6 @@ export async function createInventoryItemAction(
 ): Promise<OperationsActionState> {
   const name = String(formData.get('name') || '').trim();
   if (!name) return { success: false, message: 'Item name is required.' };
-
   const result = await createInventoryItem({
     name,
     description: String(formData.get('description') || ''),
@@ -137,7 +156,6 @@ export async function createInventoryItemAction(
     serialTracking: formData.get('serial_tracking') === 'on',
     reorderLevel: Number(formData.get('reorder_level') || 0),
   });
-
   if (result.success) {
     revalidatePath('/modules/operations');
     revalidatePath('/modules/operations/inventory');
@@ -146,15 +164,61 @@ export async function createInventoryItemAction(
   return { success: result.success, message: result.message };
 }
 
+export async function startTransferAction(
+  _previousState: OperationsActionState,
+  formData: FormData
+): Promise<OperationsActionState> {
+  const result = await startOperationsTransfer({
+    inventoryItemId: String(formData.get('inventory_item_id') || ''),
+    fromLocationId: String(formData.get('from_location_id') || ''),
+    toLocationId: String(formData.get('to_location_id') || ''),
+    quantity: Math.max(1, Number(formData.get('quantity') || 1)),
+    orderId: String(formData.get('order_id') || '') || null,
+    orderItemId: String(formData.get('order_item_id') || '') || null,
+    carrierType: String(formData.get('carrier_type') || 'other') as TransferCarrierType,
+    carrierUserId: String(formData.get('carrier_user_id') || '') || null,
+    carrierName: String(formData.get('carrier_name') || ''),
+    carrierPhone: String(formData.get('carrier_phone') || ''),
+    carrierReference: String(formData.get('carrier_reference') || ''),
+    reason: String(formData.get('reason') || ''),
+    note: String(formData.get('note') || ''),
+  });
+  if (result.success) {
+    revalidatePath('/modules/operations');
+    revalidatePath('/modules/operations/inventory');
+    revalidatePath('/modules/operations/transfers');
+    if (result.orderId) revalidatePath(`/modules/operations/orders/${result.orderId}`);
+  }
+  return { success: result.success, message: result.message };
+}
+
+export async function receiveTransferAction(formData: FormData) {
+  const transferId = String(formData.get('transfer_id') || '');
+  if (!transferId) return;
+  const result = await receiveOperationsTransfer(transferId, String(formData.get('note') || ''));
+  if (!result.success) throw new Error(result.message);
+  revalidatePath('/modules/operations');
+  revalidatePath('/modules/operations/inventory');
+  revalidatePath('/modules/operations/transfers');
+}
+
+export async function cancelTransferAction(formData: FormData) {
+  const transferId = String(formData.get('transfer_id') || '');
+  if (!transferId) return;
+  const result = await cancelOperationsTransfer(transferId, String(formData.get('note') || ''));
+  if (!result.success) throw new Error(result.message);
+  revalidatePath('/modules/operations');
+  revalidatePath('/modules/operations/inventory');
+  revalidatePath('/modules/operations/transfers');
+}
+
 export async function createWebsiteLinkAction(
   _previousState: OperationsActionState,
   formData: FormData
 ): Promise<OperationsActionState> {
   const inventoryItemId = String(formData.get('inventory_item_id') || '');
   const websiteProductId = String(formData.get('website_product_id') || '');
-  if (!inventoryItemId || !websiteProductId) {
-    return { success: false, message: 'Choose an inventory item and a website product.' };
-  }
+  if (!inventoryItemId || !websiteProductId) return { success: false, message: 'Choose an inventory item and a website product.' };
   const allocationRaw = String(formData.get('website_allocation') || '').trim();
   const result = await createWebsiteProductLink({
     inventoryItemId,
