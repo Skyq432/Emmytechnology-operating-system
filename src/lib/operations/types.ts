@@ -1,14 +1,32 @@
 import type { OrderStatus } from './domain';
+import type { CommercialState, CommissionStatus, PaymentStatus } from './commercial';
 
 export type OperationsPriority = 'low' | 'normal' | 'high' | 'urgent';
 export type OperationsSource = 'manual' | 'crm' | 'website' | 'whatsapp' | 'internal' | 'other';
-export type WebsiteRelationshipType =
-  | 'stocked'
-  | 'preorder'
-  | 'on_demand'
-  | 'dropship'
-  | 'service'
-  | 'display_only';
+export type WebsiteRelationshipType = 'stocked' | 'preorder' | 'on_demand' | 'dropship' | 'service' | 'display_only';
+export type FulfilmentSource = 'internal' | 'supplier' | 'dropship' | 'manual';
+
+export interface OperationsIdentitySummary {
+  id: string;
+  identity_code: string;
+  primary_name: string | null;
+  primary_phone: string | null;
+  primary_email: string | null;
+  crm_stage: number;
+  crm_stage_name: string;
+  lead_id: string | null;
+  ambassador_id: string | null;
+  ambassador_name: string | null;
+  acquisition_source: string | null;
+  cash_off_balance: number;
+}
+
+export interface OperationsLocation {
+  id: string;
+  code: string;
+  name: string;
+  location_type: string;
+}
 
 export interface OperationsOverview {
   openOrders: number;
@@ -27,9 +45,30 @@ export interface OperationsOrder {
   source_type: OperationsSource;
   source_reference: string | null;
   reference_label: string | null;
+  identity_id: string | null;
+  lead_id: string | null;
+  ambassador_id: string | null;
+  conversion_id: string | null;
   customer_name: string | null;
   customer_phone: string | null;
   customer_email: string | null;
+  commercial_state: CommercialState;
+  acquisition_source: string | null;
+  attribution_note: string | null;
+  subtotal: number;
+  discount_type: string | null;
+  discount_amount: number;
+  discount_percentage: number;
+  discount_reason: string | null;
+  cash_off_amount: number;
+  delivery_charge: number;
+  total_amount: number;
+  amount_paid: number;
+  payment_status: PaymentStatus;
+  commission_rate: number;
+  commission_amount: number;
+  commission_status: CommissionStatus;
+  confirmed_at: string | null;
   status: OrderStatus;
   priority: OperationsPriority;
   current_team: string | null;
@@ -49,6 +88,11 @@ export interface OperationsOrderItem {
   quantity: number;
   quantity_reserved: number;
   unit_price: number | null;
+  list_price: number | null;
+  line_discount_amount: number;
+  line_total: number;
+  fulfilment_source: FulfilmentSource;
+  source_location_id: string | null;
   note: string | null;
 }
 
@@ -102,6 +146,16 @@ export interface OperationsInventoryItem {
   created_at: string;
   updated_at: string;
   on_hand?: number;
+  reserved?: number;
+  available?: number;
+  location_balances?: Array<{
+    location_id: string;
+    location_code: string;
+    location_name: string;
+    on_hand: number;
+    reserved: number;
+    available: number;
+  }>;
 }
 
 export interface OperationsWebsiteLink {
