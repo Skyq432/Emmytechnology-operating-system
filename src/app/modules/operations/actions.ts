@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import {
   changeOperationsOrderStatus,
+  confirmOperationsOrder,
   createInventoryItem,
   createOperationsOrder,
   createWebsiteProductLink,
@@ -13,15 +14,13 @@ import {
 } from '@/lib/operations/tracking-server';
 import type { OrderStatus } from '@/lib/operations/domain';
 import type {
+  FulfilmentSource,
   OperationsPriority,
   OperationsSource,
   WebsiteRelationshipType,
 } from '@/lib/operations/types';
 
-export type OperationsActionState = {
-  success: boolean;
-  message: string;
-};
+export type OperationsActionState = { success: boolean; message: string };
 
 export async function createOrderAction(
   _previousState: OperationsActionState,
@@ -29,37 +28,61 @@ export async function createOrderAction(
 ): Promise<OperationsActionState> {
   const itemName = String(formData.get('item_name') || '').trim();
   const quantity = Math.max(1, Number(formData.get('quantity') || 1));
-
   if (!itemName) return { success: false, message: 'Item name is required.' };
 
+  const unitPrice = Math.max(0, Number(formData.get('unit_price') || 0));
+  const listPrice = Math.max(0, Number(formData.get('list_price') || unitPrice));
   const result = await createOperationsOrder({
     sourceType: String(formData.get('source_type') || 'manual') as OperationsSource,
     sourceReference: String(formData.get('source_reference') || ''),
     referenceLabel: String(formData.get('reference_label') || ''),
+    identityId: String(formData.get('identity_id') || '') || null,
+    leadId: String(formData.get('lead_id') || '') || null,
+    ambassadorId: String(formData.get('ambassador_id') || '') || null,
     customerName: String(formData.get('customer_name') || ''),
     customerPhone: String(formData.get('customer_phone') || ''),
     customerEmail: String(formData.get('customer_email') || ''),
     priority: String(formData.get('priority') || 'normal') as OperationsPriority,
     currentTeam: String(formData.get('current_team') || 'Operations'),
     dueAt: String(formData.get('due_at') || '') || null,
-    items: [
-      {
-        inventoryItemId: String(formData.get('inventory_item_id') || '') || null,
-        websiteProductId: String(formData.get('website_product_id') || '') || null,
-        itemName,
-        quantity,
-        unitPrice: formData.get('unit_price') ? Number(formData.get('unit_price')) : null,
-        note: String(formData.get('item_note') || ''),
-      },
-    ],
+    discountType: String(formData.get('discount_type') || ''),
+    discountAmount: Number(formData.get('discount_amount') || 0),
+    discountPercentage: Number(formData.get('discount_percentage') || 0),
+    discountReason: String(formData.get('discount_reason') || ''),
+    cashOffAmount: Number(formData.get('cash_off_amount') || 0),
+    deliveryCharge: Number(formData.get('delivery_charge') || 0),
+    commissionRate: Number(formData.get('commission_rate') || 0),
+    acquisitionSource: String(formData.get('acquisition_source') || ''),
+    items: [{
+      inventoryItemId: String(formData.get('inventory_item_id') || '') || null,
+      websiteProductId: String(formData.get('website_product_id') || '') || null,
+      itemName,
+      quantity,
+      unitPrice,
+      listPrice,
+      lineDiscountAmount: Number(formData.get('line_discount_amount') || 0),
+      fulfilmentSource: String(formData.get('fulfilment_source') || 'manual') as FulfilmentSource,
+      sourceLocationId: String(formData.get('source_location_id') || '') || null,
+      note: String(formData.get('item_note') || ''),
+    }],
   });
 
   if (result.success) {
     revalidatePath('/modules/operations');
     revalidatePath('/modules/operations/orders');
   }
-
   return { success: result.success, message: result.message };
+}
+
+export async function confirmOrderAction(formData: FormData) {
+  const orderId = String(formData.get('order_id') || '');
+  if (!orderId) return;
+  const result = await confirmOperationsOrder(orderId);
+  if (!result.success) throw new Error(result.message);
+  revalidatePath('/modules/operations');
+  revalidatePath('/modules/operations/orders');
+  revalidatePath('/modules/operations/inventory');
+  revalidatePath(`/modules/operations/orders/${orderId}`);
 }
 
 export async function changeOrderStatusAction(formData: FormData) {
@@ -67,10 +90,8 @@ export async function changeOrderStatusAction(formData: FormData) {
   const status = String(formData.get('status') || '') as OrderStatus;
   const note = String(formData.get('note') || '');
   if (!orderId || !status) return;
-
   const result = await changeOperationsOrderStatus(orderId, status, note);
   if (!result.success) throw new Error(result.message);
-
   revalidatePath('/modules/operations');
   revalidatePath('/modules/operations/orders');
   revalidatePath(`/modules/operations/orders/${orderId}`);
@@ -82,10 +103,8 @@ export async function createHandoverAction(formData: FormData) {
   const toUserId = String(formData.get('to_user_id') || '') || null;
   const note = String(formData.get('note') || '');
   if (!orderId || !toTeam) return;
-
   const result = await createOperationsHandover({ orderId, toTeam, toUserId, note });
   if (!result.success) throw new Error(result.message);
-
   revalidatePath('/modules/operations');
   revalidatePath('/modules/operations/orders');
   revalidatePath(`/modules/operations/orders/${orderId}`);
@@ -96,10 +115,8 @@ export async function acknowledgeHandoverAction(formData: FormData) {
   const orderId = String(formData.get('order_id') || '');
   const note = String(formData.get('note') || '');
   if (!handoverId || !orderId) return;
-
   const result = await acknowledgeOperationsHandover(handoverId, note);
   if (!result.success) throw new Error(result.message);
-
   revalidatePath('/modules/operations');
   revalidatePath('/modules/operations/orders');
   revalidatePath(`/modules/operations/orders/${orderId}`);
@@ -109,12 +126,10 @@ export async function createInventoryItemAction(
   _previousState: OperationsActionState,
   formData: FormData
 ): Promise<OperationsActionState> {
-  const sku = String(formData.get('sku') || '').trim();
   const name = String(formData.get('name') || '').trim();
-  if (!sku || !name) return { success: false, message: 'SKU and item name are required.' };
+  if (!name) return { success: false, message: 'Item name is required.' };
 
   const result = await createInventoryItem({
-    sku,
     name,
     description: String(formData.get('description') || ''),
     category: String(formData.get('category') || ''),
@@ -128,7 +143,6 @@ export async function createInventoryItemAction(
     revalidatePath('/modules/operations/inventory');
     revalidatePath('/modules/operations/website-links');
   }
-
   return { success: result.success, message: result.message };
 }
 
@@ -141,7 +155,6 @@ export async function createWebsiteLinkAction(
   if (!inventoryItemId || !websiteProductId) {
     return { success: false, message: 'Choose an inventory item and a website product.' };
   }
-
   const allocationRaw = String(formData.get('website_allocation') || '').trim();
   const result = await createWebsiteProductLink({
     inventoryItemId,
@@ -150,11 +163,9 @@ export async function createWebsiteLinkAction(
     websiteAllocation: allocationRaw ? Math.max(0, Number(allocationRaw)) : null,
     stockSyncEnabled: formData.get('stock_sync_enabled') === 'on',
   });
-
   if (result.success) {
     revalidatePath('/modules/operations');
     revalidatePath('/modules/operations/website-links');
   }
-
   return { success: result.success, message: result.message };
 }
