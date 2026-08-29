@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:operations": "node --experimental-strip-types --test src/lib/operations/*.test.ts"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",
