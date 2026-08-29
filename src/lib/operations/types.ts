@@ -65,6 +65,30 @@ export interface OperationsOrderEvent {
   created_at: string;
 }
 
+export interface OperationsHandover {
+  id: string;
+  order_id: string;
+  from_team: string | null;
+  from_user_id: string | null;
+  to_team: string;
+  to_user_id: string | null;
+  note: string | null;
+  status: 'pending' | 'acknowledged' | 'cancelled';
+  acknowledged_by: string | null;
+  acknowledged_at: string | null;
+  acknowledgement_note: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OperationsOrderDetail {
+  order: OperationsOrder;
+  events: OperationsOrderEvent[];
+  handoffs: OperationsHandover[];
+  users: Array<{ id: string; name: string | null; email: string | null }>;
+}
+
 export interface OperationsInventoryItem {
   id: string;
   sku: string;
