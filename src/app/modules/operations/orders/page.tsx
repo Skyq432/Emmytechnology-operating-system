@@ -3,6 +3,7 @@ import {
   getOperationsLocations,
   getWebsiteProductLinks,
 } from '@/lib/operations/server';
+import { getOperationsAmbassadors } from '@/lib/operations/attribution-server';
 import {
   getOperationsInventoryForRange,
   getOperationsOrdersForRange,
@@ -11,11 +12,12 @@ import {
 
 export default async function OperationsOrdersPage() {
   const range = await getOperationsReportingRange();
-  const [orders, inventory, locations, websiteLinkData] = await Promise.all([
+  const [orders, inventory, locations, websiteLinkData, ambassadors] = await Promise.all([
     getOperationsOrdersForRange(range),
     getOperationsInventoryForRange(range),
     getOperationsLocations(),
     getWebsiteProductLinks(),
+    getOperationsAmbassadors(),
   ]);
 
   return (
@@ -24,6 +26,7 @@ export default async function OperationsOrdersPage() {
       inventory={inventory}
       locations={locations}
       websiteProducts={websiteLinkData.websiteProducts}
+      ambassadors={ambassadors}
     />
   );
 }
