@@ -1,14 +1,16 @@
 import { OrdersClient } from '@/components/operations/orders/orders-client';
 import {
   getOperationsInventory,
+  getOperationsLocations,
   getOperationsOrders,
   getWebsiteProductLinks,
 } from '@/lib/operations/server';
 
 export default async function OperationsOrdersPage() {
-  const [orders, inventory, websiteLinkData] = await Promise.all([
+  const [orders, inventory, locations, websiteLinkData] = await Promise.all([
     getOperationsOrders(),
     getOperationsInventory(),
+    getOperationsLocations(),
     getWebsiteProductLinks(),
   ]);
 
@@ -16,6 +18,7 @@ export default async function OperationsOrdersPage() {
     <OrdersClient
       orders={orders}
       inventory={inventory}
+      locations={locations}
       websiteProducts={websiteLinkData.websiteProducts}
     />
   );
