@@ -2,16 +2,18 @@ import { createClient } from '@/lib/supabase-server';
 import type { OperationsIdentitySummary } from './types';
 
 const stageNames: Record<number, string> = {
-  1: 'Awareness',
-  2: 'Interest',
-  3: 'Consideration',
-  4: 'Intent',
-  5: 'Purchase',
-  6: 'Onboarding',
-  7: 'Satisfaction',
-  8: 'Loyalty',
-  9: 'Expansion',
-  10: 'Advocacy',
+  1: 'Awareness', 2: 'Interest', 3: 'Consideration', 4: 'Intent', 5: 'Purchase',
+  6: 'Onboarding', 7: 'Satisfaction', 8: 'Loyalty', 9: 'Expansion', 10: 'Advocacy',
+};
+
+type LeadRow = {
+  id: string;
+  identity_id: string | null;
+  ambassador_id: string | null;
+  source: string;
+  funnel_stage: string | null;
+  updated_at: string | null;
+  created_at: string | null;
 };
 
 async function requireAdmin() {
@@ -70,42 +72,27 @@ export async function searchOperationsIdentities(query: string): Promise<Operati
 
   const ids = identities.map((row) => row.id);
   const [leadsResult, ownershipResult, cashOffResult] = await Promise.all([
-    supabase
-      .from('leads')
-      .select('id,identity_id,ambassador_id,source,funnel_stage,updated_at,created_at')
-      .in('identity_id', ids)
-      .order('updated_at', { ascending: false }),
-    supabase
-      .from('crm_lead_ownership')
-      .select('identity_id,original_ambassador_id,owner_type,owner_id,owner_label,updated_at')
-      .in('identity_id', ids),
-    supabase
-      .from('cash_off_accounts')
-      .select('identity_id,balance')
-      .in('identity_id', ids),
+    supabase.from('leads').select('id,identity_id,ambassador_id,source,funnel_stage,updated_at,created_at').in('identity_id', ids).order('updated_at', { ascending: false }),
+    supabase.from('crm_lead_ownership').select('identity_id,original_ambassador_id,owner_type,owner_id,owner_label,updated_at').in('identity_id', ids),
+    supabase.from('cash_off_accounts').select('identity_id,balance').in('identity_id', ids),
   ]);
   if (leadsResult.error) throw new Error(leadsResult.error.message);
   if (ownershipResult.error) throw new Error(ownershipResult.error.message);
   if (cashOffResult.error) throw new Error(cashOffResult.error.message);
 
-  const leadByIdentity = new Map<string, (typeof leadsResult.data)[number]>();
-  for (const row of leadsResult.data || []) {
-    if (!leadByIdentity.has(row.identity_id)) leadByIdentity.set(row.identity_id, row);
+  const leadByIdentity = new Map<string, LeadRow>();
+  for (const row of (leadsResult.data || []) as LeadRow[]) {
+    if (row.identity_id && !leadByIdentity.has(row.identity_id)) leadByIdentity.set(row.identity_id, row);
   }
 
   const ownershipByIdentity = new Map((ownershipResult.data || []).map((row) => [row.identity_id, row]));
   const cashOffByIdentity = new Map((cashOffResult.data || []).map((row) => [row.identity_id, Number(row.balance || 0)]));
 
-  const ambassadorIds = Array.from(
-    new Set(
-      identities
-        .flatMap((identity) => {
-          const lead = leadByIdentity.get(identity.id);
-          const ownership = ownershipByIdentity.get(identity.id);
-          return [ownership?.original_ambassador_id, lead?.ambassador_id].filter(Boolean) as string[];
-        })
-    )
-  );
+  const ambassadorIds = Array.from(new Set(identities.flatMap((identity) => {
+    const lead = leadByIdentity.get(identity.id);
+    const ownership = ownershipByIdentity.get(identity.id);
+    return [ownership?.original_ambassador_id, lead?.ambassador_id].filter(Boolean) as string[];
+  })));
 
   const ambassadorMap = new Map<string, string>();
   if (ambassadorIds.length) {
@@ -122,42 +109,30 @@ export async function searchOperationsIdentities(query: string): Promise<Operati
       for (const user of users || []) userMap.set(user.id, user.name || user.email || 'Ambassador');
     }
     for (const ambassador of ambassadors || []) {
-      ambassadorMap.set(
-        ambassador.id,
-        ambassador.display_name || userMap.get(ambassador.user_id) || ambassador.ambassador_tag || 'Ambassador'
-      );
+      ambassadorMap.set(ambassador.id, ambassador.display_name || userMap.get(ambassador.user_id) || ambassador.ambassador_tag || 'Ambassador');
     }
   }
 
-  const summaries = await Promise.all(
-    identities.map(async (identity) => {
-      const lead = leadByIdentity.get(identity.id);
-      const ownership = ownershipByIdentity.get(identity.id);
-      const ambassadorId = ownership?.original_ambassador_id || lead?.ambassador_id || null;
-      const { data: stage } = await supabase.rpc('ops_current_crm_stage', { p_identity_id: identity.id });
-      const crmStage = Number(stage || 0);
+  return Promise.all(identities.map(async (identity) => {
+    const lead = leadByIdentity.get(identity.id);
+    const ownership = ownershipByIdentity.get(identity.id);
+    const ambassadorId = ownership?.original_ambassador_id || lead?.ambassador_id || null;
+    const { data: stage } = await supabase.rpc('ops_current_crm_stage', { p_identity_id: identity.id });
+    const crmStage = Number(stage || 0);
 
-      return {
-        id: identity.id,
-        identity_code: identity.identity_code,
-        primary_name: identity.primary_name,
-        primary_phone: identity.primary_phone,
-        primary_email: identity.primary_email,
-        crm_stage: crmStage,
-        crm_stage_name: stageNames[crmStage] || 'Unknown',
-        lead_id: lead?.id || null,
-        ambassador_id: ambassadorId,
-        ambassador_name: ambassadorId ? ambassadorMap.get(ambassadorId) || 'Ambassador' : null,
-        acquisition_source: lead?.source || null,
-        cash_off_balance: cashOffByIdentity.get(identity.id) || 0,
-      } satisfies OperationsIdentitySummary;
-    })
-  );
-
-  return summaries;
-}
-
-export async function getOperationsIdentitySummary(identityId: string) {
-  const matches = await searchOperationsIdentities(identityId);
-  return matches.find((item) => item.id === identityId) || null;
+    return {
+      id: identity.id,
+      identity_code: identity.identity_code,
+      primary_name: identity.primary_name,
+      primary_phone: identity.primary_phone,
+      primary_email: identity.primary_email,
+      crm_stage: crmStage,
+      crm_stage_name: stageNames[crmStage] || 'Unknown',
+      lead_id: lead?.id || null,
+      ambassador_id: ambassadorId,
+      ambassador_name: ambassadorId ? ambassadorMap.get(ambassadorId) || 'Ambassador' : null,
+      acquisition_source: lead?.source || null,
+      cash_off_balance: cashOffByIdentity.get(identity.id) || 0,
+    } satisfies OperationsIdentitySummary;
+  }));
 }
