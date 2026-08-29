@@ -126,11 +126,26 @@ export interface OperationsHandover {
   updated_at: string;
 }
 
+export interface OperationsReservation {
+  id: string;
+  order_id: string;
+  order_item_id: string;
+  inventory_item_id: string;
+  location_id: string;
+  quantity: number;
+  status: 'active' | 'released' | 'fulfilled' | 'cancelled';
+  created_at: string;
+}
+
 export interface OperationsOrderDetail {
   order: OperationsOrder;
   events: OperationsOrderEvent[];
   handoffs: OperationsHandover[];
+  reservations: OperationsReservation[];
   users: Array<{ id: string; name: string | null; email: string | null }>;
+  locations: OperationsLocation[];
+  identity: { id: string; identity_code: string; primary_name: string | null; primary_phone: string | null; primary_email: string | null; crm_stage: number } | null;
+  ambassador: { id: string; name: string } | null;
 }
 
 export interface OperationsInventoryItem {
