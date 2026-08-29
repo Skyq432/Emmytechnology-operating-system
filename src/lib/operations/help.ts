@@ -3,13 +3,13 @@ export const OPERATIONS_NAV = [
     key: 'overview',
     href: '/modules/operations',
     label: 'Overview',
-    help: 'See the most important Operations work in one place: open orders, urgent work, stock and recent activity.',
+    help: 'See the most important Operations work in one place: orders, stock, transfers and recent activity.',
   },
   {
     key: 'orders',
     href: '/modules/operations/orders',
     label: 'Orders',
-    help: 'Track what needs to be done for a customer and see which team is handling it now.',
+    help: 'Track customer orders, money, commission, fulfilment and what should happen next.',
   },
   {
     key: 'products',
@@ -21,7 +21,13 @@ export const OPERATIONS_NAV = [
     key: 'inventory',
     href: '/modules/operations/inventory',
     label: 'Inventory',
-    help: 'Keep track of items EmmyTech has or uses inside the business. An inventory item does not have to be on the website.',
+    help: 'See what EmmyTech has at Sango, UI or In Transit, including reserved and available quantities.',
+  },
+  {
+    key: 'transfers',
+    href: '/modules/operations/transfers',
+    label: 'Transfers',
+    help: 'Move EmmyTech stock between locations. A transfer can be for restocking or linked to a customer Order.',
   },
   {
     key: 'websiteLinks',
@@ -32,16 +38,17 @@ export const OPERATIONS_NAV = [
 ] as const;
 
 export const OPERATIONS_HELP: Record<string, string> = {
-  openOrders: 'Orders EmmyTech has started but has not finished or cancelled yet.',
-  urgent: 'Active orders marked urgent because they need faster attention.',
-  dispatch: 'Orders that are ready to leave EmmyTech or are already on the way.',
+  openOrders: 'Orders in the selected period that are not completed or cancelled.',
+  urgent: 'Orders in the selected period marked urgent because they need faster attention.',
+  dispatch: 'Orders in the selected period that are ready to leave EmmyTech or are already on the way.',
   inventoryItems: 'The number of internal items Operations is keeping track of.',
   lowStock: 'Items that are at or below the quantity where we should think about restocking.',
   websiteLinks: 'Links between internal inventory and products customers can see on the website.',
-  recentOrders: 'The latest orders the Operations team has worked on.',
-  activityTimeline: 'A simple history of order changes and team handovers.',
-  createOrder: 'Create a new internal order so the team can track it from start to finish.',
-  createInventory: 'Add an item that EmmyTech needs to track inside the business.',
+  recentOrders: 'The latest orders inside the selected reporting period.',
+  activityTimeline: 'Important Operations activity inside the selected reporting period.',
+  createOrder: 'Create a Draft first. Confirm only when the sale is real; confirmation can reserve stock and create pending commission.',
+  createInventory: 'Add an item that EmmyTech needs to track inside the business. The SKU is created automatically.',
+  createTransfer: 'Move stock from one EmmyTech location to another. The item goes through In Transit until the destination receives it.',
   createWebsiteLink: 'Connect an internal item to a website product. This is optional.',
   productManager: 'This is the same Product manager used in Marketing. Any change here changes the same website product record.',
 };
