@@ -1,7 +1,11 @@
 import { OperationsOverview } from '@/components/operations/operations-overview';
-import { getOperationsOverview } from '@/lib/operations/server';
+import {
+  getOperationsOverviewForRange,
+  getOperationsReportingRange,
+} from '@/lib/operations/reporting-server';
 
 export default async function OperationsPage() {
-  const data = await getOperationsOverview();
+  const range = await getOperationsReportingRange();
+  const data = await getOperationsOverviewForRange(range);
   return <OperationsOverview data={data} />;
 }
