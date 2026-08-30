@@ -77,7 +77,7 @@ export function OperationsShell({ children }: { children: React.ReactNode }) {
                     <Icon className="h-[18px] w-[18px] shrink-0" />
                     <span className="truncate">{item.label}</span>
                   </Link>
-                  <div className={active ? 'rounded-full bg-white' : 'rounded-full bg-white/10'}><HelpTip text={item.help} label={`About ${item.label}`} /></div>
+                  <div className={active ? 'text-[#003399]' : 'text-[#9eb4d9]'}><HelpTip text={item.help} label={`About ${item.label}`} /></div>
                 </div>
                 {isProduct && <p className="px-4 pt-2 text-[10px] leading-4 text-[#aebfdf]">Shared website catalogue</p>}
               </div>
