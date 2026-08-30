@@ -1,7 +1,17 @@
 import { randomInt } from 'node:crypto';
 import { createClient } from '@/lib/supabase-server';
 import { resolveOrCreateOperationsIdentity } from './identity-server';
-import type { PaymentMethod, RepairPaymentRequirement, RepairStatus } from './types';
+import type {
+  OperationsRepair,
+  OperationsRepairCardAssignment,
+  OperationsRepairConsent,
+  OperationsRepairEvent,
+  OperationsRepairPayment,
+  OperationsRepairQuote,
+  PaymentMethod,
+  RepairPaymentRequirement,
+  RepairStatus,
+} from './types';
 
 const REPAIR_PIN_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
@@ -27,6 +37,79 @@ export async function getAvailableRepairCards() {
     .order('card_code');
   if (error) throw new Error(error.message);
   return data || [];
+}
+
+export async function getRepairAdminDetail(repairId: string) {
+  const { supabase } = await requireAdmin();
+  const [repairResult, assignmentsResult, quotesResult, paymentsResult, consentsResult, eventsResult] = await Promise.all([
+    supabase.from('ops_repairs').select('*').eq('id', repairId).single(),
+    supabase.from('ops_repair_card_assignments').select('*,card:ops_repair_cards(*)').eq('repair_id', repairId).order('assigned_at', { ascending: false }),
+    supabase.from('ops_repair_quotes').select('*').eq('repair_id', repairId).order('version', { ascending: false }),
+    supabase.from('ops_repair_payments').select('*').eq('repair_id', repairId).order('paid_at', { ascending: false }),
+    supabase.from('ops_repair_consents').select('*').eq('repair_id', repairId).order('created_at', { ascending: false }),
+    supabase.from('ops_repair_events').select('*').eq('repair_id', repairId).order('created_at', { ascending: false }),
+  ]);
+
+  const error = repairResult.error || assignmentsResult.error || quotesResult.error || paymentsResult.error || consentsResult.error || eventsResult.error;
+  if (error) throw new Error(error.message);
+
+  const repair = {
+    ...repairResult.data,
+    parts_cost: Number(repairResult.data.parts_cost || 0),
+    labour_cost: Number(repairResult.data.labour_cost || 0),
+    amount_charged: Number(repairResult.data.amount_charged || 0),
+    repair_profit: Number(repairResult.data.repair_profit || 0),
+    amount_paid: Number(repairResult.data.amount_paid || 0),
+    balance_due: Number(repairResult.data.balance_due || 0),
+  } as OperationsRepair;
+
+  const assignments = (assignmentsResult.data || []) as OperationsRepairCardAssignment[];
+  const quotes = (quotesResult.data || []).map((row) => ({
+    ...row,
+    quote_amount: Number(row.quote_amount || 0),
+    required_before_start: Number(row.required_before_start || 0),
+  })) as OperationsRepairQuote[];
+  const payments = (paymentsResult.data || []).map((row) => ({ ...row, amount: Number(row.amount || 0) })) as OperationsRepairPayment[];
+
+  return {
+    repair,
+    activeAssignment: assignments.find((row) => row.status === 'active') || null,
+    assignmentHistory: assignments,
+    currentQuote: quotes.find((row) => row.id === repair.current_quote_id) || null,
+    quoteHistory: quotes,
+    payments,
+    consents: (consentsResult.data || []) as OperationsRepairConsent[],
+    events: (eventsResult.data || []) as OperationsRepairEvent[],
+  };
+}
+
+export async function updateRepairWorkDetails(input: {
+  repairId: string;
+  diagnosis?: string | null;
+  repairType?: string | null;
+  partsReplaced?: string | null;
+  partsCost?: number;
+  labourCost?: number;
+  technicianName?: string | null;
+  conditionReturned?: string | null;
+  warrantyPeriod?: string | null;
+  warrantyExpiresAt?: string | null;
+  notes?: string | null;
+}) {
+  const { supabase } = await requireAdmin();
+  const { error } = await supabase.from('ops_repairs').update({
+    diagnosis: input.diagnosis?.trim() || null,
+    repair_type: input.repairType?.trim() || null,
+    parts_replaced: input.partsReplaced?.trim() || null,
+    parts_cost: Math.max(0, Number(input.partsCost || 0)),
+    labour_cost: Math.max(0, Number(input.labourCost || 0)),
+    technician_name: input.technicianName?.trim() || null,
+    condition_returned: input.conditionReturned?.trim() || null,
+    warranty_period: input.warrantyPeriod?.trim() || null,
+    warranty_expires_at: input.warrantyExpiresAt || null,
+    notes: input.notes?.trim() || null,
+  }).eq('id', input.repairId);
+  return error ? { success: false as const, message: error.message } : { success: true as const, message: 'Repair work details saved' };
 }
 
 export async function createRepairWithCard(input: {
