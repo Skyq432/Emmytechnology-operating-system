@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import type { PaymentMethod, RepairStatus, SolarInstallationStatus } from '@/lib/operations/types';
+import type { PaymentMethod, RepairPaymentRequirement, RepairStatus, SolarInstallationStatus } from '@/lib/operations/types';
 import type { OrderItemType } from '@/lib/operations/sales-model';
 import {
   createInventoryUnit,
@@ -10,10 +10,22 @@ import {
   saveSolarInstallation,
   updateDraftSalesDetails,
 } from '@/lib/operations/sales-server';
-import { advanceRepairWorkflow, createRepairWithCard } from '@/lib/operations/repair-server';
+import {
+  advanceRepairWorkflow,
+  createRepairWithCard,
+  publishRepairQuote,
+  recordRepairPayment,
+  regenerateRepairPin,
+  updateRepairWorkDetails,
+} from '@/lib/operations/repair-server';
 
 export type SalesActionState = { success: boolean; message: string };
 const initialFail = (message: string): SalesActionState => ({ success: false, message });
+
+function revalidateRepair(repairId: string) {
+  revalidatePath('/modules/operations/repairs');
+  revalidatePath(`/modules/operations/repairs/${repairId}`);
+}
 
 export async function recordOrderPaymentAction(_prev: SalesActionState, formData: FormData): Promise<SalesActionState> {
   const orderId = String(formData.get('order_id') || '');
@@ -142,15 +154,78 @@ export async function createRepairAction(_prev: SalesActionState, formData: Form
   return { success: false, message: result.message };
 }
 
-export async function updateRepairStatusAction(formData: FormData) {
+export async function saveRepairWorkAction(_prev: SalesActionState, formData: FormData): Promise<SalesActionState> {
+  const repairId = String(formData.get('repair_id') || '');
+  if (!repairId) return initialFail('Repair is required.');
+  const result = await updateRepairWorkDetails({
+    repairId,
+    diagnosis: String(formData.get('diagnosis') || ''),
+    repairType: String(formData.get('repair_type') || ''),
+    partsReplaced: String(formData.get('parts_replaced') || ''),
+    partsCost: Number(formData.get('parts_cost') || 0),
+    labourCost: Number(formData.get('labour_cost') || 0),
+    technicianName: String(formData.get('technician_name') || ''),
+    conditionReturned: String(formData.get('condition_returned') || ''),
+    warrantyPeriod: String(formData.get('warranty_period') || ''),
+    warrantyExpiresAt: String(formData.get('warranty_expires_at') || '') || null,
+    notes: String(formData.get('notes') || ''),
+  });
+  if (result.success) revalidateRepair(repairId);
+  return { success: result.success, message: result.message };
+}
+
+export async function publishRepairQuoteAction(_prev: SalesActionState, formData: FormData): Promise<SalesActionState> {
+  const repairId = String(formData.get('repair_id') || '');
+  const quoteAmount = Number(formData.get('quote_amount') || 0);
+  if (!repairId) return initialFail('Repair is required.');
+  if (quoteAmount < 0) return initialFail('Quote amount cannot be negative.');
+  const paymentRequirement = String(formData.get('payment_requirement') || 'none') as RepairPaymentRequirement;
+  const result = await publishRepairQuote({
+    repairId,
+    diagnosisPublic: String(formData.get('diagnosis_public') || ''),
+    workDescription: String(formData.get('work_description') || ''),
+    quoteAmount,
+    estimatedCompletion: String(formData.get('estimated_completion') || ''),
+    paymentRequirement,
+    requiredBeforeStart: Number(formData.get('required_before_start') || 0),
+  });
+  if (result.success) revalidateRepair(repairId);
+  return { success: result.success, message: result.message };
+}
+
+export async function recordRepairPaymentAction(_prev: SalesActionState, formData: FormData): Promise<SalesActionState> {
+  const repairId = String(formData.get('repair_id') || '');
+  const amount = Number(formData.get('amount') || 0);
+  if (!repairId) return initialFail('Repair is required.');
+  if (amount <= 0) return initialFail('Enter a payment amount greater than zero.');
+  const result = await recordRepairPayment({
+    repairId,
+    amount,
+    paymentMethod: String(formData.get('payment_method') || 'other') as PaymentMethod,
+    reference: String(formData.get('reference') || ''),
+    paidAt: String(formData.get('paid_at') || '') || null,
+    note: String(formData.get('note') || ''),
+  });
+  if (result.success) revalidateRepair(repairId);
+  return { success: result.success, message: result.message };
+}
+
+export async function regenerateRepairPinAction(_prev: SalesActionState, formData: FormData): Promise<SalesActionState> {
+  const repairId = String(formData.get('repair_id') || '');
+  if (!repairId) return initialFail('Repair is required.');
+  const result = await regenerateRepairPin(repairId);
+  if (result.success) revalidateRepair(repairId);
+  return { success: result.success, message: result.message };
+}
+
+export async function updateRepairStatusAction(_prev: SalesActionState, formData: FormData): Promise<SalesActionState> {
   const repairId = String(formData.get('repair_id') || '');
   const status = String(formData.get('status') || '') as RepairStatus;
   const note = String(formData.get('note') || '');
-  if (!repairId || !status) return;
+  if (!repairId || !status) return initialFail('Choose a valid repair action.');
   const result = await advanceRepairWorkflow(repairId, status, note);
-  if (!result.success) throw new Error(result.message);
-  revalidatePath('/modules/operations/repairs');
-  revalidatePath(`/modules/operations/repairs/${repairId}`);
+  if (result.success) revalidateRepair(repairId);
+  return { success: result.success, message: result.message };
 }
 
 export async function saveSolarInstallationAction(_prev: SalesActionState, formData: FormData): Promise<SalesActionState> {
