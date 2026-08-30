@@ -66,7 +66,7 @@ export function OperationsShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="flex flex-col gap-1.5">
-          {OPERATIONS_NAV.map((item, index) => {
+          {OPERATIONS_NAV.map((item) => {
             const active = item.href === '/modules/operations' ? pathname === item.href : pathname.startsWith(item.href);
             const Icon = iconMap[item.key];
             const isProduct = item.key === 'products';
