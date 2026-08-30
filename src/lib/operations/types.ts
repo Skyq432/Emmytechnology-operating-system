@@ -1,6 +1,8 @@
 import type { OrderStatus } from './domain';
 import type { CommercialState, CommissionStatus, PaymentStatus } from './commercial';
 import type { OrderItemType } from './sales-model';
+import type { RepairStatus, RepairPaymentRequirement, RepairQuoteStatus } from './repair-domain';
+export type { RepairStatus, RepairPaymentRequirement, RepairQuoteStatus } from './repair-domain';
 
 export type OperationsPriority = 'low' | 'normal' | 'high' | 'urgent';
 export type OperationsSource = 'manual' | 'crm' | 'website' | 'whatsapp' | 'internal' | 'other';
@@ -8,7 +10,9 @@ export type WebsiteRelationshipType = 'stocked' | 'preorder' | 'on_demand' | 'dr
 export type FulfilmentSource = 'internal' | 'supplier' | 'dropship' | 'manual';
 export type PaymentMethod = 'bank_transfer' | 'pos' | 'cash' | 'split' | 'other';
 export type InventoryUnitStatus = 'available' | 'reserved' | 'in_transit' | 'sold' | 'repair' | 'returned' | 'faulty' | 'retired';
-export type RepairStatus = 'received' | 'diagnosing' | 'awaiting_parts' | 'in_progress' | 'ready_collection' | 'collected' | 'cancelled';
+export type RepairCardStatus = 'available' | 'assigned' | 'missing' | 'retired';
+export type RepairCardAssignmentStatus = 'active' | 'closed';
+export type RepairConsentType = 'repair_authorization' | 'completion_acceptance' | 'unrepaired_return_acknowledgement';
 export type SolarInstallationStatus = 'not_required' | 'pending' | 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
 
 export interface OperationsIdentitySummary {
@@ -54,12 +58,51 @@ export interface OperationsInventoryUnit {
 
 export interface OperationsRepair {
   id: string; repair_code: string; identity_id: string | null; original_order_id: string | null; inventory_unit_id: string | null; customer_name: string | null;
-  customer_phone: string | null; received_at: string; completed_at: string | null; collected_at: string | null; device_type: string | null; brand: string | null;
+  customer_phone: string | null; customer_email: string | null; received_at: string; completed_at: string | null; collected_at: string | null; device_type: string | null; brand: string | null;
   model: string | null; serial_or_imei: string | null; purchased_from_us: 'yes' | 'no' | 'not_sure'; fault_reported: string; diagnosis: string | null;
   repair_type: string | null; parts_replaced: string | null; parts_cost: number; labour_cost: number; amount_charged: number; repair_profit: number; status: RepairStatus;
-  warranty_period: string | null; warranty_expires_at: string | null; condition_received: string | null; condition_returned: string | null;
+  warranty_period: string | null; warranty_expires_at: string | null; condition_received: string | null; condition_returned: string | null; accessories_received: string | null;
   payment_status: 'unpaid' | 'partial' | 'paid' | 'refunded'; amount_paid: number; balance_due: number; technician_user_id: string | null; technician_name: string | null;
-  notes: string | null; created_at: string; updated_at: string;
+  current_quote_id: string | null; current_card_assignment_id: string | null; notes: string | null; created_at: string; updated_at: string;
+}
+
+export interface OperationsRepairCard {
+  id: string; card_code: string; public_token: string; status: RepairCardStatus; created_by: string | null; created_at: string; updated_at: string;
+}
+
+export interface OperationsRepairCardAssignment {
+  id: string; card_id: string; repair_id: string; identity_id: string; access_pin: string; pin_version: number; status: RepairCardAssignmentStatus;
+  handover_started_at: string | null; handover_expires_at: string | null; assigned_by: string | null; closed_by: string | null; assigned_at: string; closed_at: string | null;
+  card?: OperationsRepairCard | null;
+}
+
+export interface OperationsRepairQuote {
+  id: string; repair_id: string; version: number; diagnosis_public: string | null; work_description: string | null; quote_amount: number; estimated_completion: string | null;
+  payment_requirement: RepairPaymentRequirement; required_before_start: number; status: RepairQuoteStatus; published_at: string | null; approved_at: string | null; declined_at: string | null;
+  created_by: string | null; created_at: string;
+}
+
+export interface OperationsRepairPayment {
+  id: string; repair_id: string; amount: number; payment_method: PaymentMethod; reference: string | null; paid_at: string; note: string | null; is_void: boolean;
+  voided_at: string | null; voided_by: string | null; recorded_by: string | null; created_at: string;
+}
+
+export interface OperationsRepairConsent {
+  id: string; repair_id: string; assignment_id: string; identity_id: string; quote_id: string | null; consent_type: RepairConsentType; consent_version: string;
+  snapshot: Record<string, unknown>; portal_session_id: string | null; created_at: string;
+}
+
+export interface OperationsRepairEvent {
+  id: string; repair_id: string; assignment_id: string | null; event_type: string; title: string; note: string | null; from_status: string | null; to_status: string | null;
+  customer_visible: boolean; metadata: Record<string, unknown>; actor_id: string | null; created_at: string;
+}
+
+export interface OperationsRepairPortalSession {
+  id: string; assignment_id: string; token_hash: string; pin_version: number; expires_at: string; revoked_at: string | null; created_at: string; last_seen_at: string | null;
+}
+
+export interface OperationsRepairAccessAttempt {
+  id: string; card_id: string; assignment_id: string | null; client_fingerprint: string | null; succeeded: boolean; created_at: string;
 }
 
 export interface OperationsSolarInstallation {
