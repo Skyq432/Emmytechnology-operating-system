@@ -6,12 +6,11 @@ import type { OrderItemType } from '@/lib/operations/sales-model';
 import {
   createInventoryUnit,
   createOperationsSupplier,
-  createRepair,
   recordOrderPayment,
   saveSolarInstallation,
   updateDraftSalesDetails,
-  updateRepairStatus,
 } from '@/lib/operations/sales-server';
+import { advanceRepairWorkflow, createRepairWithCard } from '@/lib/operations/repair-server';
 
 export type SalesActionState = { success: boolean; message: string };
 const initialFail = (message: string): SalesActionState => ({ success: false, message });
@@ -100,13 +99,18 @@ export async function createInventoryUnitAction(_prev: SalesActionState, formDat
 
 export async function createRepairAction(_prev: SalesActionState, formData: FormData): Promise<SalesActionState> {
   const fault = String(formData.get('fault_reported') || '').trim();
+  const cardId = String(formData.get('card_id') || '');
   if (!fault) return initialFail('Fault reported is required.');
-  const result = await createRepair({
+  if (!cardId) return initialFail('Choose an available Repair Card.');
+
+  const result = await createRepairWithCard({
+    cardId,
     identityId: String(formData.get('identity_id') || '') || null,
     originalOrderId: String(formData.get('original_order_id') || '') || null,
     inventoryUnitId: String(formData.get('inventory_unit_id') || '') || null,
     customerName: String(formData.get('customer_name') || ''),
     customerPhone: String(formData.get('customer_phone') || ''),
+    customerEmail: String(formData.get('customer_email') || ''),
     deviceType: String(formData.get('device_type') || ''),
     brand: String(formData.get('brand') || ''),
     model: String(formData.get('model') || ''),
@@ -123,19 +127,27 @@ export async function createRepairAction(_prev: SalesActionState, formData: Form
     warrantyExpiresAt: String(formData.get('warranty_expires_at') || '') || null,
     conditionReceived: String(formData.get('condition_received') || ''),
     conditionReturned: String(formData.get('condition_returned') || ''),
+    accessoriesReceived: String(formData.get('accessories_received') || ''),
     technicianUserId: String(formData.get('technician_user_id') || '') || null,
     technicianName: String(formData.get('technician_name') || ''),
     notes: String(formData.get('notes') || ''),
   });
-  if (result.success) revalidatePath('/modules/operations/repairs');
-  return { success: result.success, message: result.message };
+
+  if (result.success) {
+    revalidatePath('/modules/operations/repairs');
+    const data = result.data as { repair_code?: string; card_code?: string; access_pin?: string } | null;
+    const details = [data?.repair_code, data?.card_code, data?.access_pin ? `PIN ${data.access_pin}` : ''].filter(Boolean).join(' · ');
+    return { success: true, message: details ? `Repair created · ${details}` : result.message };
+  }
+  return { success: false, message: result.message };
 }
 
 export async function updateRepairStatusAction(formData: FormData) {
   const repairId = String(formData.get('repair_id') || '');
   const status = String(formData.get('status') || '') as RepairStatus;
+  const note = String(formData.get('note') || '');
   if (!repairId || !status) return;
-  const result = await updateRepairStatus(repairId, status);
+  const result = await advanceRepairWorkflow(repairId, status, note);
   if (!result.success) throw new Error(result.message);
   revalidatePath('/modules/operations/repairs');
   revalidatePath(`/modules/operations/repairs/${repairId}`);
