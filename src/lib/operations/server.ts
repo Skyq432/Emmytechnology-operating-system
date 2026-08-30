@@ -12,6 +12,7 @@ import type {
   FulfilmentSource,
 } from './types';
 import type { OrderStatus } from './domain';
+import { resolveOrCreateOperationsIdentity } from './identity-server';
 
 async function requireAdmin() {
   const supabase = await createClient();
@@ -178,11 +179,19 @@ export async function createOperationsOrder(input: {
   }>;
 }) {
   const { supabase } = await requireAdmin();
+  const identityId = await resolveOrCreateOperationsIdentity({
+    existingIdentityId: input.identityId,
+    name: input.customerName,
+    phone: input.customerPhone,
+    email: input.customerEmail,
+    source: 'operations_order',
+  });
+
   const { data, error } = await supabase.rpc('ops_create_draft_order', {
     p_source_type: input.sourceType,
     p_source_reference: input.sourceReference ?? '',
     p_reference_label: input.referenceLabel ?? '',
-    p_identity_id: input.identityId ?? null,
+    p_identity_id: identityId,
     p_lead_id: input.leadId ?? null,
     p_ambassador_id: input.ambassadorId ?? null,
     p_customer_name: input.customerName ?? '',
