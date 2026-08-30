@@ -12,12 +12,6 @@ export const OPERATIONS_NAV = [
     help: 'Track customer orders, money, commission, fulfilment and what should happen next.',
   },
   {
-    key: 'products',
-    href: '/modules/operations/products',
-    label: 'Products',
-    help: 'Manage the same products customers see on the website, including names, prices, pictures and website status.',
-  },
-  {
     key: 'inventory',
     href: '/modules/operations/inventory',
     label: 'Inventory',
@@ -46,6 +40,12 @@ export const OPERATIONS_NAV = [
     href: '/modules/operations/website-links',
     label: 'Website Links',
     help: 'Connect a website product to an internal inventory item when they are related. They can also stay separate.',
+  },
+  {
+    key: 'products',
+    href: '/modules/operations/products',
+    label: 'Products',
+    help: 'Manage the same products customers see on the website, including names, prices, pictures and website status.',
   },
 ] as const;
 
