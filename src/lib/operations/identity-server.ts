@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase-server';
 import type { OperationsIdentitySummary } from './types';
+import { buildOperationsIdentitySignals, normalizeOperationsPhone } from './identity-domain';
+export { buildOperationsIdentitySignals, normalizeOperationsPhone } from './identity-domain';
 
 const stageNames: Record<number, string> = {
   1: 'Awareness', 2: 'Interest', 3: 'Consideration', 4: 'Intent', 5: 'Purchase',
@@ -33,13 +35,28 @@ async function requireAdmin() {
   return supabase;
 }
 
-export function normalizeOperationsPhone(value: string) {
-  const digits = value.replace(/\D/g, '');
-  if (!digits) return '';
-  if (digits.startsWith('234')) return `+${digits}`;
-  if (digits.startsWith('0') && digits.length >= 10) return `+234${digits.slice(1)}`;
-  if (digits.length === 10) return `+234${digits}`;
-  return `+${digits}`;
+export async function resolveOrCreateOperationsIdentity(input: {
+  existingIdentityId?: string | null;
+  name?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  source: 'operations_order' | 'operations_repair';
+}) {
+  const supabase = await requireAdmin();
+  if (input.existingIdentityId) return input.existingIdentityId;
+
+  const signals = buildOperationsIdentitySignals(input);
+  if (!signals.length) throw new Error('Customer name, phone or email is required.');
+
+  const { data, error } = await supabase.rpc('upsert_identity_from_signals', {
+    p_signals: signals,
+    p_primary_name: input.name?.trim() || null,
+    p_primary_phone: normalizeOperationsPhone(input.phone || '') || null,
+    p_primary_email: input.email?.trim().toLowerCase() || null,
+    p_source: input.source,
+  });
+  if (error || !data) throw new Error(error?.message || 'Unable to resolve customer Identity');
+  return String(data);
 }
 
 function safeSearch(value: string) {
