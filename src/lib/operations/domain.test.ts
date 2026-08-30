@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import {
   canTransitionOrderStatus,
   getOrderStatusLabel,
+  getSkippedOrderStatuses,
+  requiresStatusTransitionReason,
 } from './domain.ts';
 
 test('normal fulfilment flow moves forward one stage at a time', () => {
@@ -13,8 +15,31 @@ test('normal fulfilment flow moves forward one stage at a time', () => {
   assert.equal(canTransitionOrderStatus('delivered', 'completed'), true);
 });
 
-test('normal fulfilment flow cannot silently jump or move backwards', () => {
-  assert.equal(canTransitionOrderStatus('new', 'packing'), false);
+test('admin fulfilment can move to any later normal stage', () => {
+  assert.equal(canTransitionOrderStatus('new', 'delivered'), true);
+  assert.equal(canTransitionOrderStatus('stock_check', 'ready_dispatch'), true);
+});
+
+test('forward jumps require a reason but single-step moves do not', () => {
+  assert.equal(requiresStatusTransitionReason('new', 'confirmed'), false);
+  assert.equal(requiresStatusTransitionReason('new', 'delivered'), true);
+  assert.equal(requiresStatusTransitionReason('stock_check', 'ready_dispatch'), true);
+});
+
+test('skipped statuses are reported for the audit timeline', () => {
+  assert.deepEqual(getSkippedOrderStatuses('new', 'delivered'), [
+    'confirmed',
+    'stock_check',
+    'assigned',
+    'picking',
+    'packing',
+    'ready_dispatch',
+    'dispatched',
+  ]);
+  assert.deepEqual(getSkippedOrderStatuses('picking', 'packing'), []);
+});
+
+test('normal fulfilment flow cannot move backwards', () => {
   assert.equal(canTransitionOrderStatus('packing', 'picking'), false);
   assert.equal(canTransitionOrderStatus('dispatched', 'confirmed'), false);
 });
