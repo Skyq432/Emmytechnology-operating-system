@@ -11,7 +11,9 @@ import {
   Package,
   Repeat2,
   Search,
+  Stethoscope,
   Truck,
+  UsersRound,
 } from 'lucide-react';
 import { HelpTip } from '@/components/ui/help-tip';
 import { OperationsPeriodBar } from '@/components/operations/operations-period-bar';
@@ -23,6 +25,8 @@ const iconMap = {
   products: Package,
   inventory: Boxes,
   transfers: Repeat2,
+  suppliers: UsersRound,
+  repairs: Stethoscope,
   websiteLinks: Link2,
 } as const;
 
@@ -71,7 +75,7 @@ export function OperationsShell({ children }: { children: React.ReactNode }) {
             })}
           </nav>
           <div className="mt-8 border-t border-slate-100 px-3 pt-4">
-            <p className="text-[11px] leading-5 text-slate-500">Products are for the website. Inventory is internal stock. Transfers move internal stock between EmmyTech locations.</p>
+            <p className="text-[11px] leading-5 text-slate-500">Products are website records. Inventory is internal stock. Suppliers, transfers and repairs keep the physical work separate but linked.</p>
           </div>
         </aside>
 
