@@ -21,13 +21,25 @@ export const OPERATIONS_NAV = [
     key: 'inventory',
     href: '/modules/operations/inventory',
     label: 'Inventory',
-    help: 'See what EmmyTech has at Sango, UI or In Transit, including reserved and available quantities.',
+    help: 'See what EmmyTech has at Sango, UI or In Transit, including reserved, available and individual serialized devices.',
   },
   {
     key: 'transfers',
     href: '/modules/operations/transfers',
     label: 'Transfers',
     help: 'Move EmmyTech stock between locations. A transfer can be for restocking or linked to a customer Order.',
+  },
+  {
+    key: 'suppliers',
+    href: '/modules/operations/suppliers',
+    label: 'Suppliers',
+    help: 'Keep the people or companies EmmyTech buys stock from, with simple contact details for sourcing and receiving.',
+  },
+  {
+    key: 'repairs',
+    href: '/modules/operations/repairs',
+    label: 'Repairs',
+    help: 'Track devices brought for repair, what is wrong, who is fixing them, costs, warranty and collection.',
   },
   {
     key: 'websiteLinks',
@@ -49,6 +61,8 @@ export const OPERATIONS_HELP: Record<string, string> = {
   createOrder: 'Create a Draft first. Confirm only when the sale is real; confirmation can reserve stock and create pending commission.',
   createInventory: 'Add an item that EmmyTech needs to track inside the business. The SKU is created automatically.',
   createTransfer: 'Move stock from one EmmyTech location to another. The item goes through In Transit until the destination receives it.',
+  createSupplier: 'Save a supplier once so staff can reuse the same supplier when stock or serialized devices are acquired.',
+  createRepair: 'Create a repair job for a customer device. Repair history stays separate from the customer CRM history but links back when possible.',
   createWebsiteLink: 'Connect an internal item to a website product. This is optional.',
   productManager: 'This is the same Product manager used in Marketing. Any change here changes the same website product record.',
 };
