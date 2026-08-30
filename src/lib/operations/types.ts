@@ -1,10 +1,15 @@
 import type { OrderStatus } from './domain';
 import type { CommercialState, CommissionStatus, PaymentStatus } from './commercial';
+import type { OrderItemType } from './sales-model';
 
 export type OperationsPriority = 'low' | 'normal' | 'high' | 'urgent';
 export type OperationsSource = 'manual' | 'crm' | 'website' | 'whatsapp' | 'internal' | 'other';
 export type WebsiteRelationshipType = 'stocked' | 'preorder' | 'on_demand' | 'dropship' | 'service' | 'display_only';
 export type FulfilmentSource = 'internal' | 'supplier' | 'dropship' | 'manual';
+export type PaymentMethod = 'bank_transfer' | 'pos' | 'cash' | 'split' | 'other';
+export type InventoryUnitStatus = 'available' | 'reserved' | 'in_transit' | 'sold' | 'repair' | 'returned' | 'faulty' | 'retired';
+export type RepairStatus = 'received' | 'diagnosing' | 'awaiting_parts' | 'in_progress' | 'ready_collection' | 'collected' | 'cancelled';
+export type SolarInstallationStatus = 'not_required' | 'pending' | 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
 
 export interface OperationsIdentitySummary {
   id: string;
@@ -55,6 +60,9 @@ export interface OperationsOrder {
   commercial_state: CommercialState;
   acquisition_source: string | null;
   attribution_note: string | null;
+  order_type: OrderItemType;
+  sales_staff_user_id: string | null;
+  sales_staff_name: string | null;
   subtotal: number;
   discount_type: string | null;
   discount_amount: number;
@@ -64,6 +72,7 @@ export interface OperationsOrder {
   delivery_charge: number;
   total_amount: number;
   amount_paid: number;
+  balance_due: number;
   payment_status: PaymentStatus;
   commission_rate: number;
   commission_amount: number;
@@ -85,15 +94,128 @@ export interface OperationsOrderItem {
   inventory_item_id: string | null;
   website_product_id: string | null;
   item_name: string;
+  item_type: OrderItemType;
+  brand: string | null;
+  model: string | null;
+  condition: string | null;
   quantity: number;
   quantity_reserved: number;
   unit_price: number | null;
   list_price: number | null;
+  unit_cost_snapshot: number | null;
   line_discount_amount: number;
   line_total: number;
+  warranty_period: string | null;
+  warranty_expires_at: string | null;
+  specs: Record<string, unknown>;
   fulfilment_source: FulfilmentSource;
   source_location_id: string | null;
   note: string | null;
+}
+
+export interface OperationsOrderPayment {
+  id: string;
+  order_id: string;
+  amount: number;
+  payment_method: PaymentMethod;
+  reference: string | null;
+  paid_at: string;
+  note: string | null;
+  is_void: boolean;
+  recorded_by: string | null;
+  created_at: string;
+}
+
+export interface OperationsSupplier {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  notes: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OperationsInventoryUnit {
+  id: string;
+  inventory_item_id: string;
+  serial_number: string | null;
+  imei_1: string | null;
+  imei_2: string | null;
+  condition: string | null;
+  acquisition_date: string | null;
+  unit_cost: number | null;
+  supplier_id: string | null;
+  current_location_id: string | null;
+  status: InventoryUnitStatus;
+  reserved_order_id: string | null;
+  reserved_order_item_id: string | null;
+  sold_order_id: string | null;
+  sold_order_item_id: string | null;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+  supplier?: { id: string; name: string } | null;
+  location?: { id: string; name: string; code: string } | null;
+}
+
+export interface OperationsRepair {
+  id: string;
+  repair_code: string;
+  identity_id: string | null;
+  original_order_id: string | null;
+  inventory_unit_id: string | null;
+  customer_name: string | null;
+  customer_phone: string | null;
+  received_at: string;
+  completed_at: string | null;
+  collected_at: string | null;
+  device_type: string | null;
+  brand: string | null;
+  model: string | null;
+  serial_or_imei: string | null;
+  purchased_from_us: 'yes' | 'no' | 'not_sure';
+  fault_reported: string;
+  diagnosis: string | null;
+  repair_type: string | null;
+  parts_replaced: string | null;
+  parts_cost: number;
+  labour_cost: number;
+  amount_charged: number;
+  repair_profit: number;
+  status: RepairStatus;
+  warranty_period: string | null;
+  warranty_expires_at: string | null;
+  condition_received: string | null;
+  condition_returned: string | null;
+  payment_status: 'unpaid' | 'partial' | 'paid' | 'refunded';
+  amount_paid: number;
+  balance_due: number;
+  technician_user_id: string | null;
+  technician_name: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OperationsSolarInstallation {
+  id: string;
+  order_id: string;
+  order_item_id: string;
+  installation_required: boolean;
+  installation_address: string | null;
+  scheduled_at: string | null;
+  completed_at: string | null;
+  installer_user_id: string | null;
+  installer_name: string | null;
+  installation_cost: number;
+  system_capacity: string | null;
+  status: SolarInstallationStatus;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface OperationsOrderEvent {
@@ -154,6 +276,11 @@ export interface OperationsInventoryItem {
   name: string;
   description: string | null;
   category: string | null;
+  brand: string | null;
+  default_condition: string | null;
+  default_unit_cost: number | null;
+  default_selling_price: number | null;
+  preferred_supplier_id: string | null;
   unit: string;
   serial_tracking: boolean;
   reorder_level: number;
