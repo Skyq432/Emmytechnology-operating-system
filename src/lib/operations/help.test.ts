@@ -9,6 +9,10 @@ test('operations navigation includes the shared website Products manager', () =>
   assert.equal(products.href, '/modules/operations/products');
 });
 
+test('Products stays last because it is the independent website catalogue manager', () => {
+  assert.equal(OPERATIONS_NAV.at(-1)?.key, 'products');
+});
+
 test('every operations navigation item has simple help text', () => {
   for (const item of OPERATIONS_NAV) {
     assert.ok(item.help.length > 10);
