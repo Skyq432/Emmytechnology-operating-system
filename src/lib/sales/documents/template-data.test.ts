@@ -6,6 +6,7 @@ import {
   renderLatexTemplate,
   buildReceiptTemplateData,
   buildQuotationTemplateData,
+  buildRefundTemplateData,
 } from './template-data.ts';
 
 test('escapeLatex neutralizes user-controlled LaTeX special characters', () => {
@@ -26,22 +27,12 @@ test('payment receipt data preserves the payment amount, cumulative paid and bal
     documentNumber: 'RCT-P-001',
     issuedAt: '2026-08-31T05:00:00.000Z',
     snapshot: {
-      source_type: 'order',
-      source_code: 'OPS-100',
-      customer_name: 'B&TECH',
-      customer_phone: '+2348000000000',
-      customer_email: 'hello@example.com',
-      items: [{ item_name: 'Laptop & Bag', quantity: 1, unit_price: 650000, line_total: 650000 }],
-      transaction_total: 650000,
-      payment_amount: 200000,
-      cumulative_paid: 200000,
-      balance_due: 450000,
-      payment_method: 'bank_transfer',
-      payment_reference: 'REF_100',
-      paid_at: '2026-08-31T04:30:00.000Z',
+      source_type: 'order', source_code: 'OPS-100', customer_name: 'B&TECH', customer_phone: '+2348000000000',
+      customer_email: 'hello@example.com', items: [{ item_name: 'Laptop & Bag', quantity: 1, unit_price: 650000, line_total: 650000 }],
+      transaction_total: 650000, payment_amount: 200000, cumulative_paid: 200000, balance_due: 450000,
+      payment_method: 'bank_transfer', payment_reference: 'REF_100', paid_at: '2026-08-31T04:30:00.000Z',
     },
   });
-
   assert.equal(data.DOCUMENT_NUMBER, 'RCT-P-001');
   assert.equal(data.SOURCE_REFERENCE, 'OPS-100');
   assert.equal(data.CUSTOMER_NAME, 'B\\&TECH');
@@ -54,14 +45,8 @@ test('payment receipt data preserves the payment amount, cumulative paid and bal
 
 test('final receipt data shows paid status and full total received when there is no single payment amount', () => {
   const data = buildReceiptTemplateData({
-    documentNumber: 'RCT-S-001',
-    issuedAt: '2026-08-31T05:00:00.000Z',
-    snapshot: {
-      source_type: 'order', source_code: 'OPS-101', customer_name: 'Customer',
-      items: [{ item_name: 'Phone', quantity: 1, unit_price: 500000, line_total: 500000 }],
-      transaction_total: 500000, total_paid: 500000, balance_due: 0,
-      payments: [{ amount: 200000 }, { amount: 300000 }],
-    },
+    documentNumber: 'RCT-S-001', issuedAt: '2026-08-31T05:00:00.000Z',
+    snapshot: { source_type: 'order', source_code: 'OPS-101', customer_name: 'Customer', items: [{ item_name: 'Phone', quantity: 1, unit_price: 500000, line_total: 500000 }], transaction_total: 500000, total_paid: 500000, balance_due: 0, payments: [{ amount: 200000 }, { amount: 300000 }] },
   });
   assert.equal(data.PAYMENT_STATUS, 'Paid in Full');
   assert.equal(data.AMOUNT_RECEIVED, '500,000.00');
@@ -70,22 +55,24 @@ test('final receipt data shows paid status and full total received when there is
 
 test('quotation data uses quotation validity and total without payment language', () => {
   const data = buildQuotationTemplateData({
-    documentNumber: 'QT-20260831-ABC',
-    issuedAt: '2026-08-31T05:00:00.000Z',
-    snapshot: {
-      quotation_code: 'QT-20260831-ABC',
-      version: 2,
-      customer_name: 'B-TECH',
-      customer_phone: '+2348000000000',
-      total_amount: 1270000,
-      validity_expires_at: '2026-09-07T23:59:59.000Z',
-      items: [{ item_name: 'Solar inverter', quantity: 1, final_unit_price: 350000 }],
-      terms: 'Stock subject to availability.',
-    },
+    documentNumber: 'QT-20260831-ABC', issuedAt: '2026-08-31T05:00:00.000Z',
+    snapshot: { quotation_code: 'QT-20260831-ABC', version: 2, customer_name: 'B-TECH', customer_phone: '+2348000000000', total_amount: 1270000, validity_expires_at: '2026-09-07T23:59:59.000Z', items: [{ item_name: 'Solar inverter', quantity: 1, final_unit_price: 350000 }], terms: 'Stock subject to availability.' },
   });
   assert.equal(data.QUOTATION_NUMBER, 'QT-20260831-ABC');
   assert.equal(data.VERSION, '2');
   assert.equal(data.TOTAL, '1,270,000.00');
   assert.match(data.VALID_UNTIL, /7 September 2026/);
   assert.match(data.ITEM_ROWS, /Solar inverter/);
+});
+
+test('refund data labels outgoing money as a refund against the original order', () => {
+  const data = buildRefundTemplateData({
+    documentNumber: 'RCT-R-001', issuedAt: '2026-08-31T05:00:00.000Z',
+    snapshot: { order_code: 'OPS-200', return_code: 'RET-1', customer_name: 'Ada', customer_email: 'ada@example.com', refund_amount: 120000, payment_method: 'bank_transfer', reference: 'RF-77', refunded_at: '2026-08-31T04:00:00.000Z' },
+  });
+  assert.equal(data.SOURCE_REFERENCE, 'OPS-200');
+  assert.equal(data.RETURN_REFERENCE, 'RET-1');
+  assert.equal(data.REFUND_AMOUNT, '120,000.00');
+  assert.equal(data.PAYMENT_METHOD, 'Bank Transfer');
+  assert.equal(data.PAYMENT_REFERENCE, 'RF-77');
 });
