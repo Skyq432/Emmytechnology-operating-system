@@ -1,7 +1,17 @@
+import { NewOrderForm } from '@/components/sales/new-order-form';
 import { OrdersWorkspace } from '@/components/sales/orders-workspace';
-import { getSalesOrders } from '@/lib/sales/read-server';
+import { getSalesInventoryCatalog, getSalesOrders } from '@/lib/sales/read-server';
 
 export default async function SalesOrdersPage() {
-  const orders = await getSalesOrders();
-  return <OrdersWorkspace orders={orders as never[]} />;
+  const [orders, catalog] = await Promise.all([
+    getSalesOrders(),
+    getSalesInventoryCatalog(),
+  ]);
+
+  return (
+    <div className="space-y-6">
+      <NewOrderForm inventory={catalog.items as never[]} />
+      <OrdersWorkspace orders={orders as never[]} />
+    </div>
+  );
 }
