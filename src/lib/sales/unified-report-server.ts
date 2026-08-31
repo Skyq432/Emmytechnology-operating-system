@@ -1,12 +1,17 @@
 import { requireSalesActor } from './server';
 import type { SalesOverviewData } from './types';
 
-export async function getUnifiedSalesOverview(): Promise<SalesOverviewData> {
+export interface SalesReportRange {
+  startIso: string;
+  endExclusiveIso: string;
+}
+
+export async function getUnifiedSalesOverview(range: SalesReportRange): Promise<SalesOverviewData> {
   const { supabase } = await requireSalesActor();
   const [revenueResult, paymentsResult, quotesResult, overdueCreditResult, renderFailureResult] = await Promise.all([
-    supabase.from('sales_revenue_balances').select('source_type,sales_channel,sales_value,outstanding,gross_profit'),
-    supabase.from('sales_unified_payments').select('amount,is_void'),
-    supabase.from('sales_quotations').select('id,status'),
+    supabase.from('sales_revenue_balances').select('source_type,sales_channel,sales_value,outstanding,gross_profit,commercial_at').gte('commercial_at', range.startIso).lt('commercial_at', range.endExclusiveIso),
+    supabase.from('sales_unified_payments').select('amount,is_void,paid_at').gte('paid_at', range.startIso).lt('paid_at', range.endExclusiveIso),
+    supabase.from('sales_quotations').select('id,status,created_at').gte('created_at', range.startIso).lt('created_at', range.endExclusiveIso),
     supabase.from('sales_credit_releases').select('id', { count: 'exact', head: true }).eq('status', 'active').lt('due_at', new Date().toISOString()),
     supabase.from('sales_documents').select('id', { count: 'exact', head: true }).eq('render_status', 'failed').is('voided_at', null),
   ]);
@@ -65,21 +70,22 @@ export async function getUnifiedSalesCustomers() {
   }).filter((row)=>row.salesValue>0||row.quotations>0);
 }
 
-export async function getUnifiedSalesReportSummary() {
+export async function getUnifiedSalesReportSummary(range: SalesReportRange) {
   const { supabase } = await requireSalesActor();
-  const [revenueResult,refundsResult,returnsResult,quotesResult] = await Promise.all([
-    supabase.from('sales_revenue_balances').select('source_type,sales_value,cash_collected,outstanding,gross_profit'),
-    supabase.from('sales_refunds').select('amount,status'),
-    supabase.from('sales_returns').select('id,status'),
-    supabase.from('sales_quotations').select('status,current_version:sales_quotation_versions!sales_quotations_current_version_fk(total_amount)'),
+  const [revenueResult,paymentsResult,refundsResult,returnsResult,quotesResult] = await Promise.all([
+    supabase.from('sales_revenue_balances').select('source_type,sales_value,outstanding,gross_profit,commercial_at').gte('commercial_at',range.startIso).lt('commercial_at',range.endExclusiveIso),
+    supabase.from('sales_unified_payments').select('amount,is_void,paid_at').gte('paid_at',range.startIso).lt('paid_at',range.endExclusiveIso),
+    supabase.from('sales_refunds').select('amount,status,refunded_at').gte('refunded_at',range.startIso).lt('refunded_at',range.endExclusiveIso),
+    supabase.from('sales_returns').select('id,status,created_at').gte('created_at',range.startIso).lt('created_at',range.endExclusiveIso),
+    supabase.from('sales_quotations').select('status,created_at,current_version:sales_quotation_versions!sales_quotations_current_version_fk(total_amount)').gte('created_at',range.startIso).lt('created_at',range.endExclusiveIso),
   ]);
-  const errors=[revenueResult.error,refundsResult.error,returnsResult.error,quotesResult.error].filter(Boolean);
+  const errors=[revenueResult.error,paymentsResult.error,refundsResult.error,returnsResult.error,quotesResult.error].filter(Boolean);
   if(errors.length) throw new Error(errors[0]!.message);
   const revenue=revenueResult.data||[];
   const grossSales=revenue.reduce((sum,row)=>sum+Number(row.sales_value||0),0);
   const grossProfit=revenue.reduce((sum,row)=>sum+Number(row.gross_profit||0),0);
-  const cashCollected=revenue.reduce((sum,row)=>sum+Number(row.cash_collected||0),0);
   const outstanding=revenue.reduce((sum,row)=>sum+Number(row.outstanding||0),0);
+  const cashCollected=(paymentsResult.data||[]).filter((row)=>!row.is_void).reduce((sum,row)=>sum+Number(row.amount||0),0);
   const cashRefunded=(refundsResult.data||[]).filter((row)=>row.status==='recorded').reduce((sum,row)=>sum+Number(row.amount||0),0);
   const quotedValue=(quotesResult.data||[]).reduce((sum,row)=>sum+Number((row.current_version as {total_amount?:number}|null)?.total_amount||0),0);
   return {
