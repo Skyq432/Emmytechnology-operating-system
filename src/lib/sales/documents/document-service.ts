@@ -1,3 +1,5 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { requireSalesActor } from '@/lib/sales/server';
 import { documentStoragePath } from './document-path';
 import { getDocumentEmailCopy, renderDocumentPdf, type SalesDocumentType } from './runtime';
@@ -10,6 +12,7 @@ type SalesDocumentRow = {
   id: string;
   document_number: string;
   document_type: SalesDocumentType;
+  identity_id: string | null;
   snapshot: JsonRecord;
   storage_path: string | null;
   render_status: 'pending' | 'rendered' | 'failed';
@@ -29,20 +32,16 @@ type DeliveryRow = {
   attempt_count: number;
 };
 
-async function getDocument(documentId: string): Promise<SalesDocumentRow> {
-  const { supabase } = await requireSalesActor();
-  const { data, error } = await supabase
-    .from('sales_documents')
-    .select('id,document_number,document_type,snapshot,storage_path,render_status,render_error,issued_at,voided_at,quotation_version_id,order_id,repair_id')
-    .eq('id', documentId)
-    .single();
+const documentSelect = 'id,document_number,document_type,identity_id,snapshot,storage_path,render_status,render_error,issued_at,voided_at,quotation_version_id,order_id,repair_id';
+
+async function getDocumentWithClient(supabase: SupabaseClient, documentId: string): Promise<SalesDocumentRow> {
+  const { data, error } = await supabase.from('sales_documents').select(documentSelect).eq('id', documentId).single();
   if (error || !data) throw new Error(error?.message || 'Sales document not found');
   return data as SalesDocumentRow;
 }
 
-export async function renderAndStoreSalesDocument(documentId: string) {
-  const { supabase } = await requireSalesActor();
-  const document = await getDocument(documentId);
+async function renderAndStoreWithClient(supabase: SupabaseClient, documentId: string) {
+  const document = await getDocumentWithClient(supabase, documentId);
   if (document.voided_at) throw new Error('Void documents cannot be rendered');
   if (document.render_status === 'rendered' && document.storage_path) return document;
 
@@ -68,7 +67,7 @@ export async function renderAndStoreSalesDocument(documentId: string) {
       .from('sales_documents')
       .update({ storage_path: storagePath, render_status: 'rendered', render_error: null })
       .eq('id', documentId)
-      .select('id,document_number,document_type,snapshot,storage_path,render_status,render_error,issued_at,voided_at,quotation_version_id,order_id,repair_id')
+      .select(documentSelect)
       .single();
     if (updateError || !updated) throw new Error(updateError?.message || 'Unable to mark document rendered');
     return updated as SalesDocumentRow;
@@ -79,31 +78,21 @@ export async function renderAndStoreSalesDocument(documentId: string) {
   }
 }
 
-async function downloadStoredDocument(document: SalesDocumentRow): Promise<Buffer> {
-  const { supabase } = await requireSalesActor();
+async function downloadStoredDocument(supabase: SupabaseClient, document: SalesDocumentRow): Promise<Buffer> {
   if (!document.storage_path) throw new Error('Document PDF has not been stored');
   const { data, error } = await supabase.storage.from(DOCUMENT_BUCKET).download(document.storage_path);
   if (error || !data) throw new Error(error?.message || 'Unable to download stored document');
   return Buffer.from(await data.arrayBuffer());
 }
 
-export async function createSignedSalesDocumentUrl(documentId: string, expiresIn = 300) {
-  const { supabase } = await requireSalesActor();
-  const document = await renderAndStoreSalesDocument(documentId);
-  if (!document.storage_path) throw new Error('Document PDF is unavailable');
-  const { data, error } = await supabase.storage.from(DOCUMENT_BUCKET).createSignedUrl(document.storage_path, expiresIn);
-  if (error || !data?.signedUrl) throw new Error(error?.message || 'Unable to create document download link');
-  return data.signedUrl;
-}
-
 async function markQuotationDelivery(
+  supabase: SupabaseClient,
   quotationVersionId: string | null,
   recipientEmail: string,
   state: 'sent' | 'failed',
   errorText?: string,
 ) {
   if (!quotationVersionId) return;
-  const { supabase } = await requireSalesActor();
   await supabase
     .from('sales_quotation_deliveries')
     .update({ state, sent_at: state === 'sent' ? new Date().toISOString() : null, error_text: errorText || null })
@@ -112,11 +101,10 @@ async function markQuotationDelivery(
     .eq('state', 'pending');
 }
 
-export async function processSalesDocumentDeliveries(documentId: string) {
-  const { supabase, actor } = await requireSalesActor();
-  const document = await renderAndStoreSalesDocument(documentId);
+async function processDeliveriesWithClient(supabase: SupabaseClient, actorId: string | null, documentId: string) {
+  const document = await renderAndStoreWithClient(supabase, documentId);
   if (document.voided_at) throw new Error('Void documents cannot be delivered');
-  const pdf = await downloadStoredDocument(document);
+  const pdf = await downloadStoredDocument(supabase, document);
   const { data: rows, error } = await supabase
     .from('sales_document_deliveries')
     .select('id,recipient_type,recipient_email,delivery_state,attempt_count')
@@ -150,15 +138,20 @@ export async function processSalesDocumentDeliveries(documentId: string) {
         })
         .eq('id', delivery.id);
       if (updateError) throw new Error(updateError.message);
-      await markQuotationDelivery(document.quotation_version_id, delivery.recipient_email, 'sent');
+      await markQuotationDelivery(supabase, document.quotation_version_id, delivery.recipient_email, 'sent');
       await supabase.from('sales_events').insert({
-        identity_id: (document.snapshot?.identity_id as string | undefined) || null,
+        identity_id: document.identity_id,
         order_id: document.order_id,
         quotation_version_id: document.quotation_version_id,
         event_type: 'receipt.delivery_succeeded',
         title: 'Document delivered',
-        metadata: { document_id: document.id, document_number: document.document_number, recipient_type: delivery.recipient_type, recipient_email: delivery.recipient_email },
-        actor_id: actor.userId,
+        metadata: {
+          document_id: document.id,
+          document_number: document.document_number,
+          recipient_type: delivery.recipient_type,
+          recipient_email: delivery.recipient_email,
+        },
+        actor_id: actorId,
       });
       results.push({ deliveryId: delivery.id, success: true, message: 'Sent' });
     } catch (deliveryError) {
@@ -171,15 +164,21 @@ export async function processSalesDocumentDeliveries(documentId: string) {
           last_error: message.slice(0, 2000),
         })
         .eq('id', delivery.id);
-      await markQuotationDelivery(document.quotation_version_id, delivery.recipient_email, 'failed', message.slice(0, 2000));
+      await markQuotationDelivery(supabase, document.quotation_version_id, delivery.recipient_email, 'failed', message.slice(0, 2000));
       await supabase.from('sales_events').insert({
+        identity_id: document.identity_id,
         order_id: document.order_id,
         quotation_version_id: document.quotation_version_id,
         event_type: 'receipt.delivery_failed',
         title: 'Document delivery failed',
         note: message.slice(0, 500),
-        metadata: { document_id: document.id, document_number: document.document_number, recipient_type: delivery.recipient_type, recipient_email: delivery.recipient_email },
-        actor_id: actor.userId,
+        metadata: {
+          document_id: document.id,
+          document_number: document.document_number,
+          recipient_type: delivery.recipient_type,
+          recipient_email: delivery.recipient_email,
+        },
+        actor_id: actorId,
       });
       results.push({ deliveryId: delivery.id, success: false, message });
     }
@@ -187,15 +186,39 @@ export async function processSalesDocumentDeliveries(documentId: string) {
   return results;
 }
 
-export async function processSalesDocument(documentId: string) {
-  const document = await renderAndStoreSalesDocument(documentId);
-  const deliveries = await processSalesDocumentDeliveries(documentId);
+async function processDocumentWithClient(supabase: SupabaseClient, actorId: string | null, documentId: string) {
+  const document = await renderAndStoreWithClient(supabase, documentId);
+  const deliveries = await processDeliveriesWithClient(supabase, actorId, documentId);
   return { document, deliveries };
 }
 
-export async function retrySalesDocument(documentId: string) {
+export async function renderAndStoreSalesDocument(documentId: string) {
   const { supabase } = await requireSalesActor();
-  const document = await getDocument(documentId);
+  return renderAndStoreWithClient(supabase, documentId);
+}
+
+export async function createSignedSalesDocumentUrl(documentId: string, expiresIn = 300) {
+  const { supabase } = await requireSalesActor();
+  const document = await renderAndStoreWithClient(supabase, documentId);
+  if (!document.storage_path) throw new Error('Document PDF is unavailable');
+  const { data, error } = await supabase.storage.from(DOCUMENT_BUCKET).createSignedUrl(document.storage_path, expiresIn);
+  if (error || !data?.signedUrl) throw new Error(error?.message || 'Unable to create document download link');
+  return data.signedUrl;
+}
+
+export async function processSalesDocumentDeliveries(documentId: string) {
+  const { supabase, actor } = await requireSalesActor();
+  return processDeliveriesWithClient(supabase, actor.userId, documentId);
+}
+
+export async function processSalesDocument(documentId: string) {
+  const { supabase, actor } = await requireSalesActor();
+  return processDocumentWithClient(supabase, actor.userId, documentId);
+}
+
+export async function retrySalesDocument(documentId: string) {
+  const { supabase, actor } = await requireSalesActor();
+  const document = await getDocumentWithClient(supabase, documentId);
   if (document.voided_at) throw new Error('Void documents cannot be retried');
   if (document.render_status === 'failed') {
     await supabase.from('sales_documents').update({ render_status: 'pending', render_error: null }).eq('id', documentId);
@@ -205,11 +228,15 @@ export async function retrySalesDocument(documentId: string) {
     .update({ delivery_state: 'pending', last_error: null })
     .eq('document_id', documentId)
     .eq('delivery_state', 'failed');
-  return processSalesDocument(documentId);
+  return processDocumentWithClient(supabase, actor.userId, documentId);
 }
 
-async function processDocumentsByReference(column: 'order_id' | 'repair_id', referenceId: string) {
-  const { supabase } = await requireSalesActor();
+async function processDocumentsByReference(
+  supabase: SupabaseClient,
+  actorId: string | null,
+  column: 'order_id' | 'repair_id',
+  referenceId: string,
+) {
   const { data, error } = await supabase
     .from('sales_documents')
     .select('id')
@@ -220,40 +247,73 @@ async function processDocumentsByReference(column: 'order_id' | 'repair_id', ref
   const results = [];
   for (const row of data || []) {
     try {
-      results.push({ id: row.id, success: true, result: await processSalesDocument(row.id) });
+      results.push({ id: row.id, success: true, result: await processDocumentWithClient(supabase, actorId, row.id) });
     } catch (processError) {
-      results.push({ id: row.id, success: false, error: processError instanceof Error ? processError.message : 'Unknown error' });
+      results.push({
+        id: row.id,
+        success: false,
+        error: processError instanceof Error ? processError.message : 'Unknown error',
+      });
     }
   }
   return results;
 }
 
-export function processDocumentsForOrder(orderId: string) {
-  return processDocumentsByReference('order_id', orderId);
+export async function processDocumentsForOrder(orderId: string) {
+  const { supabase, actor } = await requireSalesActor();
+  return processDocumentsByReference(supabase, actor.userId, 'order_id', orderId);
 }
 
-export function processDocumentsForRepair(repairId: string) {
-  return processDocumentsByReference('repair_id', repairId);
+export async function processDocumentsForRepair(repairId: string) {
+  const { supabase, actor } = await requireSalesActor();
+  return processDocumentsByReference(supabase, actor.userId, 'repair_id', repairId);
 }
 
 export async function processPendingSalesDocuments(limit = 10) {
-  const { supabase } = await requireSalesActor();
+  const { supabase, actor } = await requireSalesActor();
+  return processPendingWithClient(supabase, actor.userId, limit);
+}
+
+async function processPendingWithClient(supabase: SupabaseClient, actorId: string | null, limit: number) {
   const safeLimit = Math.min(50, Math.max(1, Number(limit || 10)));
-  const { data, error } = await supabase
-    .from('sales_documents')
-    .select('id')
-    .eq('render_status', 'pending')
-    .is('voided_at', null)
-    .order('created_at', { ascending: true })
-    .limit(safeLimit);
-  if (error) throw new Error(error.message);
+  const [documentsResult, deliveriesResult] = await Promise.all([
+    supabase
+      .from('sales_documents')
+      .select('id')
+      .eq('render_status', 'pending')
+      .is('voided_at', null)
+      .order('created_at', { ascending: true })
+      .limit(safeLimit),
+    supabase
+      .from('sales_document_deliveries')
+      .select('document_id')
+      .eq('delivery_state', 'pending')
+      .order('created_at', { ascending: true })
+      .limit(safeLimit),
+  ]);
+  if (documentsResult.error) throw new Error(documentsResult.error.message);
+  if (deliveriesResult.error) throw new Error(deliveriesResult.error.message);
+
+  const ids = Array.from(new Set([
+    ...(documentsResult.data || []).map((row) => row.id),
+    ...(deliveriesResult.data || []).map((row) => row.document_id),
+  ])).slice(0, safeLimit);
+
   const results = [];
-  for (const row of data || []) {
+  for (const id of ids) {
     try {
-      results.push({ id: row.id, success: true, result: await processSalesDocument(row.id) });
+      results.push({ id, success: true, result: await processDocumentWithClient(supabase, actorId, id) });
     } catch (processError) {
-      results.push({ id: row.id, success: false, error: processError instanceof Error ? processError.message : 'Unknown error' });
+      results.push({
+        id,
+        success: false,
+        error: processError instanceof Error ? processError.message : 'Unknown error',
+      });
     }
   }
   return results;
+}
+
+export function processPendingSalesDocumentsAsSystem(limit = 10) {
+  return processPendingWithClient(getSupabaseAdmin(), null, limit);
 }
