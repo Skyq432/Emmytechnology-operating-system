@@ -1,4 +1,4 @@
--- Guarded rollback for 20260831060000_sales_commercial_foundation.sql
+-- Guarded rollback for 20260831060000_sales_commercial_foundation.sql and additive Sales commercial RPCs.
 -- Run only after confirming no real Sales activity depends on these objects.
 
 do $$
@@ -9,10 +9,17 @@ begin
   if exists (select 1 from public.sales_discount_approvals limit 1) then
     raise exception 'Rollback refused: sales_discount_approvals contains records.';
   end if;
-  if exists (select 1 from public.ops_orders where sales_channel = 'direct_sale' or source_quotation_id is not null limit 1) then
+  if exists (
+    select 1 from public.ops_orders
+    where sales_channel in ('direct_sale','order')
+      and (sales_channel='direct_sale' or source_quotation_id is not null or acquisition_source='sales_order')
+    limit 1
+  ) then
     raise exception 'Rollback refused: Orders depend on Sales foundation.';
   end if;
 end $$;
+
+drop function if exists public.sales_create_order_draft(uuid,text,text,text,jsonb,text,numeric,text);
 
 drop table if exists public.sales_events cascade;
 drop table if exists public.sales_quotation_deliveries cascade;
