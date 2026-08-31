@@ -1,7 +1,7 @@
 import { SalesOverview } from '@/components/sales/sales-overview';
-import { getSalesOverview } from '@/lib/sales/server';
+import { getUnifiedSalesOverview } from '@/lib/sales/unified-report-server';
 
 export default async function SalesPage() {
-  const data = await getSalesOverview();
+  const data = await getUnifiedSalesOverview();
   return <SalesOverview data={data} />;
 }
