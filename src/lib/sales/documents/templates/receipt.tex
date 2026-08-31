@@ -1,0 +1,166 @@
+\documentclass[11pt, a4paper]{article}
+
+% EmmyTech receipt template - adapted from the approved invoice design.
+\usepackage[a4paper, top=1.2cm, bottom=1.2cm, left=1.5cm, right=1.5cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[sfdefault]{noto}
+\usepackage[english]{babel}
+\usepackage{booktabs}
+\usepackage[table]{xcolor}
+\usepackage{tabularx}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{enumitem}
+
+\definecolor{brandyellow}{RGB}{255, 184, 0}
+\definecolor{brandblue}{RGB}{0, 51, 102}
+\definecolor{statusgray}{RGB}{148, 163, 184}
+\definecolor{lightgray}{gray}{0.95}
+
+\begin{document}
+\pagestyle{empty}
+
+% --- Header Section ---
+\noindent
+\begin{minipage}[t]{0.65\textwidth}
+    \vspace{0pt}
+    \IfFileExists{Emmytech2.png}{%
+        \includegraphics[height=1.4cm]{Emmytech2.png}
+    }{%
+        {\Huge\textbf{\textcolor{brandblue}{EMMY} \textcolor{brandyellow}{TECHNOLOGY}}}
+    } \\
+    \vspace{1mm}
+    \textbf{\textcolor{brandblue}{Computer Resources}} \\
+    \textit{\small Professional Tech Solutions \& ICT Consultancy} \\[8pt]
+    \small
+    \textbf{Sango branch:} Shop 9, The 16th shopping plaza beside \\
+    \textit{SPAC Church, Sango-Poly Road, Ibadan.} \\[8pt]
+    \textbf{Phone:} +234 814 650 3700 \\
+    \textbf{Email:} support@emmytechnology.com
+\end{minipage}
+\hfill
+\begin{minipage}[t]{0.3\textwidth}
+    \vspace{0pt}
+    \raggedleft
+    {\Huge\textbf{\textcolor{gray!15}{RECEIPT}}} \\
+    \vspace{3mm}
+    \textbf{Receipt No:} \textcolor{brandblue}{<<DOCUMENT_NUMBER>>} \\
+    \textbf{Date Issued:} <<DATE_ISSUED>> \\
+    \textbf{Reference:} <<SOURCE_REFERENCE>>
+\end{minipage}
+
+\vspace{4mm}
+{\color{brandblue}\hrule height 2pt}
+\vspace{4mm}
+
+% --- Client and Status Info ---
+\noindent
+\begin{minipage}[t]{0.55\textwidth}
+    \textbf{\textcolor{brandblue}{RECEIVED FROM:}} \\
+    {\large\textbf{<<CUSTOMER_NAME>>}} \\
+    \small <<CUSTOMER_CONTACT>> \\
+\end{minipage}
+\hfill
+\begin{minipage}[t]{0.4\textwidth}
+    \raggedleft
+    \textbf{\textcolor{brandblue}{PAYMENT STATUS:}} \\
+    \vspace{1mm}
+    \textcolor{statusgray}{\large\textbf{<<PAYMENT_STATUS>>}}
+\end{minipage}
+
+\vspace{6mm}
+
+% --- Itemized Table ---
+{\large\textbf{\textcolor{brandblue}{SERVICE \& PRODUCT RECEIPT}}}
+\vspace{2mm}
+
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{l X r}
+    \rowcolor{brandblue}
+    \textbf{\textcolor{white}{S/N}} & \textbf{\textcolor{white}{Description of Services \& Products}} & \textbf{\textcolor{white}{Amount (NGN)}} \\
+    \midrule
+<<ITEM_ROWS>>
+    \midrule
+    \rowcolor{lightgray}
+    & \textbf{TRANSACTION TOTAL} & \textbf{<<TRANSACTION_TOTAL>>} \\
+    \bottomrule
+\end{tabularx}
+
+\vspace{4mm}
+
+\begin{flushright}
+\begin{tabular}{l r}
+    \textbf{Amount Received:} & \textbf{<<AMOUNT_RECEIVED>>} \\
+    Total Paid to Date: & <<TOTAL_PAID>> \\
+    \textbf{Balance Due:} & \textbf{<<BALANCE_DUE>>} \\
+\end{tabular}
+\end{flushright}
+
+\vspace{4mm}
+
+\noindent
+\begin{minipage}[t]{0.48\textwidth}
+    \textbf{\textcolor{brandblue}{SERVICE NOTES}} \\
+    \begin{itemize}[leftmargin=*, noitemsep, topsep=1pt]
+        \item \small All items are genuine and tested
+        \item \small Installation materials include applicable warranty
+        \item \small Professional service and after-sales support
+        \item \small This receipt records payment actually received
+    \end{itemize}
+\end{minipage}
+\hfill
+\begin{minipage}[t]{0.48\textwidth}
+    \textbf{\textcolor{brandblue}{PAYMENT DETAILS}}
+    \begin{itemize}[leftmargin=*, noitemsep, topsep=1pt]
+        \item \small Payment method: <<PAYMENT_METHOD>>
+        \item \small Payment reference: <<PAYMENT_REFERENCE>>
+        \item \small Payment date: <<PAYMENT_DATE>>
+        \item \small Issued by Emmy Technology
+    \end{itemize}
+\end{minipage}
+
+\vspace{5mm}
+
+\begin{flushright}
+    \begin{minipage}{0.65\textwidth}
+        \raggedleft
+        \small
+        \textit{Thank you for your payment and for choosing Emmy Technology.}
+    \end{minipage}
+\end{flushright}
+
+\vspace{4mm}
+
+% --- Payment Instructions / Account Reference ---
+\noindent
+\begin{minipage}[t]{0.65\textwidth}
+    \textbf{\textcolor{brandblue}{PAYMENT ACCOUNT}} \\
+    \vspace{1mm}
+    \small For any outstanding balance, payment can be made to: \\
+    \vspace{1mm}
+    \begin{tabular}{|l l|}
+        \hline
+        \textbf{Account Name:} & Emmy Technologies PC PROFESSIONAL \\
+        \textbf{Account No:} & \textbf{5128460113} \\
+        \textbf{Bank:} & \textbf{Moniepoint} \\
+        \hline
+    \end{tabular} \\
+    \vspace{2mm}
+    \textit{\small Please mention \textbf{<<SOURCE_REFERENCE>>} in your transfer description.}
+\end{minipage}
+
+\vfill
+
+% --- Footer ---
+\begin{center}
+    {\color{brandyellow}\hrule height 1pt}
+    \vspace{2mm}
+    \small
+    \textbf{Thank you for choosing Emmy Technology!} \\
+    We value our partnership and look forward to working with you again. \\
+    \vspace{1mm}
+    \textcolor{brandblue}{www.emmytechnology.com} | \textcolor{brandblue}{support@emmytechnology.com}
+\end{center}
+
+\end{document}
