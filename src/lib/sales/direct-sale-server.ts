@@ -1,3 +1,4 @@
+import { processDocumentsForOrder } from './documents/document-service';
 import { requireSalesActor, resolveOrCreateSalesIdentity } from './server';
 
 export async function createDirectSaleDraft(input: {
@@ -83,9 +84,26 @@ export async function recordDirectSalePayment(input: {
     p_paid_at: input.paidAt || new Date().toISOString(),
     p_note: input.note?.trim() || null,
   });
-  return error
-    ? { success: false as const, message: error.message }
-    : { success: true as const, message: 'Payment recorded', data };
+  if (error) return { success: false as const, message: error.message };
+
+  try {
+    const documents = await processDocumentsForOrder(input.orderId);
+    const failed = documents.filter((row) => !row.success).length;
+    return {
+      success: true as const,
+      message: failed
+        ? `Payment recorded. Receipt processing needs attention for ${failed} document(s); the payment was not reversed.`
+        : 'Payment recorded and receipt processing completed',
+      data,
+    };
+  } catch (documentError) {
+    const message = documentError instanceof Error ? documentError.message : 'Unknown receipt processing error';
+    return {
+      success: true as const,
+      message: `Payment recorded. Receipt processing will retry from the document queue: ${message}`,
+      data,
+    };
+  }
 }
 
 export async function approveDirectSaleCredit(input: {
