@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:operations": "node --experimental-strip-types --test src/lib/operations/*.test.ts"
+    "test:operations": "node --experimental-strip-types --test src/lib/operations/*.test.ts",
+    "test:sales": "node --experimental-strip-types --test src/lib/sales/*.test.ts",
+    "test:commercial": "npm run test:operations && npm run test:sales"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",
