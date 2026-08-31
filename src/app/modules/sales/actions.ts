@@ -8,6 +8,7 @@ import {
   createDirectSaleDraft,
   recordDirectSalePayment,
 } from '@/lib/sales/direct-sale-server';
+import { createSalesOrderDraft } from '@/lib/sales/order-server';
 import {
   convertAcceptedQuotation,
   createSalesQuotation,
@@ -56,6 +57,41 @@ export async function createDirectSaleAction(_prev: SalesActionState, formData: 
   });
   if (result.success) revalidateSales();
   return { success: result.success, message: result.message, data: result.success ? result.data : undefined };
+}
+
+export async function createSalesOrderAction(_prev: SalesActionState, formData: FormData): Promise<SalesActionState> {
+  const items = parseJson<Array<{
+    inventoryItemId?: string | null;
+    itemName: string;
+    itemType?: string | null;
+    category?: string | null;
+    fulfilmentSource?: 'internal' | 'supplier' | 'dropship' | 'manual';
+    quantity: number;
+    listPrice: number;
+    finalUnitPrice: number;
+    costBasis?: number | null;
+    costBasisSource?: 'inventory_average' | 'product_default' | 'supplier_on_demand' | null;
+    adminExceptionReason?: string | null;
+    note?: string | null;
+  }>>(formData.get('items_json'), []);
+  if (!items.length) return fail('Add at least one item to the Order.');
+
+  try {
+    const result = await createSalesOrderDraft({
+      existingIdentityId: String(formData.get('identity_id') || '') || null,
+      customerName: String(formData.get('customer_name') || ''),
+      customerPhone: String(formData.get('customer_phone') || ''),
+      customerEmail: String(formData.get('customer_email') || ''),
+      salesStaffName: String(formData.get('sales_staff_name') || ''),
+      deliveryCharge: Number(formData.get('delivery_charge') || 0),
+      note: String(formData.get('note') || ''),
+      items,
+    });
+    if (result.success) revalidateSales();
+    return { success: result.success, message: result.message, data: result.success ? result.data : undefined };
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : 'Unable to create Sales Order draft.');
+  }
 }
 
 export async function confirmDirectSaleAction(_prev: SalesActionState, formData: FormData): Promise<SalesActionState> {
