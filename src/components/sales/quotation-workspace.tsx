@@ -8,9 +8,10 @@ import {
   offlineQuotationDecisionAction,
   publishQuotationAction,
   queueQuotationEmailAction,
+  type SalesActionState,
 } from '@/app/modules/sales/actions';
 
-const initial = { success: false, message: '' };
+const initial: SalesActionState = { success: false, message: '' };
 const money = (value: number) => `₦${Number(value || 0).toLocaleString('en-NG', { maximumFractionDigits: 0 })}`;
 
 type InventoryItem = { id: string; sku: string; name: string; category: string | null; item_type: string; default_unit_cost: number | null; default_selling_price: number | null };
