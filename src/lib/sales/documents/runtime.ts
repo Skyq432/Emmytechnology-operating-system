@@ -9,7 +9,7 @@ import {
   buildRefundTemplateData,
   renderLatexTemplate,
   type JsonRecord,
-} from './template-data';
+} from './template-data.ts';
 
 const execFileAsync = promisify(execFile);
 export type SalesDocumentType = 'payment_receipt' | 'final_sales_receipt' | 'quotation_pdf' | 'refund_document';
