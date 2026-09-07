@@ -6,6 +6,7 @@ export async function createSalesOrderDraft(input: {
   customerName?: string | null;
   customerPhone?: string | null;
   customerEmail?: string | null;
+  customerAddress?: string | null;
   salesStaffName?: string | null;
   deliveryCharge?: number | null;
   note?: string | null;
@@ -17,6 +18,7 @@ export async function createSalesOrderDraft(input: {
     name: input.customerName,
     phone: input.customerPhone,
     email: input.customerEmail,
+    address: input.customerAddress,
   });
 
   const items = buildSalesOrderDraftItems(input.items);
