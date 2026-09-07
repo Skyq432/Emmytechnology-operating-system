@@ -8,7 +8,7 @@ const money = (value: number) => `₦${Number(value || 0).toLocaleString('en-NG'
 
 type InventoryItem = {
   id: string; sku: string; name: string; category: string | null; item_type: string; serial_tracking: boolean;
-  default_unit_cost: number | null; default_selling_price: number | null;
+  default_unit_cost: number | null; default_selling_price: number | null; salesperson_discount_limit_percent?: number; minimum_margin_percent?: number; website_selling_price?: number | null; website_price_mismatch?: boolean;
 };
 type Availability = { inventory_item_id: string; location_id: string; location_name: string; available: number };
 type Unit = { id: string; inventory_item_id: string; serial_number: string | null; imei_1: string | null; imei_2: string | null; unit_cost: number | null; current_location_id: string | null; status: string };
@@ -69,7 +69,12 @@ export function DirectSaleWorkspace({ inventory, availability, units, locations,
   const itemAvailability = useMemo(() => availability.filter((row) => row.inventory_item_id === selectedItemId && Number(row.available) > 0), [availability, selectedItemId]);
   const total = lines.reduce((sum, line) => sum + Number(line.finalUnitPrice || 0) * line.quantity, 0);
   const standardPrice = Number(selectedItem?.default_selling_price || 0);
-  const authorityFloor = standardPrice > 0 ? standardPrice * (1 - Math.min(100, Math.max(0, Number(actor.discountLimitPercent || 0))) / 100) : 0;
+  const productDiscount = Math.min(100, Math.max(0, Number(selectedItem?.salesperson_discount_limit_percent ?? actor.discountLimitPercent ?? 0)));
+  const discountFloor = standardPrice > 0 ? standardPrice * (1 - productDiscount / 100) : 0;
+  const itemCost = Number(selectedItem?.default_unit_cost || 0);
+  const minMargin = Math.min(99.99, Math.max(0, Number(selectedItem?.minimum_margin_percent || 0)));
+  const marginFloor = itemCost > 0 ? itemCost / (1 - minMargin / 100) : 0;
+  const authorityFloor = Math.max(discountFloor, marginFloor);
   const enteredPrice = Number(price || standardPrice || 0);
   const needsApproval = standardPrice > 0 && enteredPrice > 0 && enteredPrice < authorityFloor;
 
@@ -147,7 +152,7 @@ export function DirectSaleWorkspace({ inventory, availability, units, locations,
             {selectedItem?.serial_tracking ? <select value={selectedUnitId} onChange={(e) => setSelectedUnitId(e.target.value)} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm"><option value="">Choose Serial / IMEI</option>{itemUnits.map((unit) => <option key={unit.id} value={unit.id}>{unit.serial_number || unit.imei_1 || unit.imei_2 || unit.id}</option>)}</select> : <select value={selectedLocationId} onChange={(e) => setSelectedLocationId(e.target.value)} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm"><option value="">Stock location</option>{itemAvailability.map((row) => <option key={row.location_id} value={row.location_id}>{row.location_name} · {row.available} available</option>)}</select>}
             <input type="number" min="1" value={selectedItem?.serial_tracking ? 1 : qty} disabled={selectedItem?.serial_tracking} onChange={(e) => setQty(Number(e.target.value))} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" placeholder="Quantity" />
             <input value={price} onChange={(e) => setPrice(e.target.value)} className={`rounded-xl border px-3 py-2.5 text-sm ${needsApproval ? 'border-amber-400 bg-amber-50' : 'border-slate-200'}`} placeholder={selectedItem ? (standardPrice > 0 ? `Agreed price · standard ${money(standardPrice)}` : 'Standard price not configured') : 'Agreed selling price'} />
-            {selectedItem ? <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs md:col-span-2 xl:col-span-3"><div className="flex flex-wrap gap-x-6 gap-y-1"><span>Standard price <strong className="text-slate-900">{standardPrice > 0 ? money(standardPrice) : 'Not configured'}</strong></span><span>Your lowest price <strong className="text-[#032489]">{standardPrice > 0 ? money(authorityFloor) : 'Pending price setup'}</strong></span><span>Pricing authority <strong>{actor.authorityLevel === 'admin' ? 'Admin override' : `${Number(actor.discountLimitPercent || 0).toFixed(0)}% discount`}</strong></span></div>{needsApproval ? <div className="mt-2 font-bold text-amber-700">This price is below your normal authority. Admin approval is required.</div> : null}</div> : null}
+            {selectedItem ? <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs md:col-span-2 xl:col-span-3"><div className="flex flex-wrap gap-x-6 gap-y-1"><span>Standard price <strong className="text-slate-900">{standardPrice > 0 ? money(standardPrice) : 'Not configured'}</strong></span><span>Your lowest price <strong className="text-[#032489]">{standardPrice > 0 ? money(authorityFloor) : 'Pending price setup'}</strong></span><span>Salesperson discount <strong>{productDiscount.toFixed(0)}%</strong><span>Minimum gross margin <strong>{minMargin.toFixed(0)}%</strong></span></span></div>{selectedItem.website_price_mismatch ? <div className="mt-2 font-bold text-amber-700">Website price {money(Number(selectedItem.website_selling_price || 0))} differs from inventory standard {money(standardPrice)}.</div> : null}{needsApproval ? <div className="mt-2 font-bold text-amber-700">This price is below your normal authority. Admin approval is required.</div> : null}</div> : null}
             <input value={exceptionReason} onChange={(e) => setExceptionReason(e.target.value)} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm md:col-span-2 xl:col-span-3" placeholder={needsApproval ? "Admin approval reason" : "Pricing note (optional)"} />
             <button type="button" onClick={addStockLine} className="rounded-xl bg-[#032489] px-4 py-2.5 text-sm font-black text-white">Add item</button>
           </div> : <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
