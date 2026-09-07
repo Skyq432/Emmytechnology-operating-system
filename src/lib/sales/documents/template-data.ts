@@ -75,6 +75,16 @@ function humanPaymentMethod(value: unknown): string {
   return escapeLatex(raw.split('_').map((part) => part ? part[0].toUpperCase() + part.slice(1) : part).join(' '));
 }
 
+function referenceLabel(snapshot: JsonRecord): string {
+  return snapshot.source_type === 'repair' ? 'Repair Ref' : 'Order Ref';
+}
+
+function settlementBlock(balance: number, sourceReference: string): string {
+  // A receipt records money received. Only ask for a transfer when one is genuinely owed.
+  if (balance <= 0) return '\\settledBlock';
+  return `\\outstandingBlock{${money(balance)}}{${sourceReference}}`;
+}
+
 export function buildReceiptTemplateData(input: { documentNumber: string; issuedAt: string; snapshot: JsonRecord }): Record<string, string> {
   const s = input.snapshot || {};
   const total = number(s.transaction_total ?? s.total_amount);
@@ -90,6 +100,7 @@ export function buildReceiptTemplateData(input: { documentNumber: string; issued
     CUSTOMER_NAME: escapeLatex(s.customer_name || 'Customer'), CUSTOMER_CONTACT: contact(s), PAYMENT_STATUS: escapeLatex(paymentStatus),
     ITEM_ROWS: itemRows(receiptItems(s), 'receipt'), TRANSACTION_TOTAL: money(total), AMOUNT_RECEIVED: money(amountReceived), TOTAL_PAID: money(totalPaid), BALANCE_DUE: money(balance),
     PAYMENT_METHOD: humanPaymentMethod(s.payment_method ?? lastPayment?.payment_method), PAYMENT_REFERENCE: escapeLatex(s.payment_reference ?? lastPayment?.reference ?? '—'), PAYMENT_DATE: date(paymentDate),
+    REFERENCE_LABEL: referenceLabel(s), SETTLEMENT_BLOCK: settlementBlock(balance, escapeLatex(s.source_code || input.documentNumber)),
   };
 }
 
