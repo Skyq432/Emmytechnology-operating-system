@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useActionState } from 'react';
 import { ArrowLeft, Smartphone } from 'lucide-react';
 import { createInventoryUnitAction, type SalesActionState } from '@/app/modules/operations/sales-actions';
-import { addInventoryStockAction, type InventoryActionState } from '@/app/modules/operations/inventory-actions';
+import { addInventoryStockAction, updateInventoryCommercialPricingAction, type InventoryActionState } from '@/app/modules/operations/inventory-actions';
 import { HelpTip } from '@/components/ui/help-tip';
 import type { OperationsInventoryItem, OperationsInventoryUnit, OperationsLocation, OperationsSupplier } from '@/lib/operations/types';
 
@@ -17,9 +17,20 @@ export function InventoryDetail({ item, units, locations, suppliers }: {
   units: OperationsInventoryUnit[];
   locations: OperationsLocation[];
   suppliers: OperationsSupplier[];
+  minimumGrossMarginPercent: number;
+  websiteProduct: { id: string; name: string; price: number | null; sale_price: number | null; status: string | null } | null;
 }) {
   const [unitState, unitAction, unitPending] = useActionState(createInventoryUnitAction, initialSales);
   const [stockState, stockAction, stockPending] = useActionState(addInventoryStockAction, initialInventory);
+  const [pricingState, pricingAction, pricingPending] = useActionState(updateInventoryCommercialPricingAction, initialInventory);
+  const standardPrice = Number(item.default_selling_price || 0);
+  const discountPercent = Number(item.salesperson_discount_limit_percent || 0);
+  const cost = Number(item.default_unit_cost || 0);
+  const discountFloor = standardPrice > 0 ? standardPrice * (1 - discountPercent / 100) : 0;
+  const marginFloor = cost > 0 && minimumGrossMarginPercent < 100 ? cost / (1 - minimumGrossMarginPercent / 100) : 0;
+  const lowestPrice = Math.max(discountFloor, marginFloor);
+  const websitePrice = websiteProduct ? Number(websiteProduct.sale_price ?? websiteProduct.price ?? 0) : 0;
+  const websiteMismatch = websitePrice > 0 && standardPrice > 0 && Math.abs(websitePrice - standardPrice) >= 0.01;
   const specEntries = Object.entries(item.specs || {}).filter(([, value]) => value !== '' && value !== null && value !== false);
 
   return <div className="mx-auto max-w-[1400px]">
@@ -31,6 +42,20 @@ export function InventoryDetail({ item, units, locations, suppliers }: {
       </div>
       {specEntries.length > 0 && <div className="mt-5 border-t border-slate-100 pt-4"><p className="mb-3 text-xs font-black uppercase tracking-wide text-slate-400">Technical details</p><div className="flex flex-wrap gap-2">{specEntries.map(([key,value]) => <span key={key} className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600"><strong className="capitalize text-slate-800">{key.replaceAll('_',' ')}:</strong> {String(value)}</span>)}</div></div>}
     </div>
+
+    <form action={pricingAction} className="mb-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <input type="hidden" name="inventory_item_id" value={item.id} />
+      <div className="flex flex-col justify-between gap-2 md:flex-row md:items-start"><div><h2 className="text-sm font-black text-slate-900">Commercial pricing</h2><p className="mt-1 text-xs text-slate-500">Set the normal selling price and the two controls that determine the lowest price Sales may use.</p></div><HelpTip text="The lowest allowed price is whichever is higher: the salesperson discount floor or the minimum gross-margin floor." label="About commercial pricing" /></div>
+      {websiteMismatch ? <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"><strong>Website price differs.</strong> Website: {money(websitePrice)} · Inventory standard: {money(standardPrice)} · Difference: {money(Math.abs(websitePrice-standardPrice))}. Prices are not changed automatically.</div> : websiteProduct && websitePrice > 0 ? <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">Website price {money(websitePrice)} matches the inventory standard price.</div> : null}
+      <div className="mt-4 grid gap-4 md:grid-cols-3">
+        <Field label="Standard selling price"><input name="standard_selling_price" type="number" min="0.01" step="0.01" required className="input" defaultValue={item.default_selling_price ?? ''} /></Field>
+        <Field label="Salesperson max discount (%)"><input name="salesperson_discount_limit_percent" type="number" min="0" max="100" step="0.01" required className="input" defaultValue={discountPercent} /></Field>
+        <Field label="Minimum gross margin (%)"><input name="minimum_gross_margin_percent" type="number" min="0" max="99.99" step="0.01" required className="input" defaultValue={minimumGrossMarginPercent} /></Field>
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-3"><Info label="Discount floor" value={standardPrice > 0 ? money(discountFloor) : '—'} /><Info label="Margin floor" value={cost > 0 ? money(marginFloor) : 'Set cost price'} /><Info label="Lowest allowed price" value={standardPrice > 0 ? money(lowestPrice) : '—'} /></div>
+      {pricingState.message && <p className={`mt-3 text-sm font-bold ${pricingState.success ? 'text-emerald-700' : 'text-rose-700'}`}>{pricingState.message}</p>}
+      <button disabled={pricingPending} className="mt-4 rounded-lg bg-[#032489] px-4 py-2.5 text-sm font-black text-white disabled:opacity-50">{pricingPending ? 'Saving...' : 'Save commercial pricing'}</button>
+    </form>
 
     {item.serial_tracking ? <>
       <form action={unitAction} className="mb-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
