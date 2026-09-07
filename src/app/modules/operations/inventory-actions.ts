@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { addInventoryStock, createInventoryItemWithOpeningStock } from '@/lib/operations/inventory-server';
+import { updateInventoryCommercialPricing } from '@/lib/operations/sales-server';
 import type { OrderItemType } from '@/lib/operations/sales-model';
 
 export type InventoryActionState = { success: boolean; message: string };
@@ -84,6 +85,29 @@ export async function addInventoryStockAction(
     revalidatePath('/modules/operations');
     revalidatePath('/modules/operations/inventory');
     revalidatePath(`/modules/operations/inventory/${inventoryItemId}`);
+  }
+  return { success: result.success, message: result.message };
+}
+
+
+export async function updateInventoryCommercialPricingAction(
+  _previousState: InventoryActionState,
+  formData: FormData,
+): Promise<InventoryActionState> {
+  const inventoryItemId = String(formData.get('inventory_item_id') || '');
+  if (!inventoryItemId) return fail('Inventory item is required.');
+  const result = await updateInventoryCommercialPricing({
+    inventoryItemId,
+    standardSellingPrice: Number(formData.get('standard_selling_price') || 0),
+    salespersonDiscountLimitPercent: Number(formData.get('salesperson_discount_limit_percent') || 0),
+    minimumGrossMarginPercent: Number(formData.get('minimum_gross_margin_percent') || 0),
+  });
+  if (result.success) {
+    revalidatePath('/modules/operations/inventory');
+    revalidatePath(`/modules/operations/inventory/${inventoryItemId}`);
+    revalidatePath('/modules/sales/direct');
+    revalidatePath('/modules/sales/orders');
+    revalidatePath('/modules/sales/quotations');
   }
   return { success: result.success, message: result.message };
 }
