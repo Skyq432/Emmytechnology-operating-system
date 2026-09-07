@@ -10,6 +10,7 @@ import {
   queueQuotationEmailAction,
   type SalesActionState,
 } from '@/app/modules/sales/actions';
+import { SalesIdentityPicker } from './sales-identity-picker';
 
 const initial: SalesActionState = { success: false, message: '' };
 const money = (value: number) => `₦${Number(value || 0).toLocaleString('en-NG', { maximumFractionDigits: 0 })}`;
@@ -57,9 +58,7 @@ export function QuotationWorkspace({ quotations, inventory }: { quotations: Quot
         <form action={createAction} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="font-black">Create quotation</h2>
           <div className="mt-4 space-y-3">
-            <input name="customer_name" placeholder="Customer name" className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
-            <input name="customer_phone" placeholder="Phone" className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
-            <input name="customer_email" type="email" placeholder="Email" className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+            <SalesIdentityPicker compact title="1. Find customer" />
             <input name="sales_staff_name" placeholder="Salesperson" className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
           </div>
           {createState.message ? <div className={`mt-3 rounded-xl px-3 py-2 text-sm ${createState.success ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{createState.message}</div> : null}
