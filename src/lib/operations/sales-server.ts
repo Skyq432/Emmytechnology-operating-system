@@ -65,6 +65,38 @@ export async function getInventoryItemDetail(itemId: string): Promise<{
   };
 }
 
+export async function updateInventoryCommercialPricing(input: {
+  inventoryItemId: string;
+  standardSellingPrice: number;
+  salespersonDiscountLimitPercent: number;
+  minimumGrossMarginPercent: number;
+}) {
+  const { supabase, user } = await requireAdmin();
+  const standardSellingPrice = Number(input.standardSellingPrice);
+  const discount = Number(input.salespersonDiscountLimitPercent);
+  const margin = Number(input.minimumGrossMarginPercent);
+  if (!(standardSellingPrice > 0)) return { success: false as const, message: 'Standard selling price must be greater than zero.' };
+  if (discount < 0 || discount > 100) return { success: false as const, message: 'Salesperson discount must be between 0% and 100%.' };
+  if (margin < 0 || margin >= 100) return { success: false as const, message: 'Minimum gross margin must be between 0% and 99.99%.' };
+
+  const { error: itemError } = await supabase.from('ops_inventory_items').update({
+    default_selling_price: standardSellingPrice,
+    salesperson_discount_limit_percent: discount,
+  }).eq('id', input.inventoryItemId);
+  if (itemError) return { success: false as const, message: itemError.message };
+
+  const { error: policyError } = await supabase.from('sales_margin_policies').upsert({
+    policy_scope: 'product',
+    inventory_item_id: input.inventoryItemId,
+    category: null,
+    minimum_margin_percent: margin,
+    is_active: true,
+    created_by: user.id,
+  }, { onConflict: 'inventory_item_id' });
+  if (policyError) return { success: false as const, message: policyError.message };
+  return { success: true as const, message: 'Commercial pricing saved.' };
+}
+
 export async function createInventoryUnit(input: {
   inventoryItemId: string;
   serialNumber?: string | null;
