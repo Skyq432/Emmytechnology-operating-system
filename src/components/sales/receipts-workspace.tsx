@@ -59,7 +59,8 @@ function DocumentCard({ doc }: { doc: DocumentRow }) {
   const [retryState, retryAction, retryPending] = useActionState(retryDocumentAction, initial);
   const snapshot = doc.snapshot || {};
   const hasFailedDelivery = (doc.deliveries || []).some((delivery) => delivery.delivery_state === 'failed');
-  const needsRetry = doc.render_status === 'failed' || hasFailedDelivery;
+  const needsPdfRetry = doc.render_status === 'failed';
+  const needsEmailRetry = doc.render_status === 'rendered' && hasFailedDelivery;
 
   return <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -89,8 +90,9 @@ function DocumentCard({ doc }: { doc: DocumentRow }) {
 
     {!doc.voided_at ? <div className="mt-4 flex flex-wrap items-center gap-2">
       {doc.render_status === 'rendered' && doc.storage_path ? <a href={`/api/sales/documents/${doc.id}`} target="_blank" rel="noreferrer" className="rounded-lg bg-[#032489] px-3 py-2 text-xs font-black text-white">Open PDF</a> : null}
-      {!needsRetry ? <form action={processAction}><input type="hidden" name="document_id" value={doc.id} /><button disabled={processPending} className="rounded-lg border border-[#032489] px-3 py-2 text-xs font-black text-[#032489] disabled:opacity-50">{processPending ? 'Processing…' : doc.render_status === 'rendered' ? 'Process Deliveries' : 'Render & Process'}</button></form> : null}
-      {needsRetry ? <form action={retryAction}><input type="hidden" name="document_id" value={doc.id} /><button disabled={retryPending} className="rounded-lg bg-amber-500 px-3 py-2 text-xs font-black text-white disabled:opacity-50">{retryPending ? 'Retrying…' : 'Retry'}</button></form> : null}
+      {!needsPdfRetry && !needsEmailRetry ? <form action={processAction}><input type="hidden" name="document_id" value={doc.id} /><button disabled={processPending} className="rounded-lg border border-[#032489] px-3 py-2 text-xs font-black text-[#032489] disabled:opacity-50">{processPending ? 'Processing…' : doc.render_status === 'rendered' ? 'Send Email' : 'Generate PDF & Send Email'}</button></form> : null}
+      {needsPdfRetry ? <form action={retryAction}><input type="hidden" name="document_id" value={doc.id} /><button disabled={retryPending} className="rounded-lg bg-amber-500 px-3 py-2 text-xs font-black text-white disabled:opacity-50">{retryPending ? 'Retrying PDF…' : 'Retry PDF Generation'}</button></form> : null}
+      {needsEmailRetry ? <form action={retryAction}><input type="hidden" name="document_id" value={doc.id} /><button disabled={retryPending} className="rounded-lg bg-amber-500 px-3 py-2 text-xs font-black text-white disabled:opacity-50">{retryPending ? 'Retrying Email…' : 'Retry Email'}</button></form> : null}
     </div> : null}
     <Result state={processState} />
     <Result state={retryState} />
