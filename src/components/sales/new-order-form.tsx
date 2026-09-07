@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from 'react';
 import { createSalesOrderAction } from '@/app/modules/sales/actions';
+import { SalesIdentityPicker } from './sales-identity-picker';
 
 const initial = { success: false, message: '' };
 const money = (value: number) => `₦${Number(value || 0).toLocaleString('en-NG', { maximumFractionDigits: 0 })}`;
@@ -109,12 +110,12 @@ export function NewOrderForm({ inventory }: { inventory: InventoryItem[] }) {
       </div>
 
       <form action={action} className="mt-5 space-y-5">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          <input name="customer_name" placeholder="Customer name" className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
-          <input name="customer_phone" placeholder="Phone" className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
-          <input name="customer_email" type="email" placeholder="Email" className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
-          <input name="sales_staff_name" placeholder="Salesperson" className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
-          <input name="delivery_charge" type="number" min="0" placeholder="Delivery charge" className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+        <div className="grid gap-4 xl:grid-cols-[1fr_420px]">
+          <SalesIdentityPicker compact title="1. Find customer" />
+          <div className="grid content-start gap-3">
+            <input name="sales_staff_name" placeholder="Salesperson" className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+            <input name="delivery_charge" type="number" min="0" placeholder="Delivery charge" className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+          </div>
         </div>
 
         <div className="rounded-xl border border-slate-200 p-4">
