@@ -124,7 +124,7 @@ export interface OperationsOrderDetail {
 
 export interface OperationsInventoryItem {
   id: string; sku: string; name: string; description: string | null; category: string | null; item_type: OrderItemType; brand: string | null; model: string | null;
-  specs: Record<string, unknown>; default_condition: string | null; default_unit_cost: number | null; default_selling_price: number | null; preferred_supplier_id: string | null;
+  specs: Record<string, unknown>; default_condition: string | null; default_unit_cost: number | null; default_selling_price: number | null; salesperson_discount_limit_percent: number; preferred_supplier_id: string | null;
   unit: string; serial_tracking: boolean; reorder_level: number; is_active: boolean; created_at: string; updated_at: string;
   on_hand?: number; reserved?: number; available?: number;
   location_balances?: Array<{ location_id: string; location_code: string; location_name: string; on_hand: number; reserved: number; available: number }>;
