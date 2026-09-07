@@ -44,30 +44,26 @@ export async function getUnifiedSalesOverview(range: SalesReportRange): Promise<
 
 export async function getUnifiedSalesCustomers() {
   const { supabase } = await requireSalesActor();
-  const { data: identities, error } = await supabase.from('identities').select('id,identity_code,primary_name,primary_phone,primary_email').order('updated_at',{ascending:false}).limit(500);
+  const { data, error } = await supabase
+    .from('sales_customer_summary')
+    .select('*')
+    .order('sales_value', { ascending: false })
+    .limit(500);
   if (error) throw new Error(error.message);
-  if (!identities?.length) return [];
-  const ids = identities.map((row) => row.id);
-  const [revenueResult,quotesResult] = await Promise.all([
-    supabase.from('sales_revenue_balances').select('identity_id,sales_value,cash_collected,outstanding,gross_profit,source_type').in('identity_id',ids),
-    supabase.from('sales_quotations').select('identity_id,status').in('identity_id',ids),
-  ]);
-  if (revenueResult.error) throw new Error(revenueResult.error.message);
-  if (quotesResult.error) throw new Error(quotesResult.error.message);
-  return identities.map((identity) => {
-    const rows=(revenueResult.data||[]).filter((row)=>row.identity_id===identity.id);
-    const quotes=(quotesResult.data||[]).filter((row)=>row.identity_id===identity.id);
-    return {
-      ...identity,
-      salesValue:rows.reduce((sum,row)=>sum+Number(row.sales_value||0),0),
-      cashCollected:rows.reduce((sum,row)=>sum+Number(row.cash_collected||0),0),
-      outstanding:rows.reduce((sum,row)=>sum+Number(row.outstanding||0),0),
-      grossProfit:rows.reduce((sum,row)=>sum+Number(row.gross_profit||0),0),
-      repairTransactions:rows.filter((row)=>row.source_type==='repair').length,
-      quotations:quotes.length,
-      acceptedQuotations:quotes.filter((row)=>['accepted','converted'].includes(row.status)).length,
-    };
-  }).filter((row)=>row.salesValue>0||row.quotations>0);
+  return (data || []).map((row) => ({
+    id: row.id,
+    identity_code: row.identity_code,
+    primary_name: row.primary_name,
+    primary_phone: row.primary_phone,
+    primary_email: row.primary_email,
+    salesValue: Number(row.sales_value || 0),
+    cashCollected: Number(row.cash_collected || 0),
+    outstanding: Number(row.outstanding || 0),
+    grossProfit: Number(row.gross_profit || 0),
+    repairTransactions: Number(row.repair_transactions || 0),
+    quotations: Number(row.quotations || 0),
+    acceptedQuotations: Number(row.accepted_quotations || 0),
+  }));
 }
 
 export async function getUnifiedSalesReportSummary(range: SalesReportRange) {
