@@ -40,6 +40,7 @@ export async function resolveOrCreateOperationsIdentity(input: {
   name?: string | null;
   phone?: string | null;
   email?: string | null;
+  address?: string | null;
   source: 'operations_order' | 'operations_repair';
 }) {
   const supabase = await requireAdmin();
@@ -75,6 +76,7 @@ export async function searchOperationsIdentities(query: string): Promise<Operati
     `primary_name.ilike.%${raw}%`,
     `primary_email.ilike.%${raw}%`,
     `primary_phone.ilike.%${raw}%`,
+    `identity_code.ilike.%${raw}%`,
   ];
   if (phoneDigits) clauses.push(`primary_phone.ilike.%${phoneDigits.slice(-10)}%`);
   if (localPhone) clauses.push(`primary_phone.ilike.%${localPhone}%`);
@@ -85,9 +87,30 @@ export async function searchOperationsIdentities(query: string): Promise<Operati
     .or(clauses.join(','))
     .limit(8);
   if (error) throw new Error(error.message);
-  if (!identities?.length) return [];
+  let matchedIdentities = identities || [];
+  if (matchedIdentities.length < 8) {
+    const { data: signalRows, error: signalError } = await supabase
+      .from('identity_signals')
+      .select('identity_id,signal_type,signal_value')
+      .in('signal_type', ['name','phone','email','address'])
+      .ilike('signal_value', `%${raw.toLowerCase()}%`)
+      .limit(16);
+    if (signalError) throw new Error(signalError.message);
+    const missingIds = Array.from(new Set((signalRows || []).map((row) => row.identity_id)))
+      .filter((id) => !matchedIdentities.some((row) => row.id === id))
+      .slice(0, 8 - matchedIdentities.length);
+    if (missingIds.length) {
+      const { data: signalIdentities, error: signalIdentityError } = await supabase
+        .from('identities')
+        .select('id,identity_code,primary_name,primary_phone,primary_email')
+        .in('id', missingIds);
+      if (signalIdentityError) throw new Error(signalIdentityError.message);
+      matchedIdentities = [...matchedIdentities, ...(signalIdentities || [])];
+    }
+  }
+  if (!matchedIdentities.length) return [];
 
-  const ids = identities.map((row) => row.id);
+  const ids = matchedIdentities.map((row) => row.id);
   const [leadsResult, ownershipResult, cashOffResult] = await Promise.all([
     supabase.from('leads').select('id,identity_id,ambassador_id,source,funnel_stage,updated_at,created_at').in('identity_id', ids).order('updated_at', { ascending: false }),
     supabase.from('crm_lead_ownership').select('identity_id,original_ambassador_id,owner_type,owner_id,owner_label,updated_at').in('identity_id', ids),
@@ -105,7 +128,7 @@ export async function searchOperationsIdentities(query: string): Promise<Operati
   const ownershipByIdentity = new Map((ownershipResult.data || []).map((row) => [row.identity_id, row]));
   const cashOffByIdentity = new Map((cashOffResult.data || []).map((row) => [row.identity_id, Number(row.balance || 0)]));
 
-  const ambassadorIds = Array.from(new Set(identities.flatMap((identity) => {
+  const ambassadorIds = Array.from(new Set(matchedIdentities.flatMap((identity) => {
     const lead = leadByIdentity.get(identity.id);
     const ownership = ownershipByIdentity.get(identity.id);
     return [ownership?.original_ambassador_id, lead?.ambassador_id].filter(Boolean) as string[];
@@ -130,7 +153,16 @@ export async function searchOperationsIdentities(query: string): Promise<Operati
     }
   }
 
-  return Promise.all(identities.map(async (identity) => {
+  const { data: addressSignals } = await supabase
+    .from('identity_signals')
+    .select('identity_id,signal_value')
+    .in('identity_id', ids)
+    .eq('signal_type', 'address')
+    .order('last_seen_at', { ascending: false });
+  const addressByIdentity = new Map<string, string>();
+  for (const row of addressSignals || []) if (!addressByIdentity.has(row.identity_id)) addressByIdentity.set(row.identity_id, row.signal_value);
+
+  return Promise.all(matchedIdentities.map(async (identity) => {
     const lead = leadByIdentity.get(identity.id);
     const ownership = ownershipByIdentity.get(identity.id);
     const ambassadorId = ownership?.original_ambassador_id || lead?.ambassador_id || null;
@@ -143,6 +175,7 @@ export async function searchOperationsIdentities(query: string): Promise<Operati
       primary_name: identity.primary_name,
       primary_phone: identity.primary_phone,
       primary_email: identity.primary_email,
+      primary_address: addressByIdentity.get(identity.id) || null,
       crm_stage: crmStage,
       crm_stage_name: stageNames[crmStage] || 'Unknown',
       lead_id: lead?.id || null,
