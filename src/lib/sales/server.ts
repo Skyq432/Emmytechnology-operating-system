@@ -46,12 +46,14 @@ export async function resolveOrCreateSalesIdentity(input: {
   name?: string | null;
   phone?: string | null;
   email?: string | null;
+  address?: string | null;
 }) {
   return resolveOrCreateOperationsIdentity({
     existingIdentityId: input.existingIdentityId,
     name: input.name,
     phone: input.phone,
     email: input.email,
+    address: input.address,
     source: 'operations_order',
   });
 }
