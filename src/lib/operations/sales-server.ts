@@ -32,7 +32,7 @@ export async function getOperationsSuppliers(): Promise<OperationsSupplier[]> {
 export async function createOperationsSupplier(input: {
   name: string; phone?: string | null; email?: string | null; address?: string | null; notes?: string | null;
 }) {
-  const { supabase, user } = await requireAdmin();
+  const { supabase } = await requireAdmin();
   const { data, error } = await supabase.from('ops_suppliers').insert({
     name: input.name.trim(), phone: input.phone?.trim() || null, email: input.email?.trim() || null,
     address: input.address?.trim() || null, notes: input.notes?.trim() || null, created_by: user.id,
@@ -91,21 +91,13 @@ export async function updateInventoryCommercialPricing(input: {
   if (discount < 0 || discount > 100) return { success: false as const, message: 'Salesperson discount must be between 0% and 100%.' };
   if (margin < 0 || margin >= 100) return { success: false as const, message: 'Minimum gross margin must be between 0% and 99.99%.' };
 
-  const { error: itemError } = await supabase.from('ops_inventory_items').update({
-    default_selling_price: standardSellingPrice,
-    salesperson_discount_limit_percent: discount,
-  }).eq('id', input.inventoryItemId);
-  if (itemError) return { success: false as const, message: itemError.message };
-
-  const { error: policyError } = await supabase.from('sales_margin_policies').upsert({
-    policy_scope: 'product',
-    inventory_item_id: input.inventoryItemId,
-    category: null,
-    minimum_margin_percent: margin,
-    is_active: true,
-    created_by: user.id,
-  }, { onConflict: 'inventory_item_id' });
-  if (policyError) return { success: false as const, message: policyError.message };
+  const { error } = await supabase.rpc('ops_update_inventory_commercial_pricing', {
+    p_inventory_item_id: input.inventoryItemId,
+    p_standard_selling_price: standardSellingPrice,
+    p_salesperson_discount_limit_percent: discount,
+    p_minimum_gross_margin_percent: margin,
+  });
+  if (error) return { success: false as const, message: error.message };
   return { success: true as const, message: 'Commercial pricing saved.' };
 }
 
