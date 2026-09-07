@@ -40,10 +40,10 @@ async function getDocumentWithClient(supabase: SupabaseClient, documentId: strin
   return data as SalesDocumentRow;
 }
 
-async function renderAndStoreWithClient(supabase: SupabaseClient, documentId: string) {
+async function renderAndStoreWithClient(supabase: SupabaseClient, documentId: string, force = false) {
   const document = await getDocumentWithClient(supabase, documentId);
   if (document.voided_at) throw new Error('Void documents cannot be rendered');
-  if (document.render_status === 'rendered' && document.storage_path) return document;
+  if (!force && document.render_status === 'rendered' && document.storage_path) return document;
 
   const storagePath = documentStoragePath({
     documentType: document.document_type,
@@ -197,9 +197,9 @@ export async function renderAndStoreSalesDocument(documentId: string) {
   return renderAndStoreWithClient(supabase, documentId);
 }
 
-export async function createSignedSalesDocumentUrl(documentId: string, expiresIn = 300) {
+export async function createSignedSalesDocumentUrl(documentId: string, expiresIn = 300, forceRerender = false) {
   const { supabase } = await requireSalesActor();
-  const document = await renderAndStoreWithClient(supabase, documentId);
+  const document = await renderAndStoreWithClient(supabase, documentId, forceRerender);
   if (!document.storage_path) throw new Error('Document PDF is unavailable');
   const { data, error } = await supabase.storage.from(DOCUMENT_BUCKET).createSignedUrl(document.storage_path, expiresIn);
   if (error || !data?.signedUrl) throw new Error(error?.message || 'Unable to create document download link');
