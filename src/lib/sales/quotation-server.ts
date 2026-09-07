@@ -5,6 +5,7 @@ export async function createSalesQuotation(input: {
   customerName?: string | null;
   customerPhone?: string | null;
   customerEmail?: string | null;
+  customerAddress?: string | null;
   salesStaffName?: string | null;
 }) {
   const { supabase, actor } = await requireSalesActor();
@@ -13,6 +14,7 @@ export async function createSalesQuotation(input: {
     name: input.customerName,
     phone: input.customerPhone,
     email: input.customerEmail,
+    address: input.customerAddress,
   });
 
   const { data, error } = await supabase.rpc('sales_create_quotation', {
