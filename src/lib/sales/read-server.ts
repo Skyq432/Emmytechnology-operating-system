@@ -8,17 +8,34 @@ function numeric<T extends Record<string, unknown>>(row: T, fields: string[]) {
 
 export async function getSalesInventoryCatalog() {
   const supabase = await createClient();
-  const [itemsResult, availabilityResult, unitsResult, locationsResult] = await Promise.all([
+  const [itemsResult, availabilityResult, unitsResult, locationsResult, websiteLinksResult] = await Promise.all([
     supabase.from('ops_inventory_items').select('*').eq('is_active', true).order('name'),
     supabase.from('ops_inventory_availability').select('*'),
     supabase.from('ops_inventory_units').select('id,inventory_item_id,serial_number,imei_1,imei_2,unit_cost,current_location_id,status').eq('status', 'available').order('created_at'),
     supabase.from('ops_locations').select('id,code,name').eq('is_active', true).order('name'),
+    supabase.from('ops_website_product_links').select('inventory_item_id,website_product:products(price,sale_price,status)').eq('is_active', true),
   ]);
-  const errors = [itemsResult.error, availabilityResult.error, unitsResult.error, locationsResult.error].filter(Boolean);
+  const errors = [itemsResult.error, availabilityResult.error, unitsResult.error, locationsResult.error, websiteLinksResult.error].filter(Boolean);
   if (errors.length) throw new Error(errors[0]!.message);
 
+  const websitePriceByInventory = new Map<string, number>();
+  for (const link of websiteLinksResult.data || []) {
+    const product = Array.isArray(link.website_product) ? link.website_product[0] : link.website_product;
+    if (!product || product.status !== 'active') continue;
+    const price = Number(product.sale_price ?? product.price ?? 0);
+    if (price > 0) websitePriceByInventory.set(link.inventory_item_id, price);
+  }
+
   return {
-    items: (itemsResult.data || []).map((row) => numeric(row, ['default_unit_cost', 'default_selling_price', 'reorder_level'])),
+    items: (itemsResult.data || []).map((row) => {
+      const normalized = numeric(row, ['default_unit_cost', 'default_selling_price', 'reorder_level']);
+      const websitePrice = websitePriceByInventory.get(row.id);
+      return {
+        ...normalized,
+        default_selling_price: websitePrice || Number(normalized.default_selling_price || 0) || null,
+        standard_price_source: websitePrice ? 'website_product' : (normalized.default_selling_price ? 'inventory' : null),
+      };
+    }),
     availability: (availabilityResult.data || []).map((row) => numeric(row, ['on_hand', 'reserved', 'available', 'reorder_level'])),
     units: (unitsResult.data || []).map((row) => numeric(row, ['unit_cost'])),
     locations: locationsResult.data || [],
