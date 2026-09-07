@@ -1,10 +1,11 @@
 \documentclass[11pt, a4paper]{article}
 
-% EmmyTech receipt template - adapted from the approved invoice design.
-\usepackage[a4paper, top=1.2cm, bottom=1.2cm, left=1.5cm, right=1.5cm]{geometry}
+% EmmyTech receipt template — arc header + real brand logo (right-aligned).
+\usepackage[a4paper, top=3.2cm, bottom=1.3cm, left=1.5cm, right=1.5cm]{geometry}
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
-\usepackage[sfdefault]{noto}
+\usepackage{helvet}
+\renewcommand{\familydefault}{\sfdefault}
 \usepackage[english]{babel}
 \usepackage{booktabs}
 \usepackage[table]{xcolor}
@@ -12,96 +13,179 @@
 \usepackage{amsmath}
 \usepackage{graphicx}
 \usepackage{enumitem}
+\usepackage{tikz}
+\usepackage{eso-pic}
+\usetikzlibrary{calc,shapes.geometric}
 
-\definecolor{brandyellow}{RGB}{255, 184, 0}
 \definecolor{brandblue}{RGB}{0, 51, 102}
-\definecolor{statusgray}{RGB}{148, 163, 184}
+\definecolor{brandyellow}{RGB}{255, 184, 0}
+\definecolor{statusgray}{RGB}{110, 120, 135}
 \definecolor{lightgray}{gray}{0.95}
+\definecolor{hairline}{RGB}{214, 190, 130}
+
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+
+% Uniform inter-word spacing (no wide gap after a full stop)
+\frenchspacing
+
+% Block layout: no first-line paragraph indent anywhere
+\setlength{\parindent}{0pt}
+
+% ---- Decorative background: top arc band + gold trim + bottom-left accent ----
+\AddToShipoutPictureBG{%
+  \begin{tikzpicture}[remember picture,overlay]
+    % Top navy band: thick on the left, tapering to a point on the right
+    \fill[brandblue]
+      (current page.north west) --
+      (current page.north east) --
+      ([yshift=-0.9cm]current page.north east) --
+      ([yshift=-3.1cm]current page.north west) -- cycle;
+    % Gold trim line just below the band edge
+    \draw[brandyellow, line width=2.6pt]
+      ([yshift=-0.9cm]current page.north east) --
+      ([yshift=-3.1cm]current page.north west);
+    \draw[brandyellow!55, line width=1pt]
+      ([yshift=-1.12cm]current page.north east) --
+      ([yshift=-3.32cm]current page.north west);
+    % Bottom-left mirrored accent
+    \fill[brandblue]
+      (current page.south west) --
+      ([xshift=5.2cm]current page.south west) --
+      ([yshift=2.0cm]current page.south west) -- cycle;
+    \draw[brandyellow, line width=2.2pt]
+      ([xshift=5.2cm]current page.south west) --
+      ([yshift=2.0cm]current page.south west);
+  \end{tikzpicture}%
+}
+
+
+% ---- Settlement blocks (chosen by template-data.ts via <<SETTLEMENT_BLOCK>>) ----
+% Company bank details live here, not in TypeScript.
+\newcommand{\accountTable}{%
+    \arrayrulecolor{hairline}%
+    \renewcommand{\arraystretch}{1.55}%
+    \setlength{\tabcolsep}{7pt}%
+    \begin{tabularx}{\linewidth}{|l|Y|}
+        \hline
+        \textbf{Account Name:} & Emmy Technologies PC PROFESSIONAL \\
+        \hline
+        \textbf{Account No:} & \textbf{5128460113} \\
+        \hline
+        \textbf{Bank:} & \textbf{Moniepoint} \\
+        \hline
+    \end{tabularx}%
+}
+
+% Fully settled: confirm, never ask for money.
+\newcommand{\settledBlock}{%
+    \textbf{\textcolor{brandblue}{SETTLEMENT STATUS}}%
+    \vspace{2.6mm}\par
+    {\small\raggedright This transaction is fully settled. No further payment is due.\par}%
+    \vspace{2.4mm}\par
+    \textit{\small\textcolor{statusgray}{Retain this receipt as proof of payment.}}%
+}
+
+% Balance outstanding: #1 = formatted amount, #2 = payment reference.
+\newcommand{\outstandingBlock}[2]{%
+    \textbf{\textcolor{brandblue}{OUTSTANDING BALANCE}}%
+    \vspace{2.6mm}\par
+    {\small\raggedright Balance of \textbf{NGN #1} remains on this transaction.
+     To settle, transfer to the account below:\par}%
+    \vspace{3.2mm}\par
+    \accountTable
+    \vspace{3.4mm}\par
+    {\raggedright\hyphenpenalty=10000\exhyphenpenalty=10000%
+     \textit{\small Quote \textbf{#2} as your payment reference.}\par}%
+}
 
 \begin{document}
 \pagestyle{empty}
 
-% --- Header Section ---
+% --- Title (left) + Brand logo (right) ---
 \noindent
-\begin{minipage}[t]{0.65\textwidth}
-    \vspace{0pt}
-    \IfFileExists{Emmytech2.png}{%
-        \includegraphics[height=1.4cm]{Emmytech2.png}
-    }{%
-        {\Huge\textbf{\textcolor{brandblue}{EMMY} \textcolor{brandyellow}{TECHNOLOGY}}}
-    } \\
-    \vspace{1mm}
-    \textbf{\textcolor{brandblue}{Computer Resources}} \\
-    \textit{\small Professional Tech Solutions \& ICT Consultancy} \\[8pt]
-    \small
-    \textbf{Sango branch:} Shop 9, The 16th shopping plaza beside \\
-    \textit{SPAC Church, Sango-Poly Road, Ibadan.} \\[8pt]
-    \textbf{Phone:} +234 814 650 3700 \\
-    \textbf{Email:} support@emmytechnology.com
+\begin{minipage}[c][2.0cm][c]{0.63\textwidth}
+  {\Huge\textbf{\textcolor{brandblue}{PAYMENT} \textcolor{black}{RECEIPT}}}\\[2.4mm]
+  \textit{\footnotesize\textcolor{statusgray}{Computer Resources \ --\ Professional Tech Solutions \& ICT Consultancy}}
 \end{minipage}
 \hfill
-\begin{minipage}[t]{0.3\textwidth}
-    \vspace{0pt}
-    \raggedleft
-    {\Huge\textbf{\textcolor{gray!15}{RECEIPT}}} \\
-    \vspace{3mm}
-    \textbf{Receipt No:} \textcolor{brandblue}{<<DOCUMENT_NUMBER>>} \\
-    \textbf{Date Issued:} <<DATE_ISSUED>> \\
-    \textbf{Reference:} <<SOURCE_REFERENCE>>
+\begin{minipage}[c][2.0cm][c]{0.33\textwidth}
+  \raggedleft
+  \IfFileExists{Emmytech2.png}{%
+    \includegraphics[height=1.95cm]{Emmytech2.png}%
+  }{%
+    {\Large\textbf{\textcolor{brandblue}{EMMY}\textcolor{brandyellow}{TECHNOLOGY}}}%
+  }
 \end{minipage}
 
 \vspace{4mm}
-{\color{brandblue}\hrule height 2pt}
-\vspace{4mm}
+\small
+\textbf{Receipt No:}\ \textcolor{brandblue}{\textbf{<<DOCUMENT_NUMBER>>}} \hspace{8mm}
+\textbf{Date Issued:}\ <<DATE_ISSUED>> \hspace{8mm}
+\textbf{<<REFERENCE_LABEL>>:}\ <<SOURCE_REFERENCE>>
+
+\vspace{3mm}
+{\color{hairline}\hrule height 1.4pt}
+\vspace{5mm}
 
 % --- Client and Status Info ---
 \noindent
 \begin{minipage}[t]{0.55\textwidth}
-    \textbf{\textcolor{brandblue}{RECEIVED FROM:}} \\
+    \textbf{\textcolor{brandblue}{RECEIVED FROM}} \\[1mm]
     {\large\textbf{<<CUSTOMER_NAME>>}} \\
-    \small <<CUSTOMER_CONTACT>> \\
+    \small <<CUSTOMER_CONTACT>>
 \end{minipage}
 \hfill
 \begin{minipage}[t]{0.4\textwidth}
     \raggedleft
-    \textbf{\textcolor{brandblue}{PAYMENT STATUS:}} \\
-    \vspace{1mm}
-    \textcolor{statusgray}{\large\textbf{<<PAYMENT_STATUS>>}}
+    \textbf{\textcolor{brandblue}{PAYMENT STATUS}} \\[1mm]
+    \textcolor{statusgray}{\Large\textbf{<<PAYMENT_STATUS>>}}
 \end{minipage}
 
-\vspace{6mm}
+\vspace{7mm}
 
 % --- Itemized Table ---
 {\large\textbf{\textcolor{brandblue}{SERVICE \& PRODUCT RECEIPT}}}
 \vspace{2mm}
 
-\renewcommand{\arraystretch}{1.3}
-\begin{tabularx}{\textwidth}{l X r}
+\renewcommand{\arraystretch}{1.4}
+\arrayrulecolor{hairline}
+\begin{tabularx}{\textwidth}{|l|Y|r|}
+    \hline
     \rowcolor{brandblue}
-    \textbf{\textcolor{white}{S/N}} & \textbf{\textcolor{white}{Description of Services \& Products}} & \textbf{\textcolor{white}{Amount (NGN)}} \\
-    \midrule
+    \textcolor{white}{\textbf{S/N}} &
+    \textcolor{white}{\textbf{Description of Services \& Products}} &
+    \textcolor{white}{\textbf{Amount (NGN)}} \\
+    \hline
+
 <<ITEM_ROWS>>
-    \midrule
+
+    \hline
     \rowcolor{lightgray}
-    & \textbf{TRANSACTION TOTAL} & \textbf{<<TRANSACTION_TOTAL>>} \\
-    \bottomrule
+    & \textbf{TRANSACTION TOTAL} & \textbf{NGN <<TRANSACTION_TOTAL>>} \\
+    \hline
 \end{tabularx}
-
-\vspace{4mm}
-
-\begin{flushright}
-\begin{tabular}{l r}
-    \textbf{Amount Received:} & \textbf{<<AMOUNT_RECEIVED>>} \\
-    Total Paid to Date: & <<TOTAL_PAID>> \\
-    \textbf{Balance Due:} & \textbf{<<BALANCE_DUE>>} \\
-\end{tabular}
-\end{flushright}
 
 \vspace{4mm}
 
 \noindent
 \begin{minipage}[t]{0.48\textwidth}
-    \textbf{\textcolor{brandblue}{SERVICE NOTES}} \\
+\hspace{0pt}
+\end{minipage}
+\hfill
+\begin{minipage}[t]{0.48\textwidth}
+    \renewcommand{\arraystretch}{1.25}
+    \begin{tabular*}{\linewidth}{@{}l@{\extracolsep{\fill}}r@{}}
+        \textbf{Amount Received:} & \textbf{NGN <<AMOUNT_RECEIVED>>} \\
+        Total Paid to Date: & NGN <<TOTAL_PAID>> \\
+        \textbf{Balance Due:} & \textbf{NGN <<BALANCE_DUE>>} \\
+    \end{tabular*}
+\end{minipage}
+
+\vspace{6mm}
+
+\noindent
+\begin{minipage}[t]{0.48\textwidth}
+    \textbf{\textcolor{brandblue}{SERVICE NOTES}} \\[1mm]
     \begin{itemize}[leftmargin=*, noitemsep, topsep=1pt]
         \item \small All items are genuine and tested
         \item \small Installation materials include applicable warranty
@@ -111,7 +195,7 @@
 \end{minipage}
 \hfill
 \begin{minipage}[t]{0.48\textwidth}
-    \textbf{\textcolor{brandblue}{PAYMENT DETAILS}}
+    \textbf{\textcolor{brandblue}{PAYMENT DETAILS}} \\[1mm]
     \begin{itemize}[leftmargin=*, noitemsep, topsep=1pt]
         \item \small Payment method: <<PAYMENT_METHOD>>
         \item \small Payment reference: <<PAYMENT_REFERENCE>>
@@ -120,47 +204,37 @@
     \end{itemize}
 \end{minipage}
 
-\vspace{5mm}
+\vspace{6mm}
 
-\begin{flushright}
-    \begin{minipage}{0.65\textwidth}
-        \raggedleft
-        \small
-        \textit{Thank you for your payment and for choosing Emmy Technology.}
-    \end{minipage}
-\end{flushright}
-
-\vspace{4mm}
-
-% --- Payment Instructions / Account Reference ---
+% --- Settlement block (built in template-data.ts) + thanks ---
 \noindent
-\begin{minipage}[t]{0.65\textwidth}
-    \textbf{\textcolor{brandblue}{PAYMENT ACCOUNT}} \\
-    \vspace{1mm}
-    \small For any outstanding balance, payment can be made to: \\
-    \vspace{1mm}
-    \begin{tabular}{|l l|}
-        \hline
-        \textbf{Account Name:} & Emmy Technologies PC PROFESSIONAL \\
-        \textbf{Account No:} & \textbf{5128460113} \\
-        \textbf{Bank:} & \textbf{Moniepoint} \\
-        \hline
-    \end{tabular} \\
-    \vspace{2mm}
-    \textit{\small Please mention \textbf{<<SOURCE_REFERENCE>>} in your transfer description.}
+\begin{minipage}[t]{0.48\textwidth}
+<<SETTLEMENT_BLOCK>>
+\end{minipage}
+\hfill
+\begin{minipage}[t]{0.48\textwidth}
+    \textbf{\textcolor{brandblue}{WITH THANKS}} \\[1mm]
+    {\small\textit{\textcolor{statusgray}{Thank you for your payment and for choosing Emmy Technology.}}}
 \end{minipage}
 
 \vfill
 
 % --- Footer ---
 \begin{center}
-    {\color{brandyellow}\hrule height 1pt}
+    {\color{brandyellow}\hrule height 1.6pt}
     \vspace{2mm}
+    \textbf{\textcolor{brandblue}{Thank you for choosing Emmy Technology!}} \\
+    \small We value our partnership and look forward to working with you again.
+    \vspace{3mm}
+
     \small
-    \textbf{Thank you for choosing Emmy Technology!} \\
-    We value our partnership and look forward to working with you again. \\
-    \vspace{1mm}
-    \textcolor{brandblue}{www.emmytechnology.com} | \textcolor{brandblue}{support@emmytechnology.com}
+    \begin{tabular}{cccc}
+    \textbf{\textcolor{brandblue}{\textbullet}}~+234 814 650 3700 &
+    \textbf{\textcolor{brandblue}{\textbullet}}~www.emmytechnology.com &
+    \textbf{\textcolor{brandblue}{\textbullet}}~support@emmytechnology.com &
+    \textbf{\textcolor{brandblue}{\textbullet}}~Sango branch, Ibadan \\
+    \end{tabular}
 \end{center}
+\vspace{2mm}
 
 \end{document}
