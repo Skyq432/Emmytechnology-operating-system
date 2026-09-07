@@ -1,7 +1,16 @@
 import { DirectSaleWorkspace } from '@/components/sales/direct-sale-workspace';
 import { getSalesInventoryCatalog } from '@/lib/sales/read-server';
+import { requireSalesActor } from '@/lib/sales/server';
 
 export default async function DirectSalePage() {
-  const data = await getSalesInventoryCatalog();
-  return <DirectSaleWorkspace inventory={data.items as never[]} availability={data.availability as never[]} units={data.units as never[]} locations={data.locations as never[]} />;
+  const [data, { actor }] = await Promise.all([getSalesInventoryCatalog(), requireSalesActor()]);
+  return (
+    <DirectSaleWorkspace
+      inventory={data.items as never[]}
+      availability={data.availability as never[]}
+      units={data.units as never[]}
+      locations={data.locations as never[]}
+      actor={{ authorityLevel: actor.authorityLevel, discountLimitPercent: actor.discountLimitPercent }}
+    />
+  );
 }
