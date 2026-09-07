@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { renderFallbackSalesPdf } from './fallback-pdf.ts';
 import {
   buildQuotationTemplateData,
   buildReceiptTemplateData,
@@ -94,7 +95,7 @@ export async function renderDocumentPdf(input: {
   } catch (error) {
     const typed = error as NodeJS.ErrnoException;
     if (typed.code === 'ENOENT') {
-      throw new Error('pdflatex is unavailable. Configure SALES_LATEX_RENDER_URL for hosted document generation.');
+      return renderFallbackSalesPdf(input);
     }
     throw error;
   }
