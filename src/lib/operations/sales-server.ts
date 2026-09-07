@@ -45,13 +45,17 @@ export async function getInventoryItemDetail(itemId: string): Promise<{
   units: OperationsInventoryUnit[];
   locations: OperationsLocation[];
   suppliers: OperationsSupplier[];
+  minimumGrossMarginPercent: number;
+  websiteProduct: { id: string; name: string; price: number | null; sale_price: number | null; status: string | null } | null;
 }> {
   const { supabase } = await requireAdmin();
-  const [itemResult, unitsResult, locationsResult, suppliersResult] = await Promise.all([
+  const [itemResult, unitsResult, locationsResult, suppliersResult, marginResult, websiteResult] = await Promise.all([
     supabase.from('ops_inventory_items').select('*').eq('id', itemId).single(),
     supabase.from('ops_inventory_units').select('*,supplier:ops_suppliers(id,name),location:ops_locations(id,name,code)').eq('inventory_item_id', itemId).order('created_at', { ascending: false }),
     supabase.from('ops_locations').select('id,code,name,location_type').eq('is_active', true).order('name'),
     supabase.from('ops_suppliers').select('*').eq('is_active', true).order('name'),
+    supabase.from('sales_margin_policies').select('minimum_margin_percent').eq('policy_scope','product').eq('inventory_item_id', itemId).eq('is_active', true).maybeSingle(),
+    supabase.from('ops_website_product_links').select('website_product:products(id,name,price,sale_price,status)').eq('inventory_item_id', itemId).eq('is_active', true).limit(1).maybeSingle(),
   ]);
   if (itemResult.error) throw new Error(itemResult.error.message);
   if (unitsResult.error) throw new Error(unitsResult.error.message);
@@ -62,6 +66,14 @@ export async function getInventoryItemDetail(itemId: string): Promise<{
     units: (unitsResult.data || []) as OperationsInventoryUnit[],
     locations: (locationsResult.data || []) as OperationsLocation[],
     suppliers: (suppliersResult.data || []) as OperationsSupplier[],
+    minimumGrossMarginPercent: Number(marginResult.data?.minimum_margin_percent || 0),
+    websiteProduct: (() => {
+      const raw = websiteResult.data?.website_product as unknown;
+      const product = Array.isArray(raw) ? raw[0] : raw;
+      if (!product || typeof product !== 'object') return null;
+      const p = product as { id: string; name: string; price: number | null; sale_price: number | null; status: string | null };
+      return { ...p, price: p.price == null ? null : Number(p.price), sale_price: p.sale_price == null ? null : Number(p.sale_price) };
+    })(),
   };
 }
 
