@@ -39,7 +39,15 @@ export async function retryDocumentAction(_prev: DocumentActionState, formData: 
     const result = await retrySalesDocument(documentId);
     refresh();
     const failed = result.deliveries.filter((row) => !row.success).length;
-    return { success: failed === 0, message: failed ? `Retry completed with ${failed} delivery failure(s).` : 'Document retry completed successfully.' };
+    const smtpMissing = result.deliveries.some((row) => !row.success && /SMTP is not configured/i.test(row.message));
+    return {
+      success: failed === 0,
+      message: failed
+        ? smtpMissing
+          ? 'PDF is ready. Email sending is not configured yet.'
+          : `Email retry completed with ${failed} delivery failure(s).`
+        : 'Email delivery retry completed successfully.',
+    };
   } catch (error) {
     refresh();
     return fail(error instanceof Error ? error.message : 'Unable to retry document.');
