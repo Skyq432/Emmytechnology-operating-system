@@ -12,7 +12,7 @@ const initialSales: SalesActionState = { success: false, message: '' };
 const initialInventory: InventoryActionState = { success: false, message: '' };
 const money = (value: number | null | undefined) => value == null ? '—' : `₦${Number(value).toLocaleString('en-NG', { maximumFractionDigits: 0 })}`;
 
-export function InventoryDetail({ item, units, locations, suppliers }: {
+export function InventoryDetail({ item, units, locations, suppliers, minimumGrossMarginPercent, websiteProduct }: {
   item: OperationsInventoryItem;
   units: OperationsInventoryUnit[];
   locations: OperationsLocation[];
