@@ -87,6 +87,12 @@ export async function renderDocumentPdf(input: {
   issuedAt: string;
   snapshot: JsonRecord;
 }): Promise<Buffer> {
+  // Receipts are customer/staff-facing PDFs. LaTeX remains an internal editable
+  // technical source/reference, but receipt delivery must not depend on a TeX runtime.
+  if (input.documentType === 'payment_receipt' || input.documentType === 'final_sales_receipt') {
+    return renderFallbackSalesPdf(input);
+  }
+
   const source = await buildDocumentLatex(input);
   const logo = await fs.readFile(path.join(templateDir(), 'Emmytech2.png'));
   if (process.env.SALES_LATEX_RENDER_URL?.trim()) return renderRemote(source, logo);
