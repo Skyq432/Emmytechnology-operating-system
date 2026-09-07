@@ -1,9 +1,17 @@
 'use client';
 
 import { useActionState, useEffect, useMemo, useState } from 'react';
-import { createDirectSaleAction } from '@/app/modules/sales/actions';
+import {
+  approveCreditAction,
+  completeHandoverAction,
+  confirmDirectSaleAction,
+  createDirectSaleAction,
+  recordSalesPaymentAction,
+  type SalesActionState,
+} from '@/app/modules/sales/actions';
+import type { DirectSaleCheckoutSnapshot } from '@/lib/sales/direct-sale-server';
 
-const initialState = { success: false, message: '' };
+const initialState: SalesActionState = { success: false, message: '' };
 const money = (value: number) => `₦${Number(value || 0).toLocaleString('en-NG', { maximumFractionDigits: 0 })}`;
 
 type InventoryItem = {
@@ -23,6 +31,120 @@ type IdentityResult = {
   id: string; identity_code: string; primary_name: string | null; primary_phone: string | null; primary_email: string | null;
   crm_stage_name?: string; ambassador_name?: string | null; acquisition_source?: string | null; cash_off_balance?: number;
 };
+
+function DirectSaleCheckout({ initialCheckout, isAdmin }: { initialCheckout: DirectSaleCheckoutSnapshot; isAdmin: boolean }) {
+  const [checkout, setCheckout] = useState(initialCheckout);
+  const [confirmState, confirmAction, confirming] = useActionState(confirmDirectSaleAction, initialState);
+  const [paymentState, paymentAction, paying] = useActionState(recordSalesPaymentAction, initialState);
+  const [creditState, creditAction, crediting] = useActionState(approveCreditAction, initialState);
+  const [handoverState, handoverAction, handing] = useActionState(completeHandoverAction, initialState);
+
+  useEffect(() => {
+    const candidates = [confirmState, paymentState, creditState, handoverState];
+    for (const candidate of candidates) {
+      if (candidate.success && candidate.data) setCheckout(candidate.data as DirectSaleCheckoutSnapshot);
+    }
+  }, [confirmState, paymentState, creditState, handoverState]);
+
+  const latestState = [handoverState, paymentState, creditState, confirmState].find((row) => row.message);
+  const confirmed = checkout.commercialState === 'confirmed';
+  const completed = Boolean(checkout.handoverCompletedAt) || checkout.fulfilmentStatus === 'completed';
+  const creditCoversBalance = Boolean(checkout.credit && checkout.credit.status === 'active' && checkout.credit.approvedOutstandingAmount >= checkout.outstanding);
+  const canHandover = confirmed && !completed && (checkout.outstanding <= 0 || creditCoversBalance);
+  const finalReceipt = checkout.documents.find((doc) => doc.documentType === 'final_sales_receipt');
+  const paymentReceipts = checkout.documents.filter((doc) => doc.documentType === 'payment_receipt');
+
+  return (
+    <div className="grid gap-5 xl:grid-cols-[360px_1fr]">
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-400">Current checkout</div>
+        <h2 className="mt-2 text-xl font-black text-[#032489]">{checkout.customerName || 'Customer'}</h2>
+        <div className="mt-1 text-xs text-slate-500">{checkout.customerPhone || 'No phone'}{checkout.customerEmail ? ` · ${checkout.customerEmail}` : ''}</div>
+        <div className="mt-4 rounded-xl bg-slate-50 p-3">
+          <div className="text-[10px] font-black uppercase text-slate-400">Sale ID</div>
+          <div className="mt-1 font-black text-slate-900">{checkout.orderCode}</div>
+        </div>
+        <div className="mt-4 space-y-2">{checkout.items.map((item) => (
+          <div key={item.id} className="rounded-xl border border-slate-200 p-3">
+            <div className="text-sm font-bold text-slate-900">{item.itemName}</div>
+            <div className="mt-1 flex justify-between text-xs text-slate-500"><span>{item.quantity} × {money(item.unitPrice)}</span><b>{money(item.lineTotal)}</b></div>
+          </div>
+        ))}</div>
+        <button type="button" onClick={() => window.location.reload()} className="mt-5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-black text-[#032489]">Start New Direct Sale</button>
+      </section>
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div><div className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-400">Checkout</div><h2 className="mt-1 text-xl font-black text-slate-900">{completed ? 'Sale completed' : confirmed ? 'Payment & handover' : '3. Confirm sale'}</h2></div>
+          <div className="rounded-xl bg-blue-50 px-4 py-2 text-lg font-black text-[#032489]">{money(checkout.totalAmount)}</div>
+        </div>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-xl bg-slate-50 p-3"><div className="text-[10px] font-black uppercase text-slate-400">Total</div><div className="mt-1 font-black">{money(checkout.totalAmount)}</div></div>
+          <div className="rounded-xl bg-emerald-50 p-3"><div className="text-[10px] font-black uppercase text-emerald-600">Paid</div><div className="mt-1 font-black text-emerald-800">{money(checkout.paidAmount)}</div></div>
+          <div className="rounded-xl bg-amber-50 p-3"><div className="text-[10px] font-black uppercase text-amber-600">Outstanding</div><div className="mt-1 font-black text-amber-800">{money(checkout.outstanding)}</div></div>
+        </div>
+
+        {!confirmed && !completed ? (
+          <form action={confirmAction} className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 p-4">
+            <input type="hidden" name="order_id" value={checkout.id} />
+            <div className="font-black text-blue-950">Confirm this Direct Sale</div>
+            <p className="mt-1 text-xs leading-5 text-blue-700">This reserves the selected stock and turns the draft into a real commercial sale. Check the customer, items and total before continuing.</p>
+            <button disabled={confirming} className="mt-3 w-full rounded-xl bg-[#032489] px-4 py-3 text-sm font-black text-white disabled:opacity-50">{confirming ? 'Confirming & reserving stock…' : 'Confirm Sale & Reserve Stock'}</button>
+          </form>
+        ) : null}
+
+        {confirmed && !completed ? (
+          <div className="mt-5 grid gap-4 lg:grid-cols-2">
+            {checkout.outstanding > 0 ? <form action={paymentAction} className="rounded-2xl border border-slate-200 p-4">
+              <input type="hidden" name="order_id" value={checkout.id} />
+              <div className="font-black text-slate-900">4. Record payment</div>
+              <p className="mt-1 text-xs text-slate-500">Enter the amount actually received. Partial payments are allowed.</p>
+              <input name="amount" type="number" min="1" max={checkout.outstanding} defaultValue={checkout.outstanding} required className="mt-3 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <select name="payment_method" className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm"><option value="bank_transfer">Bank transfer</option><option value="pos">POS</option><option value="cash">Cash</option><option value="split">Split</option><option value="other">Other</option></select>
+                <input name="reference" placeholder="Reference (optional)" className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+              </div>
+              <button disabled={paying} className="mt-3 w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-black text-white disabled:opacity-50">{paying ? 'Recording…' : 'Record Payment'}</button>
+            </form> : <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4"><div className="font-black text-emerald-900">✓ Payment complete</div><p className="mt-1 text-xs text-emerald-700">The sale is fully paid and is ready for physical handover.</p></div>}
+
+            {checkout.outstanding > 0 && isAdmin ? <form action={creditAction} className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <input type="hidden" name="order_id" value={checkout.id} />
+              <div className="font-black text-amber-950">Admin credit release</div>
+              <p className="mt-1 text-xs text-amber-700">Only use this when the customer may collect before paying the full balance.</p>
+              <input name="approved_outstanding_amount" type="number" min="1" max={checkout.outstanding} defaultValue={checkout.outstanding} className="mt-3 w-full rounded-xl border border-amber-200 px-3 py-2.5 text-sm" />
+              <input name="due_at" type="datetime-local" required className="mt-2 w-full rounded-xl border border-amber-200 px-3 py-2.5 text-sm" />
+              <input name="reason" required placeholder="Reason for credit release" className="mt-2 w-full rounded-xl border border-amber-200 px-3 py-2.5 text-sm" />
+              <button disabled={crediting} className="mt-3 w-full rounded-xl bg-amber-700 px-4 py-3 text-sm font-black text-white disabled:opacity-50">{crediting ? 'Approving…' : creditCoversBalance ? 'Credit Already Covers Balance' : 'Approve Credit Release'}</button>
+            </form> : null}
+          </div>
+        ) : null}
+
+        {confirmed && !completed ? (
+          <form action={handoverAction} className={`mt-4 rounded-2xl border p-4 ${canHandover ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`}>
+            <input type="hidden" name="order_id" value={checkout.id} />
+            <div className={`font-black ${canHandover ? 'text-emerald-900' : 'text-slate-700'}`}>5. Physical handover</div>
+            <p className="mt-1 text-xs text-slate-500">{canHandover ? (checkout.outstanding <= 0 ? 'Payment is complete. Confirm that the product has physically been given to the customer.' : `Active Admin credit covers the ${money(checkout.outstanding)} balance. You may release the product.`) : `${money(checkout.outstanding)} remains unpaid. Full payment or sufficient Admin credit is required before handover.`}</p>
+            <button disabled={handing || !canHandover} className="mt-3 w-full rounded-xl bg-emerald-700 px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-slate-300">{handing ? 'Completing handover…' : 'Complete Handover'}</button>
+          </form>
+        ) : null}
+
+        {completed ? <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+          <div className="text-lg font-black text-emerald-900">✓ Sale completed successfully</div>
+          <p className="mt-1 text-sm text-emerald-700">The handover is recorded and inventory has been updated. This transaction remains connected to the same CRM Identity and Order ID.</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {finalReceipt ? <a href={`/api/sales/documents/${finalReceipt.id}`} target="_blank" rel="noreferrer" className="rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-black text-white">View Final Receipt</a> : null}
+            {paymentReceipts.map((doc) => <a key={doc.id} href={`/api/sales/documents/${doc.id}`} target="_blank" rel="noreferrer" className="rounded-xl border border-emerald-300 bg-white px-4 py-2.5 text-xs font-black text-emerald-800">{doc.documentNumber}</a>)}
+            <button type="button" onClick={() => window.location.reload()} className="rounded-xl border border-emerald-300 bg-white px-4 py-2.5 text-xs font-black text-emerald-800">New Direct Sale</button>
+          </div>
+          {!finalReceipt && checkout.outstanding <= 0 ? <div className="mt-3 text-xs font-semibold text-amber-700">Final receipt metadata is still being processed. Payment remains safely recorded.</div> : null}
+        </div> : null}
+
+        {latestState?.message ? <div className={`mt-4 rounded-xl px-3 py-2 text-sm font-semibold ${latestState.success ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{latestState.message}</div> : null}
+      </section>
+    </div>
+  );
+}
 
 export function DirectSaleWorkspace({ inventory, availability, units, locations, actor }: {
   inventory: InventoryItem[]; availability: Availability[]; units: Unit[]; locations: Location[];
@@ -120,9 +242,15 @@ export function DirectSaleWorkspace({ inventory, availability, units, locations,
     setServiceName(''); setServiceCost(''); setServiceList(''); setServicePrice(''); setQty(1); setExceptionReason('');
   }
 
+  const createdCheckout = state.success && state.data ? state.data as DirectSaleCheckoutSnapshot : null;
+
   return (
     <div className="mx-auto max-w-[1400px] space-y-5">
       <div><p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">Immediate commercial sale</p><h1 className="mt-2 text-3xl font-black text-[#032489]">Direct Sale</h1><p className="mt-2 text-sm text-slate-500">Use real Operations stock for physical products. Drafts do not consume stock; physical handover happens only after confirmation and payment or approved credit.</p></div>
+
+      {createdCheckout ? <DirectSaleCheckout initialCheckout={createdCheckout} isAdmin={actor.authorityLevel === 'admin'} /> : null}
+
+      {!createdCheckout ? <>
 
       <form action={action} className="grid gap-5 xl:grid-cols-[360px_1fr]">
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -172,6 +300,7 @@ export function DirectSaleWorkspace({ inventory, availability, units, locations,
           <button disabled={pending || !lines.length} className="mt-4 w-full rounded-xl bg-[#032489] px-4 py-3 text-sm font-black text-white disabled:opacity-50">{pending ? 'Creating…' : 'Create Direct Sale Draft'}</button>
         </section>
       </form>
+      </> : null}
     </div>
   );
 }
