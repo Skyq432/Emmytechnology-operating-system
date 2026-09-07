@@ -87,20 +87,25 @@ export async function renderDocumentPdf(input: {
   issuedAt: string;
   snapshot: JsonRecord;
 }): Promise<Buffer> {
-  // Receipts are customer/staff-facing PDFs. LaTeX remains an internal editable
-  // technical source/reference, but receipt delivery must not depend on a TeX runtime.
-  if (input.documentType === 'payment_receipt' || input.documentType === 'final_sales_receipt') {
-    return renderFallbackSalesPdf(input);
-  }
-
   const source = await buildDocumentLatex(input);
   const logo = await fs.readFile(path.join(templateDir(), 'Emmytech2.png'));
+
+  // Receipts have one canonical visual source: receipt.tex.
+  // Never substitute a different receipt design if TeX is unavailable.
+  const isReceipt = input.documentType === 'payment_receipt' || input.documentType === 'final_sales_receipt';
+
   if (process.env.SALES_LATEX_RENDER_URL?.trim()) return renderRemote(source, logo);
+
   try {
     return await renderLocal(source, logo);
   } catch (error) {
     const typed = error as NodeJS.ErrnoException;
     if (typed.code === 'ENOENT') {
+      if (isReceipt) {
+        throw new Error(
+          'Receipt PDF renderer is not configured. The approved receipt.tex requires pdflatex (or SALES_LATEX_RENDER_URL). No alternate receipt design will be used.'
+        );
+      }
       return renderFallbackSalesPdf(input);
     }
     throw error;
