@@ -32,7 +32,7 @@ export async function getOperationsSuppliers(): Promise<OperationsSupplier[]> {
 export async function createOperationsSupplier(input: {
   name: string; phone?: string | null; email?: string | null; address?: string | null; notes?: string | null;
 }) {
-  const { supabase } = await requireAdmin();
+  const { supabase, user } = await requireAdmin();
   const { data, error } = await supabase.from('ops_suppliers').insert({
     name: input.name.trim(), phone: input.phone?.trim() || null, email: input.email?.trim() || null,
     address: input.address?.trim() || null, notes: input.notes?.trim() || null, created_by: user.id,
