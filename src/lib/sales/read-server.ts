@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase-server';
-import { requireSalesActor } from './server';
 
 function numeric<T extends Record<string, unknown>>(row: T, fields: string[]) {
   const copy = { ...row } as Record<string, unknown>;
@@ -8,7 +7,7 @@ function numeric<T extends Record<string, unknown>>(row: T, fields: string[]) {
 }
 
 export async function getSalesInventoryCatalog() {
-  const { supabase } = await requireSalesActor();
+  const supabase = await createClient();
   const [itemsResult, availabilityResult, unitsResult, locationsResult] = await Promise.all([
     supabase.from('ops_inventory_items').select('*').eq('is_active', true).order('name'),
     supabase.from('ops_inventory_availability').select('*'),
@@ -27,10 +26,10 @@ export async function getSalesInventoryCatalog() {
 }
 
 export async function getSalesQuotations() {
-  const { supabase } = await requireSalesActor();
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from('sales_quotations')
-    .select('*,current_version:sales_quotation_versions!sales_quotations_current_version_fk(*,items:sales_quotation_items(*)),acceptances:sales_quotation_acceptances(*),deliveries:sales_quotation_deliveries(*)')
+    .select('*,current_version:sales_quotation_versions!sales_quotations_current_version_fk(*,items:sales_quotation_items(*),acceptance:sales_quotation_acceptances(*),deliveries:sales_quotation_deliveries(*))')
     .order('updated_at', { ascending: false });
   if (error) throw new Error(error.message);
   return (data || []).map((row) => ({
@@ -40,7 +39,7 @@ export async function getSalesQuotations() {
 }
 
 export async function getSalesOrders() {
-  const { supabase } = await requireSalesActor();
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from('ops_orders')
     .select('*,items:ops_order_items(*),payments:ops_order_payments(*),credit:sales_credit_releases(*)')
@@ -50,14 +49,14 @@ export async function getSalesOrders() {
 }
 
 export async function getSalesPayments() {
-  const { supabase } = await requireSalesActor();
+  const supabase = await createClient();
   const { data, error } = await supabase.from('sales_unified_payments').select('*').order('paid_at', { ascending: false });
   if (error) throw new Error(error.message);
   return (data || []).map((row) => numeric(row, ['amount']));
 }
 
 export async function getSalesDocuments() {
-  const { supabase } = await requireSalesActor();
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from('sales_documents')
     .select('*,deliveries:sales_document_deliveries(*)')
@@ -67,7 +66,7 @@ export async function getSalesDocuments() {
 }
 
 export async function getSalesCustomers() {
-  const { supabase } = await requireSalesActor();
+  const supabase = await createClient();
   const { data: identities, error } = await supabase
     .from('identities')
     .select('id,identity_code,primary_name,primary_phone,primary_email')
@@ -101,7 +100,7 @@ export async function getSalesCustomers() {
 }
 
 export async function getSalesCredit() {
-  const { supabase } = await requireSalesActor();
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from('sales_credit_releases')
     .select('*,order:ops_orders(order_code,customer_name,customer_phone,identity_id,total_amount,balance_due)')
@@ -111,7 +110,7 @@ export async function getSalesCredit() {
 }
 
 export async function getSalesReturns() {
-  const { supabase } = await requireSalesActor();
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from('sales_returns')
     .select('*,order:ops_orders(order_code,customer_name,total_amount),items:sales_return_items(*),refunds:sales_refunds(*)')
@@ -121,7 +120,7 @@ export async function getSalesReturns() {
 }
 
 export async function getSalesTeamPerformance() {
-  const { supabase } = await requireSalesActor();
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from('sales_commercial_balances')
     .select('sales_staff_user_id,sales_staff_name,sales_channel,sales_value,cash_collected,outstanding,gross_profit');
@@ -141,7 +140,7 @@ export async function getSalesTeamPerformance() {
 }
 
 export async function getSalesSettings() {
-  const { supabase } = await requireSalesActor();
+  const supabase = await createClient();
   const [settingsResult, marginResult, authorityResult, usersResult] = await Promise.all([
     supabase.from('sales_settings').select('*').eq('settings_key', 'default').single(),
     supabase.from('sales_margin_policies').select('*,inventory_item:ops_inventory_items(name,sku,category)').eq('is_active', true).order('policy_scope'),
@@ -156,7 +155,7 @@ export async function getSalesSettings() {
 }
 
 export async function getSalesReportSummary() {
-  const { supabase } = await requireSalesActor();
+  const supabase = await createClient();
   const [balancesResult, returnsResult, refundsResult, quotesResult] = await Promise.all([
     supabase.from('sales_commercial_balances').select('*'),
     supabase.from('sales_returns').select('id,status'),
