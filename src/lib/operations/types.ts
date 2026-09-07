@@ -16,7 +16,7 @@ export type RepairConsentType = 'repair_authorization' | 'completion_acceptance'
 export type SolarInstallationStatus = 'not_required' | 'pending' | 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
 
 export interface OperationsIdentitySummary {
-  id: string; identity_code: string; primary_name: string | null; primary_phone: string | null; primary_email: string | null;
+  id: string; identity_code: string; primary_name: string | null; primary_phone: string | null; primary_email: string | null; primary_address?: string | null;
   crm_stage: number; crm_stage_name: string; lead_id: string | null; ambassador_id: string | null; ambassador_name: string | null;
   acquisition_source: string | null; cash_off_balance: number;
 }
