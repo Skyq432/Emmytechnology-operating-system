@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import { ArrowLeft, Smartphone } from 'lucide-react';
 import { createInventoryUnitAction, type SalesActionState } from '@/app/modules/operations/sales-actions';
 import { addInventoryStockAction, updateInventoryCommercialPricingAction, type InventoryActionState } from '@/app/modules/operations/inventory-actions';
@@ -23,11 +23,14 @@ export function InventoryDetail({ item, units, locations, suppliers, minimumGros
   const [unitState, unitAction, unitPending] = useActionState(createInventoryUnitAction, initialSales);
   const [stockState, stockAction, stockPending] = useActionState(addInventoryStockAction, initialInventory);
   const [pricingState, pricingAction, pricingPending] = useActionState(updateInventoryCommercialPricingAction, initialInventory);
-  const standardPrice = Number(item.default_selling_price || 0);
-  const discountPercent = Number(item.salesperson_discount_limit_percent || 0);
+  const [standardPrice, setStandardPrice] = useState(Number(item.default_selling_price || 0));
+  const [discountPercent, setDiscountPercent] = useState(Number(item.salesperson_discount_limit_percent || 0));
+  const [minimumMarginPercent, setMinimumMarginPercent] = useState(Number(minimumGrossMarginPercent || 0));
   const cost = Number(item.default_unit_cost || 0);
-  const discountFloor = standardPrice > 0 ? standardPrice * (1 - discountPercent / 100) : 0;
-  const marginFloor = cost > 0 && minimumGrossMarginPercent < 100 ? cost / (1 - minimumGrossMarginPercent / 100) : 0;
+  const discountAmount = standardPrice > 0 ? standardPrice * (discountPercent / 100) : 0;
+  const discountFloor = standardPrice > 0 ? standardPrice - discountAmount : 0;
+  const marginFloor = cost > 0 && minimumMarginPercent < 100 ? cost / (1 - minimumMarginPercent / 100) : 0;
+  const marginAmount = marginFloor > cost ? marginFloor - cost : 0;
   const lowestPrice = Math.max(discountFloor, marginFloor);
   const websitePrice = websiteProduct ? Number(websiteProduct.sale_price ?? websiteProduct.price ?? 0) : 0;
   const websiteMismatch = websitePrice > 0 && standardPrice > 0 && Math.abs(websitePrice - standardPrice) >= 0.01;
@@ -48,9 +51,9 @@ export function InventoryDetail({ item, units, locations, suppliers, minimumGros
       <div className="flex flex-col justify-between gap-2 md:flex-row md:items-start"><div><h2 className="text-sm font-black text-slate-900">Commercial pricing</h2><p className="mt-1 text-xs text-slate-500">Set the normal selling price and the two controls that determine the lowest price Sales may use.</p></div><HelpTip text="The lowest allowed price is whichever is higher: the salesperson discount floor or the minimum gross-margin floor." label="About commercial pricing" /></div>
       {websiteMismatch ? <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"><strong>Website price differs.</strong> Website: {money(websitePrice)} · Inventory standard: {money(standardPrice)} · Difference: {money(Math.abs(websitePrice-standardPrice))}. Prices are not changed automatically.</div> : websiteProduct && websitePrice > 0 ? <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">Website price {money(websitePrice)} matches the inventory standard price.</div> : null}
       <div className="mt-4 grid gap-4 md:grid-cols-3">
-        <Field label="Standard selling price"><input name="standard_selling_price" type="number" min="0.01" step="0.01" required className="input" defaultValue={item.default_selling_price ?? ''} /></Field>
-        <Field label="Salesperson max discount (%)"><input name="salesperson_discount_limit_percent" type="number" min="0" max="100" step="0.01" required className="input" defaultValue={discountPercent} /></Field>
-        <Field label="Minimum gross margin (%)"><input name="minimum_gross_margin_percent" type="number" min="0" max="99.99" step="0.01" required className="input" defaultValue={minimumGrossMarginPercent} /></Field>
+        <Field label="Standard selling price"><input name="standard_selling_price" type="number" min="0.01" step="0.01" required className="input" value={standardPrice || ''} onChange={(e) => setStandardPrice(Number(e.target.value || 0))} /></Field>
+        <Field label="Salesperson max discount (%)"><input name="salesperson_discount_limit_percent" type="number" min="0" max="100" step="0.01" required className="input" value={discountPercent} onChange={(e) => setDiscountPercent(Number(e.target.value || 0))} /><p className="mt-1 text-[11px] font-bold text-slate-500">{discountPercent}% = {money(discountAmount)} off · floor {money(discountFloor)}</p></Field>
+        <Field label="Minimum gross margin (%)"><input name="minimum_gross_margin_percent" type="number" min="0" max="99.99" step="0.01" required className="input" value={minimumMarginPercent} onChange={(e) => setMinimumMarginPercent(Number(e.target.value || 0))} /><p className="mt-1 text-[11px] font-bold text-slate-500">{minimumMarginPercent}% gross margin requires {money(marginFloor)} selling price · {money(marginAmount)} gross profit</p></Field>
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-3"><Info label="Discount floor" value={standardPrice > 0 ? money(discountFloor) : '—'} /><Info label="Margin floor" value={cost > 0 ? money(marginFloor) : 'Set cost price'} /><Info label="Lowest allowed price" value={standardPrice > 0 ? money(lowestPrice) : '—'} /></div>
       {pricingState.message && <p className={`mt-3 text-sm font-bold ${pricingState.success ? 'text-emerald-700' : 'text-rose-700'}`}>{pricingState.message}</p>}
