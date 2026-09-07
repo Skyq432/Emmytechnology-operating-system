@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useMemo, useState } from 'react';
+import { useActionState, useEffect, useMemo, useState } from 'react';
 import { createDirectSaleAction } from '@/app/modules/sales/actions';
 
 const initialState = { success: false, message: '' };
@@ -19,7 +19,15 @@ type CartLine = {
   finalUnitPrice?: number; costBasis?: number; costBasisSource?: string; adminExceptionReason?: string;
 };
 
-export function DirectSaleWorkspace({ inventory, availability, units, locations }: { inventory: InventoryItem[]; availability: Availability[]; units: Unit[]; locations: Location[] }) {
+type IdentityResult = {
+  id: string; identity_code: string; primary_name: string | null; primary_phone: string | null; primary_email: string | null;
+  crm_stage_name?: string; ambassador_name?: string | null; acquisition_source?: string | null; cash_off_balance?: number;
+};
+
+export function DirectSaleWorkspace({ inventory, availability, units, locations, actor }: {
+  inventory: InventoryItem[]; availability: Availability[]; units: Unit[]; locations: Location[];
+  actor: { authorityLevel: string; discountLimitPercent: number };
+}) {
   const [state, action, pending] = useActionState(createDirectSaleAction, initialState);
   const [lines, setLines] = useState<CartLine[]>([]);
   const [mode, setMode] = useState<'stock' | 'service'>('stock');
@@ -33,11 +41,50 @@ export function DirectSaleWorkspace({ inventory, availability, units, locations 
   const [serviceCost, setServiceCost] = useState('');
   const [serviceList, setServiceList] = useState('');
   const [servicePrice, setServicePrice] = useState('');
+  const [identityQuery, setIdentityQuery] = useState('');
+  const [identityResults, setIdentityResults] = useState<IdentityResult[]>([]);
+  const [identityLoading, setIdentityLoading] = useState(false);
+  const [selectedIdentity, setSelectedIdentity] = useState<IdentityResult | null>(null);
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
+
+  useEffect(() => {
+    const query = identityQuery.trim();
+    if (query.length < 3 || selectedIdentity) { setIdentityResults([]); return; }
+    const timer = window.setTimeout(async () => {
+      setIdentityLoading(true);
+      try {
+        const response = await fetch(`/api/operations/identities?q=${encodeURIComponent(query)}`);
+        const payload = await response.json();
+        setIdentityResults(Array.isArray(payload.results) ? payload.results : []);
+      } catch { setIdentityResults([]); }
+      finally { setIdentityLoading(false); }
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [identityQuery, selectedIdentity]);
 
   const selectedItem = inventory.find((item) => item.id === selectedItemId);
   const itemUnits = useMemo(() => units.filter((unit) => unit.inventory_item_id === selectedItemId), [units, selectedItemId]);
   const itemAvailability = useMemo(() => availability.filter((row) => row.inventory_item_id === selectedItemId && Number(row.available) > 0), [availability, selectedItemId]);
   const total = lines.reduce((sum, line) => sum + Number(line.finalUnitPrice || 0) * line.quantity, 0);
+  const standardPrice = Number(selectedItem?.default_selling_price || 0);
+  const authorityFloor = standardPrice > 0 ? standardPrice * (1 - Math.min(100, Math.max(0, Number(actor.discountLimitPercent || 0))) / 100) : 0;
+  const enteredPrice = Number(price || standardPrice || 0);
+  const needsApproval = standardPrice > 0 && enteredPrice > 0 && enteredPrice < authorityFloor;
+
+  function chooseIdentity(identity: IdentityResult) {
+    setSelectedIdentity(identity);
+    setIdentityQuery(identity.primary_name || identity.primary_phone || identity.primary_email || identity.identity_code);
+    setCustomerName(identity.primary_name || '');
+    setCustomerPhone(identity.primary_phone || '');
+    setCustomerEmail(identity.primary_email || '');
+    setIdentityResults([]);
+  }
+
+  function clearIdentity() {
+    setSelectedIdentity(null); setIdentityQuery(''); setCustomerName(''); setCustomerPhone(''); setCustomerEmail('');
+  }
 
   function addStockLine() {
     if (!selectedItem) return;
@@ -74,25 +121,33 @@ export function DirectSaleWorkspace({ inventory, availability, units, locations 
 
       <form action={action} className="grid gap-5 xl:grid-cols-[360px_1fr]">
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="font-black text-slate-900">Customer</h2>
+          <div className="flex items-center justify-between gap-3"><div><h2 className="font-black text-slate-900">1. Find customer</h2><p className="mt-1 text-xs text-slate-500">Search existing CRM data before creating a new customer.</p></div>{selectedIdentity ? <button type="button" onClick={clearIdentity} className="text-xs font-bold text-[#032489]">Change</button> : null}</div>
+          <div className="relative mt-4">
+            <input value={identityQuery} onChange={(e) => { setSelectedIdentity(null); setIdentityQuery(e.target.value); }} placeholder="Phone, email, name or CRM code" className="w-full rounded-xl border border-slate-200 px-3 py-3 text-sm outline-none focus:border-[#032489]" />
+            {identityLoading ? <span className="absolute right-3 top-3 text-xs text-slate-400">Searching…</span> : null}
+            {!selectedIdentity && identityResults.length ? <div className="absolute z-20 mt-2 max-h-72 w-full overflow-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl">{identityResults.map((identity) => <button key={identity.id} type="button" onClick={() => chooseIdentity(identity)} className="block w-full rounded-lg px-3 py-2.5 text-left hover:bg-slate-50"><div className="text-sm font-bold text-slate-900">{identity.primary_name || 'Unnamed customer'}</div><div className="mt-0.5 text-xs text-slate-500">{[identity.primary_phone,identity.primary_email,identity.identity_code].filter(Boolean).join(' · ')}</div></button>)}</div> : null}
+          </div>
+          {selectedIdentity ? <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50/60 p-3"><div className="text-sm font-black text-[#032489]">{selectedIdentity.primary_name || 'Existing customer'}</div><div className="mt-1 text-xs text-slate-600">{selectedIdentity.crm_stage_name || 'CRM customer'}{selectedIdentity.acquisition_source ? ` · ${selectedIdentity.acquisition_source}` : ''}</div>{selectedIdentity.ambassador_name ? <div className="mt-1 text-xs text-slate-500">Ambassador: {selectedIdentity.ambassador_name}</div> : null}{Number(selectedIdentity.cash_off_balance || 0) > 0 ? <div className="mt-2 text-xs font-bold text-emerald-700">Cash-Off available: {money(Number(selectedIdentity.cash_off_balance))}</div> : null}</div> : <p className="mt-2 text-xs text-slate-400">No match? Enter the customer's details below and a CRM Identity will be resolved when the draft is created.</p>}
+          <input type="hidden" name="identity_id" value={selectedIdentity?.id || ''} />
           <div className="mt-4 space-y-3">
-            <input name="customer_name" placeholder="Customer name" className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
-            <input name="customer_phone" placeholder="Phone" className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
-            <input name="customer_email" type="email" placeholder="Email for receipt" className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+            <input name="customer_name" value={customerName} onChange={(e)=>setCustomerName(e.target.value)} placeholder="Customer name" className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+            <input name="customer_phone" value={customerPhone} onChange={(e)=>setCustomerPhone(e.target.value)} placeholder="Phone" className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+            <input name="customer_email" value={customerEmail} onChange={(e)=>setCustomerEmail(e.target.value)} type="email" placeholder="Email for receipt" className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
             <input name="sales_staff_name" placeholder="Salesperson name" className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
           </div>
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-black text-slate-900">Sale cart</h2><div className="rounded-xl bg-blue-50 px-3 py-2 text-sm font-black text-[#032489]">Total {money(total)}</div></div>
+          <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-black text-slate-900">2. Build the sale</h2><div className="rounded-xl bg-blue-50 px-3 py-2 text-sm font-black text-[#032489]">Total {money(total)}</div></div>
           <div className="mt-4 flex gap-2"><button type="button" onClick={() => setMode('stock')} className={`rounded-lg px-3 py-2 text-xs font-bold ${mode === 'stock' ? 'bg-[#032489] text-white' : 'bg-slate-100 text-slate-600'}`}>Physical stock</button><button type="button" onClick={() => setMode('service')} className={`rounded-lg px-3 py-2 text-xs font-bold ${mode === 'service' ? 'bg-[#032489] text-white' : 'bg-slate-100 text-slate-600'}`}>Service / non-stock</button></div>
 
           {mode === 'stock' ? <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <select value={selectedItemId} onChange={(e) => { setSelectedItemId(e.target.value); setSelectedUnitId(''); setSelectedLocationId(''); setPrice(''); }} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm"><option value="">Choose inventory item</option>{inventory.map((item) => <option key={item.id} value={item.id}>{item.sku} · {item.name}</option>)}</select>
             {selectedItem?.serial_tracking ? <select value={selectedUnitId} onChange={(e) => setSelectedUnitId(e.target.value)} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm"><option value="">Choose Serial / IMEI</option>{itemUnits.map((unit) => <option key={unit.id} value={unit.id}>{unit.serial_number || unit.imei_1 || unit.imei_2 || unit.id}</option>)}</select> : <select value={selectedLocationId} onChange={(e) => setSelectedLocationId(e.target.value)} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm"><option value="">Stock location</option>{itemAvailability.map((row) => <option key={row.location_id} value={row.location_id}>{row.location_name} · {row.available} available</option>)}</select>}
             <input type="number" min="1" value={selectedItem?.serial_tracking ? 1 : qty} disabled={selectedItem?.serial_tracking} onChange={(e) => setQty(Number(e.target.value))} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" placeholder="Quantity" />
-            <input value={price} onChange={(e) => setPrice(e.target.value)} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" placeholder={selectedItem ? `Final price · default ${money(Number(selectedItem.default_selling_price || 0))}` : 'Final price'} />
-            <input value={exceptionReason} onChange={(e) => setExceptionReason(e.target.value)} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm md:col-span-2 xl:col-span-3" placeholder="Admin pricing exception reason (only if below margin floor)" />
+            <input value={price} onChange={(e) => setPrice(e.target.value)} className={`rounded-xl border px-3 py-2.5 text-sm ${needsApproval ? 'border-amber-400 bg-amber-50' : 'border-slate-200'}`} placeholder={selectedItem ? `Agreed price · standard ${money(standardPrice)}` : 'Agreed selling price'} />
+            {selectedItem ? <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs md:col-span-2 xl:col-span-3"><div className="flex flex-wrap gap-x-6 gap-y-1"><span>Standard price <strong className="text-slate-900">{money(standardPrice)}</strong></span><span>Your lowest price <strong className="text-[#032489]">{money(authorityFloor)}</strong></span><span>Discount authority <strong>{Number(actor.discountLimitPercent || 0).toFixed(0)}%</strong></span></div>{needsApproval ? <div className="mt-2 font-bold text-amber-700">This price is below your normal authority. Admin approval is required.</div> : null}</div> : null}
+            <input value={exceptionReason} onChange={(e) => setExceptionReason(e.target.value)} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm md:col-span-2 xl:col-span-3" placeholder={needsApproval ? "Admin approval reason" : "Pricing note (optional)"} />
             <button type="button" onClick={addStockLine} className="rounded-xl bg-[#032489] px-4 py-2.5 text-sm font-black text-white">Add item</button>
           </div> : <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <input value={serviceName} onChange={(e) => setServiceName(e.target.value)} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" placeholder="Service / charge name" />
