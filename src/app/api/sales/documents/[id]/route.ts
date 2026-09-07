@@ -4,11 +4,12 @@ import { createSignedSalesDocumentUrl } from '@/lib/sales/documents/document-ser
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export async function GET(_request: NextRequest, context: { params: Promise<{ id: string }> }) {
+export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
   if (!id) return NextResponse.json({ error: 'Document is required' }, { status: 400 });
   try {
-    const url = await createSignedSalesDocumentUrl(id, 300);
+    const forceRerender = request.nextUrl.searchParams.get('refresh') === '1';
+    const url = await createSignedSalesDocumentUrl(id, 300, forceRerender);
     return NextResponse.redirect(url, 307);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Document unavailable';
