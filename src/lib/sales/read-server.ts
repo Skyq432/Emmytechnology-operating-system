@@ -8,14 +8,15 @@ function numeric<T extends Record<string, unknown>>(row: T, fields: string[]) {
 
 export async function getSalesInventoryCatalog() {
   const supabase = await createClient();
-  const [itemsResult, availabilityResult, unitsResult, locationsResult, websiteLinksResult] = await Promise.all([
+  const [itemsResult, availabilityResult, unitsResult, locationsResult, websiteLinksResult, marginPoliciesResult] = await Promise.all([
     supabase.from('ops_inventory_items').select('*').eq('is_active', true).order('name'),
     supabase.from('ops_inventory_availability').select('*'),
     supabase.from('ops_inventory_units').select('id,inventory_item_id,serial_number,imei_1,imei_2,unit_cost,current_location_id,status').eq('status', 'available').order('created_at'),
     supabase.from('ops_locations').select('id,code,name').eq('is_active', true).order('name'),
     supabase.from('ops_website_product_links').select('inventory_item_id,website_product:products(price,sale_price,status)').eq('is_active', true),
+    supabase.from('sales_margin_policies').select('inventory_item_id,minimum_margin_percent').eq('policy_scope','product').eq('is_active',true),
   ]);
-  const errors = [itemsResult.error, availabilityResult.error, unitsResult.error, locationsResult.error, websiteLinksResult.error].filter(Boolean);
+  const errors = [itemsResult.error, availabilityResult.error, unitsResult.error, locationsResult.error, websiteLinksResult.error, marginPoliciesResult.error].filter(Boolean);
   if (errors.length) throw new Error(errors[0]!.message);
 
   const websitePriceByInventory = new Map<string, number>();
@@ -26,14 +27,20 @@ export async function getSalesInventoryCatalog() {
     if (price > 0) websitePriceByInventory.set(link.inventory_item_id, price);
   }
 
+  const marginByInventory = new Map((marginPoliciesResult.data || []).map((row) => [row.inventory_item_id, Number(row.minimum_margin_percent || 0)]));
   return {
     items: (itemsResult.data || []).map((row) => {
       const normalized = numeric(row, ['default_unit_cost', 'default_selling_price', 'reorder_level']);
       const websitePrice = websitePriceByInventory.get(row.id);
+      const inventoryPrice = Number(normalized.default_selling_price || 0);
       return {
         ...normalized,
-        default_selling_price: websitePrice || Number(normalized.default_selling_price || 0) || null,
-        standard_price_source: websitePrice ? 'website_product' : (normalized.default_selling_price ? 'inventory' : null),
+        default_selling_price: inventoryPrice || null,
+        website_selling_price: websitePrice || null,
+        website_price_mismatch: Boolean(websitePrice && inventoryPrice && Math.abs(websitePrice - inventoryPrice) >= 0.01),
+        standard_price_source: inventoryPrice ? 'inventory' : null,
+        salesperson_discount_limit_percent: Number(normalized.salesperson_discount_limit_percent || 0),
+        minimum_margin_percent: marginByInventory.get(row.id) || 0,
       };
     }),
     availability: (availabilityResult.data || []).map((row) => numeric(row, ['on_hand', 'reserved', 'available', 'reorder_level'])),
