@@ -6,6 +6,7 @@ export async function createDirectSaleDraft(input: {
   customerName?: string | null;
   customerPhone?: string | null;
   customerEmail?: string | null;
+  customerAddress?: string | null;
   salesStaffName?: string | null;
   items: Array<{
     inventoryItemId?: string | null;
@@ -29,6 +30,7 @@ export async function createDirectSaleDraft(input: {
     name: input.customerName,
     phone: input.customerPhone,
     email: input.customerEmail,
+    address: input.customerAddress,
   });
 
   const { data, error } = await supabase.rpc('sales_create_direct_sale_draft', {
