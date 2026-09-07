@@ -52,6 +52,7 @@ export async function createDirectSaleAction(_prev: SalesActionState, formData: 
     customerName: String(formData.get('customer_name') || ''),
     customerPhone: String(formData.get('customer_phone') || ''),
     customerEmail: String(formData.get('customer_email') || ''),
+    customerAddress: String(formData.get('customer_address') || ''),
     salesStaffName: String(formData.get('sales_staff_name') || ''),
     items,
   });
@@ -143,6 +144,7 @@ export async function createQuotationAction(_prev: SalesActionState, formData: F
     customerName: String(formData.get('customer_name') || ''),
     customerPhone: String(formData.get('customer_phone') || ''),
     customerEmail: String(formData.get('customer_email') || ''),
+    customerAddress: String(formData.get('customer_address') || ''),
     salesStaffName: String(formData.get('sales_staff_name') || ''),
   });
   if (result.success) revalidateSales();
