@@ -4,6 +4,7 @@ import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { renderFallbackSalesPdf } from './fallback-pdf.ts';
+import { renderReceiptPdf } from './pdf/receipt.ts';
 import {
   buildQuotationTemplateData,
   buildReceiptTemplateData,
@@ -87,10 +88,20 @@ export async function renderDocumentPdf(input: {
   issuedAt: string;
   snapshot: JsonRecord;
 }): Promise<Buffer> {
+  const isReceipt = input.documentType === 'payment_receipt' || input.documentType === 'final_sales_receipt';
+
+  // Receipts are production PDFs generated natively inside EmmyTech OS.
+  // The approved receipt.tex remains a design/reference file only.
+  if (isReceipt) {
+    return renderReceiptPdf({
+      documentNumber: input.documentNumber,
+      issuedAt: input.issuedAt,
+      snapshot: input.snapshot,
+    });
+  }
+
   const source = await buildDocumentLatex(input);
   const logo = await fs.readFile(path.join(templateDir(), 'Emmytech2.png'));
-
-  const isReceipt = input.documentType === 'payment_receipt' || input.documentType === 'final_sales_receipt';
 
   if (process.env.SALES_LATEX_RENDER_URL?.trim()) return renderRemote(source, logo);
 
@@ -98,21 +109,16 @@ export async function renderDocumentPdf(input: {
     return await renderLocal(source, logo);
   } catch (error) {
     const typed = error as NodeJS.ErrnoException;
-    if (typed.code === 'ENOENT') {
-      if (isReceipt) {
-        throw new Error(
-          'Receipt PDF renderer is not configured. The approved receipt.tex requires pdflatex (or SALES_LATEX_RENDER_URL). No alternate receipt design will be used.'
-        );
-      }
-
-      if (input.documentType === 'quotation_pdf' || input.documentType === 'refund_document') {
-        return renderFallbackSalesPdf({
-          documentNumber: input.documentNumber,
-          documentType: input.documentType,
-          issuedAt: input.issuedAt,
-          snapshot: input.snapshot,
-        });
-      }
+    if (
+      typed.code === 'ENOENT' &&
+      (input.documentType === 'quotation_pdf' || input.documentType === 'refund_document')
+    ) {
+      return renderFallbackSalesPdf({
+        documentNumber: input.documentNumber,
+        documentType: input.documentType,
+        issuedAt: input.issuedAt,
+        snapshot: input.snapshot,
+      });
     }
     throw error;
   }
