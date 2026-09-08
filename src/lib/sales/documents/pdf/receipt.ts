@@ -185,7 +185,7 @@ function makePdf(stream: string, logo?: EmbeddedPng | null) {
     if (logo.alpha) {
       alphaId = add(Buffer.concat([
         Buffer.from(
-          \`<< /Type /XObject /Subtype /Image /Width \${logo.width} /Height \${logo.height} /ColorSpace /DeviceGray /BitsPerComponent 8 /Filter /FlateDecode /Length \${logo.alpha.length} >>\\nstream\\n\`,
+          `<< /Type /XObject /Subtype /Image /Width ${logo.width} /Height ${logo.height} /ColorSpace /DeviceGray /BitsPerComponent 8 /Filter /FlateDecode /Length ${logo.alpha.length} >>\\nstream\\n`,
           'binary',
         ),
         logo.alpha,
@@ -195,7 +195,7 @@ function makePdf(stream: string, logo?: EmbeddedPng | null) {
 
     logoId = add(Buffer.concat([
       Buffer.from(
-        \`<< /Type /XObject /Subtype /Image /Width \${logo.width} /Height \${logo.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode\${alphaId ? \` /SMask \${alphaId} 0 R\` : ''} /Length \${logo.rgb.length} >>\\nstream\\n\`,
+        `<< /Type /XObject /Subtype /Image /Width ${logo.width} /Height ${logo.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode${alphaId ? ` /SMask ${alphaId} 0 R` : ''} /Length ${logo.rgb.length} >>\\nstream\\n`,
         'binary',
       ),
       logo.rgb,
@@ -205,19 +205,19 @@ function makePdf(stream: string, logo?: EmbeddedPng | null) {
 
   const streamBuffer = Buffer.from(stream, 'binary');
   const content = add(Buffer.concat([
-    Buffer.from(\`<< /Length \${streamBuffer.length} >>\\nstream\\n\`, 'binary'),
+    Buffer.from(`<< /Length ${streamBuffer.length} >>\\nstream\\n`, 'binary'),
     streamBuffer,
     Buffer.from('\\nendstream', 'binary'),
   ]));
 
   const pageId = objects.length + 1;
   const pagesId = pageId + 1;
-  const xObject = logoId ? \` /XObject << /Logo \${logoId} 0 R >>\` : '';
+  const xObject = logoId ? ` /XObject << /Logo ${logoId} 0 R >>` : '';
   add(
-    \`<< /Type /Page /Parent \${pagesId} 0 R /MediaBox [0 0 \${PAGE_W} \${PAGE_H}] /Resources << /Font << /F1 \${regular} 0 R /F2 \${bold} 0 R /F3 \${italic} 0 R >>\${xObject} >> /Contents \${content} 0 R >>\`,
+    `<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] /Resources << /Font << /F1 ${regular} 0 R /F2 ${bold} 0 R /F3 ${italic} 0 R >>${xObject} >> /Contents ${content} 0 R >>`,
   );
-  add(\`<< /Type /Pages /Kids [\${pageId} 0 R] /Count 1 >>\`);
-  const catalog = add(\`<< /Type /Catalog /Pages \${pagesId} 0 R >>\`);
+  add(`<< /Type /Pages /Kids [${pageId} 0 R] /Count 1 >>`);
+  const catalog = add(`<< /Type /Catalog /Pages ${pagesId} 0 R >>`);
 
   const chunks: Buffer[] = [Buffer.from('%PDF-1.4\\n%\\xFF\\xFF\\xFF\\xFF\\n', 'binary')];
   const offsets = [0];
@@ -226,7 +226,7 @@ function makePdf(stream: string, logo?: EmbeddedPng | null) {
   objects.forEach((body, index) => {
     offsets[index + 1] = total;
     const chunk = Buffer.concat([
-      Buffer.from(\`\${index + 1} 0 obj\\n\`, 'binary'),
+      Buffer.from(`${index + 1} 0 obj\\n`, 'binary'),
       body,
       Buffer.from('\\nendobj\\n', 'binary'),
     ]);
@@ -235,11 +235,11 @@ function makePdf(stream: string, logo?: EmbeddedPng | null) {
   });
 
   const xrefOffset = total;
-  let xref = \`xref\\n0 \${objects.length + 1}\\n0000000000 65535 f \\n\`;
+  let xref = `xref\\n0 ${objects.length + 1}\\n0000000000 65535 f \\n`;
   for (let i = 1; i <= objects.length; i++) {
-    xref += \`\${String(offsets[i]).padStart(10, '0')} 00000 n \\n\`;
+    xref += `${String(offsets[i]).padStart(10, '0')} 00000 n \\n`;
   }
-  xref += \`trailer\\n<< /Size \${objects.length + 1} /Root \${catalog} 0 R >>\\nstartxref\\n\${xrefOffset}\\n%%EOF\\n\`;
+  xref += `trailer\\n<< /Size ${objects.length + 1} /Root ${catalog} 0 R >>\\nstartxref\\n${xrefOffset}\\n%%EOF\\n`;
   chunks.push(Buffer.from(xref, 'binary'));
 
   return Buffer.concat(chunks);
@@ -255,7 +255,7 @@ function text(
   rgb: [number, number, number] = [0, 0, 0],
 ) {
   cmd.push(
-    \`BT /\${font} \${size} Tf \${rgb[0]} \${rgb[1]} \${rgb[2]} rg 1 0 0 1 \${x} \${y} Tm (\${pdfEscape(String(value ?? ''))}) Tj ET\`,
+    `BT /${font} ${size} Tf ${rgb[0]} ${rgb[1]} ${rgb[2]} rg 1 0 0 1 ${x} ${y} Tm (${pdfEscape(String(value ?? ''))}) Tj ET`,
   );
 }
 
@@ -268,14 +268,14 @@ function line(
   rgb: [number, number, number],
   width = 1,
 ) {
-  cmd.push(\`\${rgb[0]} \${rgb[1]} \${rgb[2]} RG \${width} w \${x1} \${y1} m \${x2} \${y2} l S\`);
+  cmd.push(`${rgb[0]} ${rgb[1]} ${rgb[2]} RG ${width} w ${x1} ${y1} m ${x2} ${y2} l S`);
 }
 
 function fillPolygon(cmd: string[], points: Array<[number, number]>, rgb: [number, number, number]) {
   if (!points.length) return;
   const [first, ...rest] = points;
   cmd.push(
-    \`\${rgb[0]} \${rgb[1]} \${rgb[2]} rg \${first[0]} \${first[1]} m \${rest.map(([x, y]) => \`\${x} \${y} l\`).join(' ')} h f\`,
+    `${rgb[0]} ${rgb[1]} ${rgb[2]} rg ${first[0]} ${first[1]} m ${rest.map(([x, y]) => `${x} ${y} l`).join(' ')} h f`,
   );
 }
 
@@ -287,7 +287,7 @@ function fillRect(
   height: number,
   rgb: [number, number, number],
 ) {
-  cmd.push(\`\${rgb[0]} \${rgb[1]} \${rgb[2]} rg \${x} \${y} \${width} \${height} re f\`);
+  cmd.push(`${rgb[0]} ${rgb[1]} ${rgb[2]} rg ${x} ${y} ${width} ${height} re f`);
 }
 
 function strokeRect(
@@ -299,7 +299,7 @@ function strokeRect(
   rgb: [number, number, number],
   lineWidth = 0.6,
 ) {
-  cmd.push(\`\${rgb[0]} \${rgb[1]} \${rgb[2]} RG \${lineWidth} w \${x} \${y} \${width} \${height} re S\`);
+  cmd.push(`${rgb[0]} ${rgb[1]} ${rgb[2]} RG ${lineWidth} w ${x} ${y} ${width} ${height} re S`);
 }
 
 export function renderReceiptPdf(input: {
@@ -367,7 +367,7 @@ export function renderReceiptPdf(input: {
     const h = logo.height * scale;
     const x = 553 - w;
     const y = 704;
-    cmd.push(\`q \${w} 0 0 \${h} \${x} \${y} cm /Logo Do Q\`);
+    cmd.push(`q ${w} 0 0 ${h} ${x} ${y} cm /Logo Do Q`);
   } else {
     text(cmd, 'EMMY', 433, 730, 16, 'F2', BLUE);
     text(cmd, 'TECHNOLOGY', 476, 730, 16, 'F2', GOLD);
@@ -378,7 +378,7 @@ export function renderReceiptPdf(input: {
   text(cmd, input.documentNumber, 94, 676, 7.5, 'F2', BLUE);
   text(cmd, 'Date Issued:', 210, 676, 7.5, 'F2');
   text(cmd, date(input.issuedAt), 269, 676, 7.5);
-  text(cmd, \`\${referenceLabel}:\`, 397, 676, 7.5, 'F2');
+  text(cmd, `${referenceLabel}:`, 397, 676, 7.5, 'F2');
   text(cmd, sourceReference, 447, 676, 7.5);
   line(cmd, 42, 662, 553, 662, HAIR, 1.4);
 
@@ -411,7 +411,7 @@ export function renderReceiptPdf(input: {
   shownRows.forEach((row, index) => {
     const qty = Math.max(1, num(row.quantity));
     const description =
-      clean(row.item_name || row.description || 'Item') + (qty > 1 ? \` (\${qty} units)\` : '');
+      clean(row.item_name || row.description || 'Item') + (qty > 1 ? ` (${qty} units)` : '');
     const amount = num(row.line_total ?? num(row.unit_price ?? row.final_unit_price) * qty);
     const wrapped = wrap(description, 57).slice(0, 2);
     const rowH = Math.max(19, wrapped.length * 10 + 7);
@@ -435,18 +435,18 @@ export function renderReceiptPdf(input: {
   line(cmd, tableX + snW, y - totalH + 20, tableX + snW, y + 20, HAIR, 0.45);
   line(cmd, tableX + tableW - amountW, y - totalH + 20, tableX + tableW - amountW, y + 20, HAIR, 0.45);
   text(cmd, 'TRANSACTION TOTAL', tableX + snW + 8, y + 5, 8, 'F2');
-  text(cmd, \`NGN \${money(total)}\`, tableX + tableW - amountW + 8, y + 5, 8, 'F2');
+  text(cmd, `NGN ${money(total)}`, tableX + tableW - amountW + 8, y + 5, 8, 'F2');
 
   y -= totalH + 24;
 
   // Right-side payment summary.
   const summaryX = 350;
   text(cmd, 'Amount Received:', summaryX, y, 8, 'F2');
-  text(cmd, \`NGN \${money(amountReceived)}\`, 462, y, 8, 'F2');
+  text(cmd, `NGN ${money(amountReceived)}`, 462, y, 8, 'F2');
   text(cmd, 'Total Paid to Date:', summaryX, y - 16, 8);
-  text(cmd, \`NGN \${money(totalPaid)}\`, 462, y - 16, 8);
+  text(cmd, `NGN ${money(totalPaid)}`, 462, y - 16, 8);
   text(cmd, 'Balance Due:', summaryX, y - 32, 8, 'F2');
-  text(cmd, \`NGN \${money(balance)}\`, 462, y - 32, 8, 'F2');
+  text(cmd, `NGN ${money(balance)}`, 462, y - 32, 8, 'F2');
 
   const sectionY = y - 78;
 
@@ -457,18 +457,18 @@ export function renderReceiptPdf(input: {
     'Professional service and after-sales support',
     'This receipt records payment actually received',
   ].forEach((note, index) => {
-    text(cmd, \`- \${note}\`, 42, sectionY - 18 - index * 13, 7.5);
+    text(cmd, `- ${note}`, 42, sectionY - 18 - index * 13, 7.5);
   });
 
   // Payment details align directly under the payment summary.
   text(cmd, 'PAYMENT DETAILS', summaryX, sectionY, 9, 'F2', BLUE);
   [
-    \`Payment method: \${paymentMethod}\`,
-    \`Payment reference: \${paymentReference}\`,
-    \`Payment date: \${paymentDate}\`,
+    `Payment method: ${paymentMethod}`,
+    `Payment reference: ${paymentReference}`,
+    `Payment date: ${paymentDate}`,
     'Issued by Emmy Technology',
   ].forEach((detail, index) => {
-    text(cmd, \`- \${detail}\`, summaryX, sectionY - 18 - index * 13, 7.5);
+    text(cmd, `- ${detail}`, summaryX, sectionY - 18 - index * 13, 7.5);
   });
 
   const settlementY = sectionY - 105;
@@ -481,7 +481,7 @@ export function renderReceiptPdf(input: {
     text(cmd, 'OUTSTANDING BALANCE', 42, settlementY, 9, 'F2', BLUE);
     text(
       cmd,
-      \`Balance of NGN \${money(balance)} remains on this transaction.\`,
+      `Balance of NGN ${money(balance)} remains on this transaction.`,
       42,
       settlementY - 20,
       7.5,
@@ -506,7 +506,7 @@ export function renderReceiptPdf(input: {
     text(cmd, 'Moniepoint', bx + 89, by + 5, 7, 'F2');
     text(
       cmd,
-      \`Quote \${sourceReference} as your payment reference.\`,
+      `Quote ${sourceReference} as your payment reference.`,
       42,
       by - 18,
       7.3,
