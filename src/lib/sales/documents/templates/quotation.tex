@@ -1,0 +1,151 @@
+\documentclass[11pt, a4paper]{article}
+
+% EmmyTech quotation template - same approved visual identity as receipt/invoice.
+\usepackage[a4paper, top=1.2cm, bottom=1.2cm, left=1.5cm, right=1.5cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[sfdefault]{noto}
+\usepackage[english]{babel}
+\usepackage{booktabs}
+\usepackage[table]{xcolor}
+\usepackage{tabularx}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{enumitem}
+
+\definecolor{brandyellow}{RGB}{255, 184, 0}
+\definecolor{brandblue}{RGB}{0, 51, 102}
+\definecolor{statusgray}{RGB}{148, 163, 184}
+\definecolor{lightgray}{gray}{0.95}
+
+\begin{document}
+\pagestyle{empty}
+
+\noindent
+\begin{minipage}[t]{0.65\textwidth}
+    \vspace{0pt}
+    \IfFileExists{Emmytech2.png}{%
+        \includegraphics[height=1.4cm]{Emmytech2.png}
+    }{%
+        {\Huge\textbf{\textcolor{brandblue}{EMMY} \textcolor{brandyellow}{TECHNOLOGY}}}
+    } \\
+    \vspace{1mm}
+    \textbf{\textcolor{brandblue}{Computer Resources}} \\
+    \textit{\small Professional Tech Solutions \& ICT Consultancy} \\[8pt]
+    \small
+    \textbf{Sango branch:} Shop 9, The 16th shopping plaza beside \\
+    \textit{SPAC Church, Sango-Poly Road, Ibadan.} \\[8pt]
+    \textbf{Phone:} +234 814 650 3700 \\
+    \textbf{Email:} support@emmytechnology.com
+\end{minipage}
+\hfill
+\begin{minipage}[t]{0.3\textwidth}
+    \vspace{0pt}
+    \raggedleft
+    {\Huge\textbf{\textcolor{gray!15}{QUOTATION}}} \\
+    \vspace{3mm}
+    \textbf{Quotation No:} \textcolor{brandblue}{<<DOCUMENT_NUMBER>>} \\
+    \textbf{Date Issued:} <<DATE_ISSUED>> \\
+    \textbf{Valid Until:} <<VALID_UNTIL>>
+\end{minipage}
+
+\vspace{4mm}
+{\color{brandblue}\hrule height 2pt}
+\vspace{4mm}
+
+\noindent
+\begin{minipage}[t]{0.55\textwidth}
+    \textbf{\textcolor{brandblue}{PREPARED FOR:}} \\
+    {\large\textbf{<<CUSTOMER_NAME>>}} \\
+    \small <<CUSTOMER_CONTACT>> \\
+\end{minipage}
+\hfill
+\begin{minipage}[t]{0.4\textwidth}
+    \raggedleft
+    \textbf{\textcolor{brandblue}{QUOTATION STATUS:}} \\
+    \vspace{1mm}
+    \textcolor{statusgray}{\large\textbf{<<QUOTATION_STATUS>>}}
+\end{minipage}
+
+\vspace{6mm}
+
+{\large\textbf{\textcolor{brandblue}{SERVICE \& PRODUCT QUOTATION}}}
+\vspace{2mm}
+
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{l X r}
+    \rowcolor{brandblue}
+    \textbf{\textcolor{white}{S/N}} & \textbf{\textcolor{white}{Description of Services \& Products}} & \textbf{\textcolor{white}{Amount (NGN)}} \\
+    \midrule
+<<ITEM_ROWS>>
+    \midrule
+    \rowcolor{lightgray}
+    & \textbf{TOTAL QUOTED VALUE} & \textbf{<<TRANSACTION_TOTAL>>} \\
+    \bottomrule
+\end{tabularx}
+
+\vspace{5mm}
+
+\noindent
+\begin{minipage}[t]{0.48\textwidth}
+    \textbf{\textcolor{brandblue}{QUOTATION NOTES}} \\
+    \begin{itemize}[leftmargin=*, noitemsep, topsep=1pt]
+        \item \small All listed items/services are subject to availability until confirmed
+        \item \small Prices remain valid until the date stated above unless revised
+        \item \small A revised quotation supersedes the previous published version
+        \item \small <<CUSTOMER_NOTE>>
+    \end{itemize}
+\end{minipage}
+\hfill
+\begin{minipage}[t]{0.48\textwidth}
+    \textbf{\textcolor{brandblue}{TERMS \& CONDITIONS}}
+    \begin{itemize}[leftmargin=*, noitemsep, topsep=1pt]
+        \item \small Quotation acceptance does not reserve stock until converted to a confirmed sale/order
+        \item \small Warranty terms apply according to the products/services supplied
+        \item \small Delivery/installation timelines are confirmed at order stage
+        \item \small <<TERMS>>
+    \end{itemize}
+\end{minipage}
+
+\vspace{6mm}
+
+\begin{flushright}
+    \begin{minipage}{0.65\textwidth}
+        \raggedleft
+        \small
+        \textit{Thank you for the opportunity to provide this quotation. We look forward to serving you.}
+    \end{minipage}
+\end{flushright}
+
+\vspace{4mm}
+
+\noindent
+\begin{minipage}[t]{0.65\textwidth}
+    \textbf{\textcolor{brandblue}{PAYMENT ACCOUNT}} \\
+    \vspace{1mm}
+    \small When the quotation is accepted and payment is required, payment can be made to: \\
+    \vspace{1mm}
+    \begin{tabular}{|l l|}
+        \hline
+        \textbf{Account Name:} & Emmy Technologies PC PROFESSIONAL \\
+        \textbf{Account No:} & \textbf{5128460113} \\
+        \textbf{Bank:} & \textbf{Moniepoint} \\
+        \hline
+    \end{tabular} \\
+    \vspace{2mm}
+    \textit{\small Please mention \textbf{<<DOCUMENT_NUMBER>>} in your transfer description.}
+\end{minipage}
+
+\vfill
+
+\begin{center}
+    {\color{brandyellow}\hrule height 1pt}
+    \vspace{2mm}
+    \small
+    \textbf{Thank you for choosing Emmy Technology!} \\
+    We value our partnership and look forward to working with you. \\
+    \vspace{1mm}
+    \textcolor{brandblue}{www.emmytechnology.com} | \textcolor{brandblue}{support@emmytechnology.com}
+\end{center}
+
+\end{document}
