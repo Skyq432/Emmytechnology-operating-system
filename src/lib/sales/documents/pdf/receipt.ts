@@ -1,7 +1,6 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import zlib from 'node:zlib';
 import type { JsonRecord } from '../template-data';
+import { EMMYTECH_LOGO_PNG_BASE64 } from './logo-data';
 
 const PAGE_W = 595.28;
 const PAGE_H = 841.89;
@@ -96,9 +95,7 @@ function paeth(a: number, b: number, c: number) {
 
 function loadLogoPng(): EmbeddedPng | null {
   try {
-    const file = fs.readFileSync(
-      path.join(process.cwd(), 'src', 'lib', 'sales', 'documents', 'templates', 'Emmytech2.png'),
-    );
+    const file = Buffer.from(EMMYTECH_LOGO_PNG_BASE64, 'base64');
     if (!file.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) return null;
 
     let offset = 8;
@@ -369,8 +366,7 @@ export function renderReceiptPdf(input: {
     const y = 704;
     cmd.push(`q ${w} 0 0 ${h} ${x} ${y} cm /Logo Do Q`);
   } else {
-    text(cmd, 'EMMY', 433, 730, 16, 'F2', BLUE);
-    text(cmd, 'TECHNOLOGY', 476, 730, 16, 'F2', GOLD);
+    throw new Error('Approved EmmyTech logo could not be decoded for receipt PDF.');
   }
 
   // Meta.
@@ -390,10 +386,9 @@ export function renderReceiptPdf(input: {
   text(cmd, paymentStatus, 440, 620, 11, 'F2', GRAY);
 
   // Item table.
-  text(cmd, 'SERVICE & PRODUCT RECEIPT', 58, 578, 10, 'F2', BLUE);
-
-  const tableX = 58;
-  const tableW = 479;
+  const tableX = 42;
+  const tableW = 511;
+  text(cmd, 'SERVICE & PRODUCT RECEIPT', tableX, 578, 10, 'F2', BLUE);
   const snW = 32;
   const amountW = 92;
   let y = 552;
@@ -457,7 +452,7 @@ export function renderReceiptPdf(input: {
     'Professional service and after-sales support',
     'This receipt records payment actually received',
   ].forEach((note, index) => {
-    text(cmd, `- ${note}`, 42, sectionY - 18 - index * 13, 7.5);
+    text(cmd, `\x95 ${note}`, 42, sectionY - 18 - index * 13, 7.5);
   });
 
   // Payment details align directly under the payment summary.
@@ -468,7 +463,7 @@ export function renderReceiptPdf(input: {
     `Payment date: ${paymentDate}`,
     'Issued by Emmy Technology',
   ].forEach((detail, index) => {
-    text(cmd, `- ${detail}`, summaryX, sectionY - 18 - index * 13, 7.5);
+    text(cmd, `\x95 ${detail}`, summaryX, sectionY - 18 - index * 13, 7.5);
   });
 
   const settlementY = sectionY - 105;
