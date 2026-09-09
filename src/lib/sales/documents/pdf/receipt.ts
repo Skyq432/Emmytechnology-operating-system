@@ -1,6 +1,6 @@
 import zlib from 'node:zlib';
 import type { JsonRecord } from '../template-data';
-import { EMMYTECH_LOGO_PNG_BASE64 } from './logo-data';
+import { EMMYTECH_LOGO_PNG_BASE64 } from './logo-data.ts';
 
 const PAGE_W = 595.28;
 const PAGE_H = 841.89;
@@ -9,6 +9,19 @@ const GOLD: [number, number, number] = [1, 0.72, 0];
 const GRAY: [number, number, number] = [0.43, 0.47, 0.53];
 const LIGHT: [number, number, number] = [0.95, 0.95, 0.95];
 const HAIR: [number, number, number] = [0.84, 0.75, 0.51];
+const HELVETICA_WIDTHS: Record<string, number> = {
+  ' ': 278, '!': 278, '"': 355, '#': 556, '$': 556, '%': 889, '&': 667, "'": 191,
+  '(': 333, ')': 333, '*': 389, '+': 584, ',': 278, '-': 333, '.': 278, '/': 278,
+  ':': 278, ';': 278, '<': 584, '=': 584, '>': 584, '?': 556, '@': 1015,
+  A: 667, B: 667, C: 722, D: 722, E: 667, F: 611, G: 778, H: 722, I: 278,
+  J: 500, K: 667, L: 556, M: 833, N: 722, O: 778, P: 667, Q: 778, R: 722,
+  S: 667, T: 611, U: 722, V: 667, W: 944, X: 667, Y: 667, Z: 611,
+  '[': 278, '\\': 278, ']': 278, '^': 469, _: 556, '`': 333,
+  a: 556, b: 556, c: 500, d: 556, e: 556, f: 278, g: 556, h: 556, i: 222,
+  j: 222, k: 500, l: 222, m: 833, n: 556, o: 556, p: 556, q: 556, r: 333,
+  s: 500, t: 278, u: 556, v: 500, w: 722, x: 500, y: 500, z: 500,
+  '{': 334, '|': 260, '}': 334, '~': 584,
+};
 
 type EmbeddedPng = { width: number; height: number; rgb: Buffer; alpha?: Buffer };
 
@@ -42,6 +55,14 @@ function clean(value: unknown) {
 
 function pdfEscape(value: string) {
   return clean(value).replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+}
+
+function helveticaTextWidth(value: unknown, size: number) {
+  const units = [...clean(value)].reduce((total, character) => {
+    if (/\d/.test(character)) return total + 556;
+    return total + (HELVETICA_WIDTHS[character] ?? 556);
+  }, 0);
+  return units * size / 1000;
 }
 
 function wrap(value: unknown, maxChars: number) {
@@ -356,14 +377,14 @@ export function renderReceiptPdf(input: {
 
   const logo = loadLogoPng();
   if (logo) {
-    // Preserve the full logo inside a dedicated right-side header box.
-    const maxW = 126;
-    const maxH = 55;
+    // Keep the complete gold symbol and navy wordmark visible in the white header area.
+    const maxW = 150;
+    const maxH = 43;
     const scale = Math.min(maxW / logo.width, maxH / logo.height);
     const w = logo.width * scale;
     const h = logo.height * scale;
     const x = 553 - w;
-    const y = 704;
+    const y = 710;
     cmd.push(`q ${w} 0 0 ${h} ${x} ${y} cm /Logo Do Q`);
   } else {
     throw new Error('Approved EmmyTech logo could not be decoded for receipt PDF.');
@@ -520,13 +541,8 @@ export function renderReceiptPdf(input: {
   line(cmd, 42, 91, 553, 91, GOLD, 1.6);
   text(cmd, 'Thank you for choosing Emmy Technology!', 201, 73, 8.5, 'F2', BLUE);
   text(cmd, 'We value our partnership and look forward to working with you again.', 165, 59, 7);
-  text(
-    cmd,
-    '+234 814 650 3700   |   www.emmytechnology.com   |   support@emmytechnology.com   |   Sango branch, Ibadan',
-    74,
-    39,
-    6.5,
-  );
+  const contactLine = '+234 814 650 3700   |   www.emmytechnology.com   |   support@emmytechnology.com   |   Sango branch, Ibadan';
+  text(cmd, contactLine, (PAGE_W - helveticaTextWidth(contactLine, 6.5)) / 2, 39, 6.5);
 
   return makePdf(cmd.join('\n'), logo);
 }
