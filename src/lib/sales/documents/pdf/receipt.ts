@@ -185,29 +185,29 @@ function makePdf(stream: string, logo?: EmbeddedPng | null) {
     if (logo.alpha) {
       alphaId = add(Buffer.concat([
         Buffer.from(
-          `<< /Type /XObject /Subtype /Image /Width ${logo.width} /Height ${logo.height} /ColorSpace /DeviceGray /BitsPerComponent 8 /Filter /FlateDecode /Length ${logo.alpha.length} >>\\nstream\\n`,
+          `<< /Type /XObject /Subtype /Image /Width ${logo.width} /Height ${logo.height} /ColorSpace /DeviceGray /BitsPerComponent 8 /Filter /FlateDecode /Length ${logo.alpha.length} >>\nstream\n`,
           'binary',
         ),
         logo.alpha,
-        Buffer.from('\\nendstream', 'binary'),
+        Buffer.from('\nendstream', 'binary'),
       ]));
     }
 
     logoId = add(Buffer.concat([
       Buffer.from(
-        `<< /Type /XObject /Subtype /Image /Width ${logo.width} /Height ${logo.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode${alphaId ? ` /SMask ${alphaId} 0 R` : ''} /Length ${logo.rgb.length} >>\\nstream\\n`,
+        `<< /Type /XObject /Subtype /Image /Width ${logo.width} /Height ${logo.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode${alphaId ? ` /SMask ${alphaId} 0 R` : ''} /Length ${logo.rgb.length} >>\nstream\n`,
         'binary',
       ),
       logo.rgb,
-      Buffer.from('\\nendstream', 'binary'),
+      Buffer.from('\nendstream', 'binary'),
     ]));
   }
 
   const streamBuffer = Buffer.from(stream, 'binary');
   const content = add(Buffer.concat([
-    Buffer.from(`<< /Length ${streamBuffer.length} >>\\nstream\\n`, 'binary'),
+    Buffer.from(`<< /Length ${streamBuffer.length} >>\nstream\n`, 'binary'),
     streamBuffer,
-    Buffer.from('\\nendstream', 'binary'),
+    Buffer.from('\nendstream', 'binary'),
   ]));
 
   const pageId = objects.length + 1;
@@ -219,27 +219,27 @@ function makePdf(stream: string, logo?: EmbeddedPng | null) {
   add(`<< /Type /Pages /Kids [${pageId} 0 R] /Count 1 >>`);
   const catalog = add(`<< /Type /Catalog /Pages ${pagesId} 0 R >>`);
 
-  const chunks: Buffer[] = [Buffer.from('%PDF-1.4\\n%\\xFF\\xFF\\xFF\\xFF\\n', 'binary')];
+  const chunks: Buffer[] = [Buffer.from('%PDF-1.4\n%\xFF\xFF\xFF\xFF\n', 'binary')];
   const offsets = [0];
   let total = chunks[0].length;
 
   objects.forEach((body, index) => {
     offsets[index + 1] = total;
     const chunk = Buffer.concat([
-      Buffer.from(`${index + 1} 0 obj\\n`, 'binary'),
+      Buffer.from(`${index + 1} 0 obj\n`, 'binary'),
       body,
-      Buffer.from('\\nendobj\\n', 'binary'),
+      Buffer.from('\nendobj\n', 'binary'),
     ]);
     chunks.push(chunk);
     total += chunk.length;
   });
 
   const xrefOffset = total;
-  let xref = `xref\\n0 ${objects.length + 1}\\n0000000000 65535 f \\n`;
+  let xref = `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
   for (let i = 1; i <= objects.length; i++) {
-    xref += `${String(offsets[i]).padStart(10, '0')} 00000 n \\n`;
+    xref += `${String(offsets[i]).padStart(10, '0')} 00000 n \n`;
   }
-  xref += `trailer\\n<< /Size ${objects.length + 1} /Root ${catalog} 0 R >>\\nstartxref\\n${xrefOffset}\\n%%EOF\\n`;
+  xref += `trailer\n<< /Size ${objects.length + 1} /Root ${catalog} 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
   chunks.push(Buffer.from(xref, 'binary'));
 
   return Buffer.concat(chunks);
