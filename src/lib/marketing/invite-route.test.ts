@@ -20,3 +20,13 @@ test('public ambassador invite route exists and keeps the invite signup contract
   assert.match(source, /invite_code\s*:\s*code/, 'Invite route must pass the invite code in signup metadata.');
   assert.match(source, /role\s*:\s*inviteData\?\.role\s*\|\|\s*['"]ambassador['"]/, 'Invite route must preserve the Ambassador role metadata.');
 });
+
+test('invite code badge is not nested inside a paragraph', () => {
+  const source = readFileSync(inviteRoute, 'utf8');
+
+  assert.doesNotMatch(
+    source,
+    /<p[^>]*>\s*Invite Code:\s*<Badge[\s\S]*?<\/Badge>\s*<\/p>/,
+    'Badge renders a div, so nesting it inside <p> causes an invalid HTML hydration error.',
+  );
+});
