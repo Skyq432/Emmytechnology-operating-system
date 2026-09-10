@@ -170,7 +170,7 @@ export default function InviteRegisterPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="rounded-lg bg-emmy-primary/5 p-3">
-            <p className="text-sm">Invite Code: <Badge variant="secondary">{code}</Badge></p>
+            <div className="flex items-center gap-2 text-sm">Invite Code: <Badge variant="secondary">{code}</Badge></div>
             <p className="mt-1 text-xs text-muted-foreground">Role: {inviteData?.role || 'ambassador'}</p>
           </div>
 
