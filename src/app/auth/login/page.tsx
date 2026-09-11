@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Loader2, LockKeyhole, Mail } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
@@ -21,23 +22,14 @@ export default function OsLoginPage() {
     setLoading(true);
 
     const supabase = createClient();
-    const { data, error: signInError } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
-
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     if (signInError || !data.user) {
       setError(signInError?.message || 'Unable to sign in.');
       setLoading(false);
       return;
     }
 
-    const { data: profile, error: profileError } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', data.user.id)
-      .single();
-
+    const { data: profile, error: profileError } = await supabase.from('users').select('role').eq('id', data.user.id).single();
     if (profileError || !isInternalRole(profile?.role)) {
       await supabase.auth.signOut();
       setError('This sign-in is for EmmyTech internal staff. Ambassador accounts use the Ambassador workspace.');
@@ -52,41 +44,27 @@ export default function OsLoginPage() {
   return (
     <main className="grid min-h-screen place-items-center bg-[#f5f8ff] p-4">
       <section className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_24px_70px_rgba(15,23,42,0.12)] sm:p-8">
-        <a href="/" className="inline-flex items-center gap-2 text-sm font-semibold text-emmy-primary">
+        <Link href="/" className="inline-flex items-center gap-2 text-sm font-semibold text-emmy-primary">
           <ArrowLeft className="h-4 w-4" />
           Back to EmmyTech OS
-        </a>
+        </Link>
 
         <img src="/emmytech-logo.png" alt="EmmyTech" className="mt-7 h-12 w-auto object-contain" />
         <p className="mt-6 text-xs font-bold uppercase tracking-[0.16em] text-emmy-primary">Company operating system</p>
         <h1 className="mt-2 text-3xl font-bold tracking-[-0.04em] text-slate-950">Staff sign in</h1>
-        <p className="mt-2 text-sm leading-6 text-slate-500">
-          Sign in with your EmmyTech staff account. Your workspace will automatically match your assigned role.
-        </p>
+        <p className="mt-2 text-sm leading-6 text-slate-500">Sign in with your EmmyTech staff account. Your workspace will automatically match your assigned role.</p>
 
         <form onSubmit={handleSubmit} className="mt-7 space-y-4">
           <label className="block">
             <span className="mb-1.5 block text-sm font-semibold text-slate-700">Email address</span>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="pl-10" required autoComplete="email" />
-            </div>
+            <div className="relative"><Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="pl-10" required autoComplete="email" /></div>
           </label>
-
           <label className="block">
             <span className="mb-1.5 block text-sm font-semibold text-slate-700">Password</span>
-            <div className="relative">
-              <LockKeyhole className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input type="password" value={password} onChange={(event) => setPassword(event.target.value)} className="pl-10" required autoComplete="current-password" />
-            </div>
+            <div className="relative"><LockKeyhole className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><Input type="password" value={password} onChange={(event) => setPassword(event.target.value)} className="pl-10" required autoComplete="current-password" /></div>
           </label>
-
           {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
-
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Sign in to EmmyTech OS
-          </Button>
+          <Button type="submit" className="w-full" disabled={loading}>{loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Sign in to EmmyTech OS</Button>
         </form>
       </section>
     </main>
