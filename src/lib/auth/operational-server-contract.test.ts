@@ -30,7 +30,10 @@ test('Sales actor supports internal staff while reserving admin authority for ad
   assert.match(code, /authorityLevel:\s*['"]salesperson['"]/, 'Internal staff should have a safe baseline salesperson authority when no profile exists.');
 });
 
-test('sensitive pricing helper stays administrator-only', () => {
-  const code = source('src/lib/operations/sales-server.ts');
-  assert.match(code, /sales\.pricing\.admin/, 'Commercial pricing changes must use the pricing-admin capability.');
+test('pricing exceptions are protected at the database security boundary', () => {
+  const code = source('supabase/migrations/20260911103500_protect_pricing_exceptions.sql');
+  assert.match(code, /sales\.pricing\.admin/, 'Pricing exception migration must require the pricing-admin capability.');
+  assert.match(code, /sales_create_direct_sale_draft/, 'Direct Sale pricing exceptions must be hardened.');
+  assert.match(code, /sales_create_order_draft/, 'Sales Order pricing exceptions must be hardened.');
+  assert.match(code, /sales_publish_quotation_version/, 'Quotation pricing exceptions must be hardened.');
 });
