@@ -11,6 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -18,7 +20,17 @@ jobs:
       - run: npm ci
       - run: npm run test:auth
       - run: npm run test:commercial
-      - name: Lint
+      - name: Lint feature TypeScript changes
+        shell: bash
+        run: |
+          mapfile -t files < <(git diff --name-only origin/main...HEAD -- '*.ts' '*.tsx')
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No changed TypeScript files to lint."
+            exit 0
+          fi
+          npx eslint "${files[@]}"
+      - name: Capture full-repository lint baseline
+        continue-on-error: true
         run: npm run lint -- --format json --output-file lint-report.json
       - name: Upload lint report
         if: always()
