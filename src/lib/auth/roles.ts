@@ -99,6 +99,98 @@ const OPERATIONS_ACCESS: Record<InternalRole, readonly OperationsNavKey[]> = {
   sales_analyst: [],
 };
 
+export const STAFF_CAPABILITIES = [
+  'sales.read',
+  'sales.direct.manage',
+  'sales.order.manage',
+  'sales.payment.record',
+  'sales.quotation.manage',
+  'sales.return.manage',
+  'sales.credit.approve',
+  'sales.refund.manage',
+  'sales.document.void',
+  'sales.pricing.admin',
+  'sales.settings.manage',
+  'operations.read',
+  'operations.order.manage',
+  'operations.inventory.read',
+  'operations.inventory.manage',
+  'operations.transfer.manage',
+  'operations.repair.read',
+  'operations.repair.intake',
+  'operations.repair.technical',
+  'operations.repair.finance',
+  'operations.repair.handover',
+  'operations.supplier.manage',
+  'operations.website.manage',
+] as const;
+
+export type StaffCapability = (typeof STAFF_CAPABILITIES)[number];
+
+const STAFF_CAPABILITY_ACCESS: Record<InternalRole, readonly StaffCapability[]> = {
+  super_admin: STAFF_CAPABILITIES,
+  admin: STAFF_CAPABILITIES,
+  growth_lead: [
+    'sales.read',
+    'sales.direct.manage',
+    'sales.order.manage',
+    'sales.payment.record',
+    'sales.quotation.manage',
+    'sales.return.manage',
+    'operations.read',
+    'operations.order.manage',
+    'operations.inventory.read',
+    'operations.transfer.manage',
+    'operations.repair.read',
+    'operations.repair.intake',
+    'operations.repair.technical',
+    'operations.repair.finance',
+    'operations.repair.handover',
+  ],
+  marketing_manager: [],
+  front_desk: [
+    'sales.read',
+    'sales.direct.manage',
+    'sales.order.manage',
+    'sales.payment.record',
+    'operations.read',
+    'operations.order.manage',
+    'operations.inventory.read',
+    'operations.transfer.manage',
+    'operations.repair.read',
+    'operations.repair.intake',
+    'operations.repair.finance',
+    'operations.repair.handover',
+  ],
+  operations_lead: [
+    'sales.read',
+    'sales.direct.manage',
+    'sales.order.manage',
+    'sales.payment.record',
+    'operations.read',
+    'operations.order.manage',
+    'operations.inventory.read',
+    'operations.inventory.manage',
+    'operations.transfer.manage',
+    'operations.repair.read',
+    'operations.repair.intake',
+    'operations.repair.technical',
+    'operations.repair.finance',
+    'operations.repair.handover',
+    'operations.supplier.manage',
+    'operations.website.manage',
+  ],
+  technician: [
+    'sales.read',
+    'sales.direct.manage',
+    'operations.read',
+    'operations.inventory.read',
+    'operations.repair.read',
+    'operations.repair.technical',
+  ],
+  sales_analyst: ['sales.read'],
+};
+
 export function isInternalRole(role: string | null | undefined): role is InternalRole {
   return typeof role === 'string' && (INTERNAL_ROLES as readonly string[]).includes(role);
 }
@@ -117,6 +209,14 @@ export function salesNavKeys(role: string | null | undefined): readonly SalesNav
 
 export function operationsNavKeys(role: string | null | undefined): readonly OperationsNavKey[] {
   return isInternalRole(role) ? OPERATIONS_ACCESS[role] : [];
+}
+
+export function capabilitiesForRole(role: string | null | undefined): readonly StaffCapability[] {
+  return isInternalRole(role) ? STAFF_CAPABILITY_ACCESS[role] : [];
+}
+
+export function hasCapability(role: string | null | undefined, capability: StaffCapability): boolean {
+  return capabilitiesForRole(role).includes(capability);
 }
 
 export function canCreateStaffInvite(role: string | null | undefined): boolean {
