@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { ReportingPeriodProvider } from '@/components/reporting/reporting-period-context';
 import { OperationsPeriodBar } from '@/components/operations/operations-period-bar';
+import { roleLabel, salesNavKeys, type InternalRole } from '@/lib/auth/roles';
 import { SALES_NAV } from '@/lib/sales/navigation';
 
 const icons = {
@@ -37,8 +38,10 @@ const icons = {
   settings: Settings,
 } as const;
 
-export function SalesShell({ children }: { children: React.ReactNode }) {
+export function SalesShell({ children, role }: { children: React.ReactNode; role: InternalRole }) {
   const pathname = usePathname();
+  const allowedKeys = salesNavKeys(role);
+  const visibleNav = SALES_NAV.filter((item) => allowedKeys.includes(item.key));
 
   return (
     <div className="min-h-screen bg-[#f7f9fc] text-slate-900">
@@ -54,7 +57,7 @@ export function SalesShell({ children }: { children: React.ReactNode }) {
               <div className="hidden text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400 sm:block">Commercial workspace</div>
             </div>
           </div>
-          <div className="ml-auto rounded-lg bg-[#032489] px-3 py-2 text-xs font-bold text-white">Administrator</div>
+          <div className="ml-auto rounded-lg bg-[#032489] px-3 py-2 text-xs font-bold text-white">{roleLabel(role)}</div>
         </div>
       </header>
 
@@ -69,7 +72,7 @@ export function SalesShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="flex flex-col gap-1">
-          {SALES_NAV.map((item) => {
+          {visibleNav.map((item) => {
             const active = item.href === '/modules/sales' ? pathname === item.href : pathname.startsWith(item.href);
             const Icon = icons[item.key];
             return (
@@ -82,13 +85,13 @@ export function SalesShell({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="mt-auto rounded-2xl border border-white/15 bg-white/[0.07] p-3.5 text-[11px] leading-5 text-[#c7d7f7]">
-          Sales owns quotations, commercial terms, payments, receipts and sales reporting. Stock and fulfilment remain in Operations.
+          Sales owns quotations, commercial terms, payments, receipts and sales reporting. Your menu is limited to the responsibilities of your role.
         </div>
       </aside>
 
       <main className="min-w-0 p-4 md:p-6 lg:ml-[270px] lg:p-7">
         <div className="mb-5 flex gap-2 overflow-x-auto lg:hidden">
-          {SALES_NAV.map((item) => {
+          {visibleNav.map((item) => {
             const active = item.href === '/modules/sales' ? pathname === item.href : pathname.startsWith(item.href);
             return <Link key={item.href} href={item.href} className={`whitespace-nowrap rounded-lg px-3 py-2 text-xs font-bold ${active ? 'bg-[#032489] text-white' : 'border border-slate-200 bg-white text-slate-600'}`}>{item.label}</Link>;
           })}
@@ -100,6 +103,6 @@ export function SalesShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function SalesWorkspace({ children }: { children: React.ReactNode }) {
-  return <ReportingPeriodProvider><SalesShell>{children}</SalesShell></ReportingPeriodProvider>;
+export function SalesWorkspace({ children, role }: { children: React.ReactNode; role: InternalRole }) {
+  return <ReportingPeriodProvider><SalesShell role={role}>{children}</SalesShell></ReportingPeriodProvider>;
 }
