@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase-server';
+import { requireStaffCapability } from '@/lib/auth/capability-server';
 import type {
   OperationsInventoryItem,
   OperationsLocation,
@@ -14,25 +14,12 @@ import type {
 import type { OrderStatus } from './domain';
 import { resolveOrCreateOperationsIdentity } from './identity-server';
 
-async function requireAdmin() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-  if (authError || !user) throw new Error('Not authenticated');
-
-  const { data: profile, error: profileError } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-  if (profileError || profile?.role !== 'admin') throw new Error('Not authorized');
-  return { supabase, user };
+async function requireOperationsAccess() {
+  return requireStaffCapability('operations.read');
 }
 
 export async function getOperationsOverview(): Promise<OperationsOverview> {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireOperationsAccess();
   const [openOrdersResult, urgentOrdersResult, awaitingDispatchResult, inventoryResult, websiteLinksResult, recentOrdersResult, recentEventsResult, availabilityResult] = await Promise.all([
     supabase.from('ops_orders').select('id', { count: 'exact', head: true }).not('status', 'in', '(completed,cancelled)'),
     supabase.from('ops_orders').select('id', { count: 'exact', head: true }).eq('priority', 'urgent').not('status', 'in', '(completed,cancelled)'),
@@ -68,7 +55,7 @@ export async function getOperationsOverview(): Promise<OperationsOverview> {
 }
 
 export async function getOperationsOrders(): Promise<OperationsOrder[]> {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireOperationsAccess();
   const { data, error } = await supabase
     .from('ops_orders')
     .select('*, items:ops_order_items(*)')
@@ -78,7 +65,7 @@ export async function getOperationsOrders(): Promise<OperationsOrder[]> {
 }
 
 export async function getOperationsLocations(): Promise<OperationsLocation[]> {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireOperationsAccess();
   const { data, error } = await supabase
     .from('ops_locations')
     .select('id,code,name,location_type')
@@ -89,7 +76,7 @@ export async function getOperationsLocations(): Promise<OperationsLocation[]> {
 }
 
 export async function getOperationsInventory(): Promise<OperationsInventoryItem[]> {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireOperationsAccess();
   const [{ data: items, error: itemError }, { data: availability, error: availabilityError }] = await Promise.all([
     supabase.from('ops_inventory_items').select('*').order('name'),
     supabase.from('ops_inventory_availability').select('*'),
@@ -128,7 +115,7 @@ export async function getWebsiteProductLinks(): Promise<{
   inventory: OperationsInventoryItem[];
   websiteProducts: Array<{ id: string; name: string; slug: string; status: string | null; price: number | null; sale_price: number | null }>;
 }> {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireOperationsAccess();
   const [linksResult, inventoryResult, productsResult] = await Promise.all([
     supabase.from('ops_website_product_links').select('*, inventory_item:ops_inventory_items(sku,name), website_product:products(name,slug,status)').order('created_at', { ascending: false }),
     supabase.from('ops_inventory_items').select('*').eq('is_active', true).order('name'),
@@ -178,7 +165,7 @@ export async function createOperationsOrder(input: {
     note?: string | null;
   }>;
 }) {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireOperationsAccess();
   const identityId = await resolveOrCreateOperationsIdentity({
     existingIdentityId: input.identityId,
     name: input.customerName,
@@ -225,13 +212,13 @@ export async function createOperationsOrder(input: {
 }
 
 export async function confirmOperationsOrder(orderId: string) {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireOperationsAccess();
   const { data, error } = await supabase.rpc('ops_confirm_order', { p_order_id: orderId });
   return error ? { success: false as const, message: error.message } : { success: true as const, message: 'Order confirmed', data };
 }
 
 export async function changeOperationsOrderStatus(orderId: string, status: OrderStatus, note?: string) {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireOperationsAccess();
   const { error } = await supabase.rpc('ops_change_order_status', { p_order_id: orderId, p_new_status: status, p_note: note ?? null });
   return error ? { success: false as const, message: error.message } : { success: true as const, message: 'Order status updated' };
 }
@@ -244,7 +231,7 @@ export async function createInventoryItem(input: {
   serialTracking?: boolean;
   reorderLevel?: number;
 }) {
-  const { supabase, user } = await requireAdmin();
+  const { supabase, user } = await requireOperationsAccess();
   const { data, error } = await supabase.from('ops_inventory_items').insert({
     name: input.name.trim(),
     description: input.description?.trim() || null,
@@ -264,7 +251,7 @@ export async function createWebsiteProductLink(input: {
   websiteAllocation?: number | null;
   stockSyncEnabled?: boolean;
 }) {
-  const { supabase, user } = await requireAdmin();
+  const { supabase, user } = await requireOperationsAccess();
   const { data, error } = await supabase.from('ops_website_product_links').insert({
     inventory_item_id: input.inventoryItemId,
     website_product_id: input.websiteProductId,
