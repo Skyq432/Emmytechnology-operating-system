@@ -15,13 +15,13 @@ import {
   ShoppingCart,
   Star,
   Users,
-  UserRound,
   BarChart3,
 } from 'lucide-react';
 import { canAccessModule, roleLabel, type InternalRole, type ModuleSlug } from '@/lib/auth/roles';
 import type { getMyWorkDashboard } from '@/lib/work/server';
 import CommandCentreWorkSummary from '@/components/work/command-centre-work-summary';
 import WorkNotificationCenter from '@/components/work/work-notification-center';
+import AccountMenu from '@/components/os/account-menu';
 import styles from './ambassador-style-dashboard.module.css';
 
 type WorkSummary = Awaited<ReturnType<typeof getMyWorkDashboard>>;
@@ -125,13 +125,7 @@ export default function AmbassadorStyleDashboard({
 
           <div className={styles.topActions}>
             <WorkNotificationCenter currentUserId={currentUserId} />
-            <div className={styles.profileCard}>
-              <div className={styles.profileAvatar}><UserRound size={18} /></div>
-              <div>
-                <strong>{administratorName}</strong>
-                <span>{label}</span>
-              </div>
-            </div>
+            <AccountMenu name={administratorName} roleLabel={label} />
           </div>
         </header>
 
