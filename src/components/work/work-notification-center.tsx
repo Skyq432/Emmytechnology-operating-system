@@ -38,7 +38,10 @@ export default function WorkNotificationCenter({ currentUserId }: { currentUserI
   }, [currentUserId, supabase]);
 
   useEffect(() => {
-    void load();
+    const initialLoadTimer = setTimeout(() => {
+      void load();
+    }, 0);
+
     const channel = supabase
       .channel(`work-notifications:${currentUserId}`)
       .on(
@@ -57,6 +60,7 @@ export default function WorkNotificationCenter({ currentUserId }: { currentUserI
       .subscribe();
 
     return () => {
+      clearTimeout(initialLoadTimer);
       void supabase.removeChannel(channel);
     };
   }, [currentUserId, load, supabase]);
