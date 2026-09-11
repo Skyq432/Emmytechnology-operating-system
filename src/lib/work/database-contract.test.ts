@@ -49,10 +49,10 @@ test('todo privacy policy is owner-only and does not contain admin override', ()
   assert.doesNotMatch(fragment, /super_admin|admin/i);
 });
 
-test('task visibility supports creator, assignee and admin roles', () => {
+test('task visibility supports creator, assignee and admin roles through the authenticated viewer id', () => {
   assert.match(migration, /work_can_read_task/i);
-  assert.match(migration, /created_by = auth\.uid\(\)/i);
-  assert.match(migration, /assignee_id = auth\.uid\(\)/i);
-  assert.match(migration, /super_admin/i);
-  assert.match(migration, /admin/i);
+  assert.match(migration, /created_by = p_user_id/i);
+  assert.match(migration, /assignee_id = p_user_id/i);
+  assert.match(migration, /work_is_admin\(p_user_id\)/i);
+  assert.match(migration, /work_can_read_task\(id, auth\.uid\(\)\)/i);
 });
