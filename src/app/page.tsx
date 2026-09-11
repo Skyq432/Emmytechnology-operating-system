@@ -9,6 +9,7 @@ export default async function Home() {
   return (
     <AmbassadorStyleDashboard
       administratorName={profile.name || user.email || 'EmmyTech Staff'}
+      currentUserId={user.id}
       role={role}
       workSummary={workSummary}
     />
