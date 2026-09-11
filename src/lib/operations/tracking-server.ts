@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase-server';
+import { requireStaffCapability } from '@/lib/auth/capability-server';
 import type { OperationsOrderDetail } from './types';
 
 const stageNames: Record<number, string> = {
@@ -6,25 +6,12 @@ const stageNames: Record<number, string> = {
   6: 'Onboarding', 7: 'Satisfaction', 8: 'Loyalty', 9: 'Expansion', 10: 'Advocacy',
 };
 
-async function requireAdmin() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-  if (authError || !user) throw new Error('Not authenticated');
-
-  const { data: profile, error: profileError } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-  if (profileError || profile?.role !== 'admin') throw new Error('Not authorized');
-  return { supabase, user };
+async function requireOperationsAccess() {
+  return requireStaffCapability('operations.read');
 }
 
 export async function getOperationsOrderDetail(orderId: string): Promise<OperationsOrderDetail> {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireOperationsAccess();
   const [orderResult, eventsResult, handoffsResult, usersResult, reservationsResult, locationsResult] = await Promise.all([
     supabase.from('ops_orders').select('*, items:ops_order_items(*)').eq('id', orderId).single(),
     supabase.from('ops_order_events').select('*').eq('order_id', orderId).order('created_at', { ascending: false }),
@@ -87,7 +74,7 @@ export async function createOperationsHandover(input: {
   toUserId?: string | null;
   note?: string | null;
 }) {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireOperationsAccess();
   const { data, error } = await supabase.rpc('ops_create_handover', {
     p_order_id: input.orderId,
     p_to_team: input.toTeam,
@@ -100,7 +87,7 @@ export async function createOperationsHandover(input: {
 }
 
 export async function acknowledgeOperationsHandover(handoverId: string, note?: string | null) {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireOperationsAccess();
   const { error } = await supabase.rpc('ops_acknowledge_handover', {
     p_handover_id: handoverId,
     p_note: note ?? null,
