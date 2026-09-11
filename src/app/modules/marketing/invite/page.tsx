@@ -11,6 +11,7 @@ import { Copy, Check, Plus, Link2, Clock, Users, Trash2 } from 'lucide-react';
 interface InviteLink {
   id: string;
   code: string;
+  role: string;
   max_uses: number;
   used_count: number;
   status: string;
@@ -29,16 +30,18 @@ export default function AdminInvitePage() {
   const supabase = createClient();
 
   useEffect(() => {
-    fetchLinks();
+    void fetchLinks();
   }, []);
 
   const fetchLinks = async () => {
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('invite_links')
         .select('*')
+        .eq('role', 'ambassador')
         .order('created_at', { ascending: false });
 
+      if (error) throw error;
       setLinks(data || []);
     } catch (err) {
       console.error('Error fetching links:', err);
@@ -52,37 +55,36 @@ export default function AdminInvitePage() {
     setMessage(null);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) throw new Error('Not authenticated');
-
-      const { data, error } = await supabase.rpc('generate_invite_link', {
-        p_admin_id: session.user.id,
+      const { data, error } = await supabase.rpc('generate_invite_link_for_role', {
+        p_role: 'ambassador',
         p_max_uses: maxUses,
         p_expiry_days: expiryDays,
       });
 
       if (error) throw error;
 
-      setMessage(`Invite link generated: ${data}`);
-      fetchLinks();
-    } catch (err: any) {
-      setMessage(`Error: ${err.message}`);
+      setMessage(`Ambassador invite generated: ${data}`);
+      await fetchLinks();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unable to generate invite';
+      setMessage(`Error: ${message}`);
     } finally {
       setGenerating(false);
     }
   };
 
-  const copyLink = (code: string) => {
+  const copyLink = async (code: string) => {
     const fullLink = `${window.location.origin}/auth/invite?code=${code}`;
-    navigator.clipboard.writeText(fullLink);
+    await navigator.clipboard.writeText(fullLink);
     setCopied(code);
     setTimeout(() => setCopied(null), 2000);
   };
 
   const deactivateLink = async (id: string) => {
     try {
-      await supabase.from('invite_links').update({ status: 'inactive' }).eq('id', id);
-      fetchLinks();
+      const { error } = await supabase.from('invite_links').update({ status: 'inactive' }).eq('id', id);
+      if (error) throw error;
+      await fetchLinks();
     } catch (err) {
       console.error('Error deactivating link:', err);
     }
@@ -90,8 +92,8 @@ export default function AdminInvitePage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emmy-primary"></div>
+      <div className="flex h-64 items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-emmy-primary"></div>
       </div>
     );
   }
@@ -99,26 +101,25 @@ export default function AdminInvitePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Invite Links</h1>
-        <p className="text-muted-foreground">Generate and manage ambassador invite links</p>
+        <h1 className="text-3xl font-bold tracking-tight">Ambassador Invite Links</h1>
+        <p className="text-muted-foreground">Generate and manage Ambassador registration links. Staff invitations are managed from Administration.</p>
       </div>
 
       {message && (
-        <div className={`p-3 rounded-lg ${message.includes('Error') ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-emerald-50 text-emerald-600 border border-emerald-200'}`}>
+        <div className={`rounded-lg p-3 ${message.includes('Error') ? 'border border-red-200 bg-red-50 text-red-600' : 'border border-emerald-200 bg-emerald-50 text-emerald-600'}`}>
           {message}
         </div>
       )}
 
-      {/* Generate New Link */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Plus className="h-5 w-5" />
-            Generate New Invite Link
+            Generate Ambassador Invite
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <label className="text-sm font-medium">Max Uses</label>
               <div className="relative">
@@ -126,7 +127,7 @@ export default function AdminInvitePage() {
                 <Input
                   type="number"
                   value={maxUses}
-                  onChange={(e) => setMaxUses(parseInt(e.target.value) || 1)}
+                  onChange={(event) => setMaxUses(parseInt(event.target.value) || 1)}
                   className="pl-9"
                   min={1}
                 />
@@ -139,7 +140,7 @@ export default function AdminInvitePage() {
                 <Input
                   type="number"
                   value={expiryDays}
-                  onChange={(e) => setExpiryDays(parseInt(e.target.value) || 0)}
+                  onChange={(event) => setExpiryDays(parseInt(event.target.value) || 0)}
                   className="pl-9"
                   min={0}
                   placeholder="0 = never"
@@ -149,62 +150,40 @@ export default function AdminInvitePage() {
           </div>
           <Button onClick={generateLink} disabled={generating} className="gap-2">
             <Link2 className="h-4 w-4" />
-            {generating ? 'Generating...' : 'Generate Link'}
+            {generating ? 'Generating...' : 'Generate Ambassador Link'}
           </Button>
         </CardContent>
       </Card>
 
-      {/* Links List */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Link2 className="h-5 w-5" />
-            Active Invite Links
+            Ambassador Invite History
           </CardTitle>
         </CardHeader>
         <CardContent>
           {links.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No invite links generated yet
-            </div>
+            <div className="py-8 text-center text-muted-foreground">No Ambassador invite links generated yet</div>
           ) : (
             <div className="space-y-3">
               {links.map((link) => (
-                <div
-                  key={link.id}
-                  className="flex items-center justify-between p-4 bg-slate-50 rounded-lg"
-                >
-                  <div className="flex-1 min-w-0">
+                <div key={link.id} className="flex items-center justify-between rounded-lg bg-slate-50 p-4">
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <code className="text-sm font-bold text-emmy-primary">{link.code}</code>
-                      <Badge variant={link.status === 'active' ? 'default' : 'secondary'}>
-                        {link.status}
-                      </Badge>
+                      <Badge variant={link.status === 'active' ? 'default' : 'secondary'}>{link.status}</Badge>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Uses: {link.used_count}/{link.max_uses} • 
-                      Expires: {link.expires_at ? new Date(link.expires_at).toLocaleDateString() : 'Never'}
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Uses: {link.used_count}/{link.max_uses} • Expires: {link.expires_at ? new Date(link.expires_at).toLocaleDateString() : 'Never'}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => copyLink(link.code)}
-                    >
-                      {copied === link.code ? (
-                        <Check className="h-4 w-4 text-emerald-500" />
-                      ) : (
-                        <Copy className="h-4 w-4" />
-                      )}
+                    <Button variant="ghost" size="sm" onClick={() => void copyLink(link.code)}>
+                      {copied === link.code ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
                     </Button>
                     {link.status === 'active' && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => deactivateLink(link.id)}
-                        className="text-red-500"
-                      >
+                      <Button variant="ghost" size="sm" onClick={() => void deactivateLink(link.id)} className="text-red-500">
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     )}
