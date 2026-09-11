@@ -92,18 +92,19 @@ export async function updateRepairWorkDetails(input: {
   notes?: string | null;
 }) {
   const { supabase } = await requireRepairAccess();
-  const { error } = await supabase.from('ops_repairs').update({
-    diagnosis: input.diagnosis?.trim() || null,
-    repair_type: input.repairType?.trim() || null,
-    parts_replaced: input.partsReplaced?.trim() || null,
-    parts_cost: Math.max(0, Number(input.partsCost || 0)),
-    labour_cost: Math.max(0, Number(input.labourCost || 0)),
-    technician_name: input.technicianName?.trim() || null,
-    condition_returned: input.conditionReturned?.trim() || null,
-    warranty_period: input.warrantyPeriod?.trim() || null,
-    warranty_expires_at: input.warrantyExpiresAt || null,
-    notes: input.notes?.trim() || null,
-  }).eq('id', input.repairId);
+  const { error } = await supabase.rpc('ops_update_repair_work_details', {
+    p_repair_id: input.repairId,
+    p_diagnosis: input.diagnosis?.trim() || null,
+    p_repair_type: input.repairType?.trim() || null,
+    p_parts_replaced: input.partsReplaced?.trim() || null,
+    p_parts_cost: Math.max(0, Number(input.partsCost || 0)),
+    p_labour_cost: Math.max(0, Number(input.labourCost || 0)),
+    p_technician_name: input.technicianName?.trim() || null,
+    p_condition_returned: input.conditionReturned?.trim() || null,
+    p_warranty_period: input.warrantyPeriod?.trim() || null,
+    p_warranty_expires_at: input.warrantyExpiresAt || null,
+    p_notes: input.notes?.trim() || null,
+  });
   return error ? { success: false as const, message: error.message } : { success: true as const, message: 'Repair work details saved' };
 }
 
