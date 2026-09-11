@@ -19,7 +19,11 @@ import {
   BarChart3,
 } from 'lucide-react';
 import { canAccessModule, roleLabel, type InternalRole, type ModuleSlug } from '@/lib/auth/roles';
+import type { getMyWorkDashboard } from '@/lib/work/server';
+import CommandCentreWorkSummary from '@/components/work/command-centre-work-summary';
 import styles from './ambassador-style-dashboard.module.css';
+
+type WorkSummary = Awaited<ReturnType<typeof getMyWorkDashboard>>;
 
 const departments: Array<{
   name: string;
@@ -40,9 +44,11 @@ const departments: Array<{
 export default function AmbassadorStyleDashboard({
   administratorName,
   role,
+  workSummary,
 }: {
   administratorName: string;
   role: InternalRole;
+  workSummary: WorkSummary;
 }) {
   const initials = administratorName
     .split(/\s+/)
@@ -75,7 +81,7 @@ export default function AmbassadorStyleDashboard({
           </Link>
           <Link href="/modules/activities" className={styles.navLink}>
             <Activity size={19} />
-            <span>My Tasks</span>
+            <span>My Work</span>
           </Link>
           <button className={styles.navLink}>
             <Bell size={19} />
@@ -143,6 +149,8 @@ export default function AmbassadorStyleDashboard({
               {label}
             </div>
           </section>
+
+          <CommandCentreWorkSummary summary={workSummary} />
 
           <section className={styles.controlBar}>
             <div className={styles.controlIcon}><ClipboardCheck size={20} /></div>
