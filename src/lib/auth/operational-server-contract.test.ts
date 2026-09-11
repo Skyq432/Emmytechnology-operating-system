@@ -27,7 +27,7 @@ test('Sales actor supports internal staff while reserving admin authority for ad
   const code = source('src/lib/sales/server.ts');
   assert.match(code, /hasCapability\(profile\.role,\s*['"]sales\.read['"]\)/, 'Sales should require the centralized sales.read capability.');
   assert.match(code, /profile\.role\s*===\s*['"]super_admin['"]\s*\|\|\s*profile\.role\s*===\s*['"]admin['"]/, 'Only super_admin/admin should receive Sales admin authority.');
-  assert.match(code, /authorityLevel:\s*['"]salesperson['"]/, 'Internal staff should have a safe baseline salesperson authority when no profile exists.');
+  assert.match(code, /salesProfile\?\.authority_level[\s\S]{0,120}\|\|\s*['"]salesperson['"]/, 'Internal staff should have a safe baseline salesperson authority when no profile exists.');
 });
 
 test('pricing exceptions are protected at the database security boundary', () => {
