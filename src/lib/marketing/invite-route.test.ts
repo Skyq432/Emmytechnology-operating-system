@@ -18,7 +18,7 @@ test('public invite route exists and keeps the secure signup contract', () => {
   assert.match(source, /\.rpc\(['"]get_invite_link['"]/, 'Invite route must validate through the secure invite RPC.');
   assert.match(source, /\.auth\.signUp\(/, 'Invite route must create the invited Supabase Auth account.');
   assert.match(source, /invite_code\s*:\s*code/, 'Invite route must pass the invite code in signup metadata.');
-  assert.match(source, /role\s*:\s*inviteData\?\.role\s*\|\|\s*['"]ambassador['"]/, 'Invite route should preserve display/backward-compatible role metadata while the database remains authoritative.');
+  assert.match(source, /role\s*:\s*inviteData\.role\s*\|\|\s*['"]ambassador['"]/, 'Invite route should preserve display/backward-compatible role metadata while the database remains authoritative.');
 });
 
 test('invite code badge is not nested inside a paragraph', () => {
