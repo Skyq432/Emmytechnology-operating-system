@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase-server';
+import { requireStaffCapability } from '@/lib/auth/capability-server';
 import type {
   OperationsInventoryItem,
   OperationsInventoryUnit,
@@ -13,17 +13,12 @@ import type {
 } from './types';
 import type { OrderItemType } from './sales-model';
 
-async function requireAdmin() {
-  const supabase = await createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) throw new Error('Not authenticated');
-  const { data: profile, error: profileError } = await supabase.from('users').select('role').eq('id', user.id).single();
-  if (profileError || profile?.role !== 'admin') throw new Error('Not authorized');
-  return { supabase, user };
+async function requireOperationsAccess() {
+  return requireStaffCapability('operations.read');
 }
 
 export async function getOperationsSuppliers(): Promise<OperationsSupplier[]> {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireOperationsAccess();
   const { data, error } = await supabase.from('ops_suppliers').select('*').eq('is_active', true).order('name');
   if (error) throw new Error(error.message);
   return (data || []) as OperationsSupplier[];
@@ -32,7 +27,7 @@ export async function getOperationsSuppliers(): Promise<OperationsSupplier[]> {
 export async function createOperationsSupplier(input: {
   name: string; phone?: string | null; email?: string | null; address?: string | null; notes?: string | null;
 }) {
-  const { supabase, user } = await requireAdmin();
+  const { supabase, user } = await requireOperationsAccess();
   const { data, error } = await supabase.from('ops_suppliers').insert({
     name: input.name.trim(), phone: input.phone?.trim() || null, email: input.email?.trim() || null,
     address: input.address?.trim() || null, notes: input.notes?.trim() || null, created_by: user.id,
@@ -48,7 +43,7 @@ export async function getInventoryItemDetail(itemId: string): Promise<{
   minimumGrossMarginPercent: number;
   websiteProduct: { id: string; name: string; price: number | null; sale_price: number | null; status: string | null } | null;
 }> {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireOperationsAccess();
   const [itemResult, unitsResult, locationsResult, suppliersResult, marginResult, websiteResult] = await Promise.all([
     supabase.from('ops_inventory_items').select('*').eq('id', itemId).single(),
     supabase.from('ops_inventory_units').select('*,supplier:ops_suppliers(id,name),location:ops_locations(id,name,code)').eq('inventory_item_id', itemId).order('created_at', { ascending: false }),
@@ -83,7 +78,7 @@ export async function updateInventoryCommercialPricing(input: {
   salespersonDiscountLimitPercent: number;
   minimumGrossMarginPercent: number;
 }) {
-  const { supabase, user } = await requireAdmin();
+  const { supabase } = await requireOperationsAccess();
   const standardSellingPrice = Number(input.standardSellingPrice);
   const discount = Number(input.salespersonDiscountLimitPercent);
   const margin = Number(input.minimumGrossMarginPercent);
@@ -113,7 +108,7 @@ export async function createInventoryUnit(input: {
   locationId?: string | null;
   note?: string | null;
 }) {
-  const { supabase, user } = await requireAdmin();
+  const { supabase, user } = await requireOperationsAccess();
   if (!input.serialNumber?.trim() && !input.imei1?.trim() && !input.imei2?.trim()) {
     return { success: false as const, message: 'Enter a Serial number or IMEI.' };
   }
@@ -133,7 +128,7 @@ export async function createInventoryUnit(input: {
 }
 
 export async function getOrderPayments(orderId: string): Promise<OperationsOrderPayment[]> {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireOperationsAccess();
   const { data, error } = await supabase.from('ops_order_payments').select('*').eq('order_id', orderId).order('paid_at', { ascending: false });
   if (error) throw new Error(error.message);
   return (data || []).map((row) => ({ ...row, amount: Number(row.amount || 0) })) as OperationsOrderPayment[];
@@ -142,7 +137,7 @@ export async function getOrderPayments(orderId: string): Promise<OperationsOrder
 export async function recordOrderPayment(input: {
   orderId: string; amount: number; paymentMethod: PaymentMethod; reference?: string | null; paidAt?: string | null; note?: string | null;
 }) {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireOperationsAccess();
   const { data, error } = await supabase.rpc('ops_record_order_payment', {
     p_order_id: input.orderId,
     p_amount: Math.max(0, Number(input.amount || 0)),
@@ -169,7 +164,7 @@ export async function updateDraftSalesDetails(input: {
   warrantyExpiresAt?: string | null;
   specs?: Record<string, unknown>;
 }) {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireOperationsAccess();
   const { data: order, error: orderError } = await supabase.from('ops_orders').select('commercial_state').eq('id', input.orderId).single();
   if (orderError) return { success: false as const, message: orderError.message };
   if (order.commercial_state !== 'draft') return { success: false as const, message: 'Sales details can only be edited while the order is Draft.' };
@@ -193,7 +188,7 @@ export async function updateDraftSalesDetails(input: {
 }
 
 export async function getOperationsRepairs(): Promise<OperationsRepair[]> {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireOperationsAccess();
   const { data, error } = await supabase.from('ops_repairs').select('*').order('received_at', { ascending: false });
   if (error) throw new Error(error.message);
   return (data || []).map((row) => ({
@@ -204,7 +199,7 @@ export async function getOperationsRepairs(): Promise<OperationsRepair[]> {
 }
 
 export async function getRepairDetail(repairId: string): Promise<OperationsRepair> {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireOperationsAccess();
   const { data, error } = await supabase.from('ops_repairs').select('*').eq('id', repairId).single();
   if (error) throw new Error(error.message);
   return { ...data, parts_cost: Number(data.parts_cost || 0), labour_cost: Number(data.labour_cost || 0), amount_charged: Number(data.amount_charged || 0), repair_profit: Number(data.repair_profit || 0), amount_paid: Number(data.amount_paid || 0), balance_due: Number(data.balance_due || 0) } as OperationsRepair;
@@ -218,7 +213,7 @@ export async function createRepair(input: {
   warrantyPeriod?: string | null; warrantyExpiresAt?: string | null; conditionReceived?: string | null; conditionReturned?: string | null;
   technicianUserId?: string | null; technicianName?: string | null; notes?: string | null;
 }) {
-  const { supabase, user } = await requireAdmin();
+  const { supabase, user } = await requireOperationsAccess();
   const amountCharged = Math.max(0, Number(input.amountCharged || 0));
   const { data, error } = await supabase.from('ops_repairs').insert({
     identity_id: input.identityId || null, original_order_id: input.originalOrderId || null, inventory_unit_id: input.inventoryUnitId || null,
@@ -236,7 +231,7 @@ export async function createRepair(input: {
 }
 
 export async function updateRepairStatus(repairId: string, status: RepairStatus) {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireOperationsAccess();
   const patch: Record<string, unknown> = { status };
   if (status === 'ready_collection') patch.completed_at = new Date().toISOString();
   if (status === 'collected') patch.collected_at = new Date().toISOString();
@@ -245,7 +240,7 @@ export async function updateRepairStatus(repairId: string, status: RepairStatus)
 }
 
 export async function getSolarInstallation(orderItemId: string): Promise<OperationsSolarInstallation | null> {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireOperationsAccess();
   const { data, error } = await supabase.from('ops_solar_installations').select('*').eq('order_item_id', orderItemId).maybeSingle();
   if (error) throw new Error(error.message);
   return data ? ({ ...data, installation_cost: Number(data.installation_cost || 0) } as OperationsSolarInstallation) : null;
@@ -256,7 +251,7 @@ export async function saveSolarInstallation(input: {
   installerUserId?: string | null; installerName?: string | null; installationCost?: number; systemCapacity?: string | null;
   status: SolarInstallationStatus; notes?: string | null;
 }) {
-  const { supabase, user } = await requireAdmin();
+  const { supabase, user } = await requireOperationsAccess();
   const payload = {
     order_id: input.orderId, order_item_id: input.orderItemId, installation_required: input.installationRequired,
     installation_address: input.installationAddress?.trim() || null, scheduled_at: input.scheduledAt || null,
