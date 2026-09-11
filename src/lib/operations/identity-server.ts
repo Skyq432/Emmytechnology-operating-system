@@ -1,4 +1,5 @@
-import { createClient } from '@/lib/supabase-server';
+import { requireStaffCapability } from '@/lib/auth/capability-server';
+import { hasCapability } from '@/lib/auth/roles';
 import type { OperationsIdentitySummary } from './types';
 import { buildOperationsIdentitySignals, normalizeOperationsPhone } from './identity-domain';
 export { buildOperationsIdentitySignals, normalizeOperationsPhone } from './identity-domain';
@@ -18,21 +19,8 @@ type LeadRow = {
   created_at: string | null;
 };
 
-async function requireAdmin() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-  if (authError || !user) throw new Error('Not authenticated');
-
-  const { data: profile, error: profileError } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-  if (profileError || profile?.role !== 'admin') throw new Error('Not authorized');
-  return supabase;
+async function requireCustomerAccess() {
+  return requireStaffCapability('sales.read');
 }
 
 export async function resolveOrCreateOperationsIdentity(input: {
@@ -43,7 +31,7 @@ export async function resolveOrCreateOperationsIdentity(input: {
   address?: string | null;
   source: 'operations_order' | 'operations_repair';
 }) {
-  const supabase = await requireAdmin();
+  const { supabase } = await requireCustomerAccess();
   if (input.existingIdentityId) return input.existingIdentityId;
 
   const signals = buildOperationsIdentitySignals(input);
@@ -65,7 +53,7 @@ function safeSearch(value: string) {
 }
 
 export async function searchOperationsIdentities(query: string): Promise<OperationsIdentitySummary[]> {
-  const supabase = await requireAdmin();
+  const { supabase, role } = await requireCustomerAccess();
   const raw = safeSearch(query);
   if (raw.length < 3) return [];
 
@@ -111,10 +99,13 @@ export async function searchOperationsIdentities(query: string): Promise<Operati
   if (!matchedIdentities.length) return [];
 
   const ids = matchedIdentities.map((row) => row.id);
+  const canSeeCashOff = hasCapability(role, 'sales.payment.record');
   const [leadsResult, ownershipResult, cashOffResult] = await Promise.all([
     supabase.from('leads').select('id,identity_id,ambassador_id,source,funnel_stage,updated_at,created_at').in('identity_id', ids).order('updated_at', { ascending: false }),
     supabase.from('crm_lead_ownership').select('identity_id,original_ambassador_id,owner_type,owner_id,owner_label,updated_at').in('identity_id', ids),
-    supabase.from('cash_off_accounts').select('identity_id,balance').in('identity_id', ids),
+    canSeeCashOff
+      ? supabase.from('cash_off_accounts').select('identity_id,balance').in('identity_id', ids)
+      : Promise.resolve({ data: [], error: null }),
   ]);
   if (leadsResult.error) throw new Error(leadsResult.error.message);
   if (ownershipResult.error) throw new Error(ownershipResult.error.message);
