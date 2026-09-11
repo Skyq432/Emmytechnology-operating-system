@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, Check, Link2, Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
+import { isInternalRole, roleLabel } from '@/lib/auth/roles';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -50,29 +51,17 @@ export default function InviteRegisterPage() {
 
       try {
         const supabase = createClient();
-        const { data, error: inviteError } = await supabase
-          .from('invite_links')
-          .select('code, role, status, max_uses, used_count, expires_at')
-          .eq('code', code)
-          .eq('status', 'active')
-          .single();
+        const { data, error: inviteError } = await supabase.rpc('get_invite_link', {
+          p_code: code,
+        });
+        const invite = Array.isArray(data) ? data[0] : data;
 
-        if (inviteError || !data) {
+        if (inviteError || !invite) {
           setError('Invalid or expired invite code');
           return;
         }
 
-        if (data.expires_at && new Date(data.expires_at).getTime() <= Date.now()) {
-          setError('This invite link has expired');
-          return;
-        }
-
-        if (data.max_uses !== null && (data.used_count ?? 0) >= data.max_uses) {
-          setError('This invite link has reached its maximum uses');
-          return;
-        }
-
-        setInviteData(data as InviteLink);
+        setInviteData(invite as InviteLink);
         setValid(true);
         setError(null);
       } catch {
@@ -117,6 +106,10 @@ export default function InviteRegisterPage() {
     }
   };
 
+  const inviteRole = inviteData?.role || 'ambassador';
+  const staffInvite = isInternalRole(inviteRole);
+  const onboardingTitle = staffInvite ? 'Join EmmyTech Staff' : 'Join EmmyTech Ambassador';
+
   if (validating) {
     return (
       <main className="grid min-h-screen place-items-center bg-[#f5f8ff] p-4">
@@ -136,7 +129,7 @@ export default function InviteRegisterPage() {
             <AlertTriangle className="mx-auto mb-4 h-12 w-12 text-red-500" />
             <h1 className="mb-2 text-xl font-bold">Invalid Invite</h1>
             <p className="mb-4 text-red-600">{error}</p>
-            <p className="text-sm text-muted-foreground">Please contact an admin to get a valid invite link.</p>
+            <p className="text-sm text-muted-foreground">Please contact an EmmyTech administrator to get a valid invite link.</p>
           </CardContent>
         </Card>
       </main>
@@ -150,7 +143,10 @@ export default function InviteRegisterPage() {
           <CardContent className="p-6 text-center">
             <Check className="mx-auto mb-4 h-12 w-12 text-emerald-500" />
             <h1 className="mb-2 text-xl font-bold">Registration Successful!</h1>
-            <p className="mb-4 text-muted-foreground">Please check your email to verify your account.</p>
+            <p className="mb-4 text-muted-foreground">
+              {staffInvite ? 'Your EmmyTech staff account has been created.' : 'Your EmmyTech Ambassador account has been created.'}
+              {' '}Please check your email if verification is required.
+            </p>
             <Button onClick={() => { window.location.href = '/auth/login'; }}>Go to Login</Button>
           </CardContent>
         </Card>
@@ -165,13 +161,13 @@ export default function InviteRegisterPage() {
           <img src="/emmytech-logo.png" alt="EmmyTech" className="mb-4 h-10 w-auto object-contain" />
           <CardTitle className="flex items-center gap-2">
             <Link2 className="h-5 w-5" />
-            Join EmmyTech Ambassador
+            {onboardingTitle}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="rounded-lg bg-emmy-primary/5 p-3">
             <div className="flex items-center gap-2 text-sm">Invite Code: <Badge variant="secondary">{code}</Badge></div>
-            <p className="mt-1 text-xs text-muted-foreground">Role: {inviteData?.role || 'ambassador'}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Role: {roleLabel(inviteRole)}</p>
           </div>
 
           {error && <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{error}</div>}
