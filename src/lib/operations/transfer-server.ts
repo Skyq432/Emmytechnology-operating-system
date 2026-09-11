@@ -1,18 +1,13 @@
-import { createClient } from '@/lib/supabase-server';
+import { requireStaffCapability } from '@/lib/auth/capability-server';
 import type { ReportingRange } from '@/lib/reporting-period';
 import type { TransferCarrierType } from './transfer';
 
-async function requireAdmin() {
-  const supabase = await createClient();
-  const { data: { user }, error } = await supabase.auth.getUser();
-  if (error || !user) throw new Error('Not authenticated');
-  const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
-  if (profile?.role !== 'admin') throw new Error('Not authorized');
-  return { supabase, user };
+async function requireOperationsAccess() {
+  return requireStaffCapability('operations.read');
 }
 
 export async function getOperationsTransfers(range: ReportingRange) {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireOperationsAccess();
   const { data, error } = await supabase
     .from('ops_stock_transfers')
     .select(`
@@ -31,11 +26,11 @@ export async function getOperationsTransfers(range: ReportingRange) {
 }
 
 export async function getTransferFormData() {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireOperationsAccess();
   const [inventoryResult, locationsResult, usersResult, reservationsResult] = await Promise.all([
     supabase.from('ops_inventory_availability').select('*').gt('on_hand', 0),
     supabase.from('ops_locations').select('id,code,name,location_type').eq('is_active', true).order('name'),
-    supabase.from('users').select('id,name,email').eq('role', 'admin').order('name'),
+    supabase.from('users').select('id,name,email').in('role', ['super_admin','admin','growth_lead','front_desk','operations_lead','technician']).order('name'),
     supabase.from('ops_inventory_reservations').select(`
       id,order_id,order_item_id,inventory_item_id,location_id,quantity,status,
       order:ops_orders(order_code,customer_name),
@@ -67,7 +62,7 @@ export async function startOperationsTransfer(input: {
   reason?: string | null;
   note?: string | null;
 }) {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireOperationsAccess();
   if (!input.inventoryItemId || !input.fromLocationId || !input.toLocationId) {
     return { success: false as const, message: 'Choose an item, source and destination.', orderId: input.orderId || null };
   }
@@ -92,13 +87,13 @@ export async function startOperationsTransfer(input: {
 }
 
 export async function receiveOperationsTransfer(transferId: string, note?: string) {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireOperationsAccess();
   const { error } = await supabase.rpc('ops_receive_stock_transfer', { p_transfer_id: transferId, p_note: note || null });
   return error ? { success: false as const, message: error.message } : { success: true as const, message: 'Transfer received.' };
 }
 
 export async function cancelOperationsTransfer(transferId: string, note?: string) {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireOperationsAccess();
   const { error } = await supabase.rpc('ops_cancel_stock_transfer', { p_transfer_id: transferId, p_note: note || null });
   return error ? { success: false as const, message: error.message } : { success: true as const, message: 'Transfer cancelled and stock returned to source.' };
 }
