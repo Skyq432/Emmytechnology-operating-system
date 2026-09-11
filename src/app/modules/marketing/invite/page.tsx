@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -27,13 +27,9 @@ export default function AdminInvitePage() {
   const [maxUses, setMaxUses] = useState(1);
   const [expiryDays, setExpiryDays] = useState(7);
   const [message, setMessage] = useState<string | null>(null);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
-  useEffect(() => {
-    void fetchLinks();
-  }, []);
-
-  const fetchLinks = async () => {
+  const fetchLinks = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('invite_links')
@@ -48,7 +44,11 @@ export default function AdminInvitePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [supabase]);
+
+  useEffect(() => {
+    void fetchLinks();
+  }, [fetchLinks]);
 
   const generateLink = async () => {
     setGenerating(true);
