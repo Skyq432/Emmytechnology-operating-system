@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Check, Link2, Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
 import { isInternalRole, roleLabel } from '@/lib/auth/roles';
@@ -19,13 +19,14 @@ type InviteLink = {
 };
 
 export default function InviteRegisterPage() {
-  const [code, setCode] = useState<string | null>(null);
-  const [codeLoaded, setCodeLoaded] = useState(false);
+  const code = useMemo(() => {
+    if (typeof window === 'undefined') return null;
+    return new URLSearchParams(window.location.search).get('code')?.trim() || null;
+  }, []);
   const [validating, setValidating] = useState(true);
   const [valid, setValid] = useState(false);
   const [inviteData, setInviteData] = useState<InviteLink | null>(null);
   const [error, setError] = useState<string | null>(null);
-
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -33,15 +34,6 @@ export default function InviteRegisterPage() {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const codeParam = params.get('code')?.trim() || null;
-    setCode(codeParam);
-    setCodeLoaded(true);
-  }, []);
-
-  useEffect(() => {
-    if (!codeLoaded) return;
-
     const validateCode = async () => {
       if (!code) {
         setError('No invite code provided');
@@ -51,9 +43,7 @@ export default function InviteRegisterPage() {
 
       try {
         const supabase = createClient();
-        const { data, error: inviteError } = await supabase.rpc('get_invite_link', {
-          p_code: code,
-        });
+        const { data, error: inviteError } = await supabase.rpc('get_invite_link', { p_code: code });
         const invite = Array.isArray(data) ? data[0] : data;
 
         if (inviteError || !invite) {
@@ -72,31 +62,22 @@ export default function InviteRegisterPage() {
     };
 
     void validateCode();
-  }, [codeLoaded, code]);
+  }, [code]);
 
   const handleRegister = async () => {
     const cleanName = name.trim();
     const cleanEmail = email.trim();
-
     if (!cleanEmail || !password || !cleanName || !valid || !inviteData || !code) return;
 
     setRegistering(true);
     setError(null);
-
     try {
       const supabase = createClient();
       const { error: authError } = await supabase.auth.signUp({
         email: cleanEmail,
         password,
-        options: {
-          data: {
-            full_name: cleanName,
-            role: inviteData?.role || 'ambassador',
-            invite_code: code,
-          },
-        },
+        options: { data: { full_name: cleanName, role: inviteData.role || 'ambassador', invite_code: code } },
       });
-
       if (authError) throw authError;
       setSuccess(true);
     } catch (registrationError) {
@@ -111,47 +92,15 @@ export default function InviteRegisterPage() {
   const onboardingTitle = staffInvite ? 'Join EmmyTech Staff' : 'Join EmmyTech Ambassador';
 
   if (validating) {
-    return (
-      <main className="grid min-h-screen place-items-center bg-[#f5f8ff] p-4">
-        <div className="flex items-center gap-2 text-slate-600">
-          <Loader2 className="h-5 w-5 animate-spin" />
-          <p>Validating invite code...</p>
-        </div>
-      </main>
-    );
+    return <main className="grid min-h-screen place-items-center bg-[#f5f8ff] p-4"><div className="flex items-center gap-2 text-slate-600"><Loader2 className="h-5 w-5 animate-spin" /><p>Validating invite code...</p></div></main>;
   }
 
   if (!valid) {
-    return (
-      <main className="grid min-h-screen place-items-center bg-[#f5f8ff] p-4">
-        <Card className="w-full max-w-md">
-          <CardContent className="p-6 text-center">
-            <AlertTriangle className="mx-auto mb-4 h-12 w-12 text-red-500" />
-            <h1 className="mb-2 text-xl font-bold">Invalid Invite</h1>
-            <p className="mb-4 text-red-600">{error}</p>
-            <p className="text-sm text-muted-foreground">Please contact an EmmyTech administrator to get a valid invite link.</p>
-          </CardContent>
-        </Card>
-      </main>
-    );
+    return <main className="grid min-h-screen place-items-center bg-[#f5f8ff] p-4"><Card className="w-full max-w-md"><CardContent className="p-6 text-center"><AlertTriangle className="mx-auto mb-4 h-12 w-12 text-red-500" /><h1 className="mb-2 text-xl font-bold">Invalid Invite</h1><p className="mb-4 text-red-600">{error}</p><p className="text-sm text-muted-foreground">Please contact an EmmyTech administrator to get a valid invite link.</p></CardContent></Card></main>;
   }
 
   if (success) {
-    return (
-      <main className="grid min-h-screen place-items-center bg-[#f5f8ff] p-4">
-        <Card className="w-full max-w-md">
-          <CardContent className="p-6 text-center">
-            <Check className="mx-auto mb-4 h-12 w-12 text-emerald-500" />
-            <h1 className="mb-2 text-xl font-bold">Registration Successful!</h1>
-            <p className="mb-4 text-muted-foreground">
-              {staffInvite ? 'Your EmmyTech staff account has been created.' : 'Your EmmyTech Ambassador account has been created.'}
-              {' '}Please check your email if verification is required.
-            </p>
-            <Button onClick={() => { window.location.href = '/auth/login'; }}>Go to Login</Button>
-          </CardContent>
-        </Card>
-      </main>
-    );
+    return <main className="grid min-h-screen place-items-center bg-[#f5f8ff] p-4"><Card className="w-full max-w-md"><CardContent className="p-6 text-center"><Check className="mx-auto mb-4 h-12 w-12 text-emerald-500" /><h1 className="mb-2 text-xl font-bold">Registration Successful!</h1><p className="mb-4 text-muted-foreground">{staffInvite ? 'Your EmmyTech staff account has been created.' : 'Your EmmyTech Ambassador account has been created.'} Please check your email if verification is required.</p><Button onClick={() => { window.location.href = '/auth/login'; }}>Go to Login</Button></CardContent></Card></main>;
   }
 
   return (
@@ -159,42 +108,19 @@ export default function InviteRegisterPage() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <img src="/emmytech-logo.png" alt="EmmyTech" className="mb-4 h-10 w-auto object-contain" />
-          <CardTitle className="flex items-center gap-2">
-            <Link2 className="h-5 w-5" />
-            {onboardingTitle}
-          </CardTitle>
+          <CardTitle className="flex items-center gap-2"><Link2 className="h-5 w-5" />{onboardingTitle}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="rounded-lg bg-emmy-primary/5 p-3">
             <div className="flex items-center gap-2 text-sm">Invite Code: <Badge variant="secondary">{code}</Badge></div>
             <p className="mt-1 text-xs text-muted-foreground">Role: {roleLabel(inviteRole)}</p>
           </div>
-
           {error && <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{error}</div>}
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium" htmlFor="invite-full-name">Full Name</label>
-            <Input id="invite-full-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Your full name" autoComplete="name" />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium" htmlFor="invite-email">Email</label>
-            <Input id="invite-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" autoComplete="email" />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium" htmlFor="invite-password">Password</label>
-            <Input id="invite-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Minimum 6 characters" minLength={6} autoComplete="new-password" />
-          </div>
-
-          <Button onClick={handleRegister} disabled={registering || !email.trim() || password.length < 6 || !name.trim()} className="w-full">
-            {registering ? 'Creating Account...' : 'Create Account'}
-          </Button>
-
-          <p className="text-center text-sm text-muted-foreground">
-            Already have an account?{' '}
-            <a href="/auth/login" className="text-emmy-primary hover:underline">Login</a>
-          </p>
+          <div className="space-y-2"><label className="text-sm font-medium" htmlFor="invite-full-name">Full Name</label><Input id="invite-full-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Your full name" autoComplete="name" /></div>
+          <div className="space-y-2"><label className="text-sm font-medium" htmlFor="invite-email">Email</label><Input id="invite-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" autoComplete="email" /></div>
+          <div className="space-y-2"><label className="text-sm font-medium" htmlFor="invite-password">Password</label><Input id="invite-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Minimum 6 characters" minLength={6} autoComplete="new-password" /></div>
+          <Button onClick={handleRegister} disabled={registering || !email.trim() || password.length < 6 || !name.trim()} className="w-full">{registering ? 'Creating Account...' : 'Create Account'}</Button>
+          <p className="text-center text-sm text-muted-foreground">Already have an account? <a href="/auth/login" className="text-emmy-primary hover:underline">Login</a></p>
         </CardContent>
       </Card>
     </main>
