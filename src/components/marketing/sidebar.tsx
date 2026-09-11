@@ -36,6 +36,12 @@ interface NavGroup {
   items: NavItem[];
 }
 
+interface MarketingSidebarUser {
+  name?: string;
+  email?: string;
+  user_metadata?: { name?: string };
+}
+
 const marketingNavigation: NavItem[] = [
   { label: 'EmmyTech OS Home', href: '/', icon: Home },
   { label: 'Marketing Solutions', href: '/modules/marketing', icon: LayoutDashboard },
@@ -59,7 +65,7 @@ const ambassadorGroups: NavGroup[] = [
   ] },
 ];
 
-export function DashboardSidebar({ role = 'ambassador', user }: { role?: string; user?: any }) {
+export function DashboardSidebar({ role = 'ambassador', user }: { role?: string; user?: MarketingSidebarUser }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -92,7 +98,10 @@ export function DashboardSidebar({ role = 'ambassador', user }: { role?: string;
       : 'Marketing workspace';
 
   useEffect(() => {
-    if (window.localStorage.getItem('emmytech-marketing-sidebar') === 'collapsed') setCollapsed(true);
+    const saved = window.localStorage.getItem('emmytech-marketing-sidebar');
+    if (saved !== 'collapsed') return;
+    const timer = window.setTimeout(() => setCollapsed(true), 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -117,7 +126,7 @@ export function DashboardSidebar({ role = 'ambassador', user }: { role?: string;
 
   const isActive = (href: string) => pathname === href || (href !== '/' && href !== '/modules/marketing' && pathname.startsWith(`${href}/`));
 
-  const SidebarContent = ({ isMobile = false }: { isMobile?: boolean }) => (
+  const renderSidebarContent = (isMobile = false) => (
     <div className={`flex h-full flex-col overflow-hidden bg-gradient-to-b from-[#073b9f] to-[#073287] text-white ${isMobile ? 'rounded-r-[28px] shadow-2xl' : 'rounded-r-[28px] shadow-[8px_0_24px_rgba(15,23,42,0.08)]'}`}>
       <div className="flex items-center gap-3 px-4 pb-3 pt-4">
         <div className={`flex h-[66px] min-w-0 items-center overflow-hidden rounded-[18px] bg-white px-3 shadow-sm ${collapsed && !isMobile ? 'w-12 justify-center' : 'flex-1'}`}>
@@ -172,10 +181,10 @@ export function DashboardSidebar({ role = 'ambassador', user }: { role?: string;
       {mobileOpen && (
         <div className="fixed inset-0 z-[70] p-3 lg:hidden">
           <button className="absolute inset-0 bg-slate-950/45 backdrop-blur-[2px]" onClick={() => setMobileOpen(false)} aria-label="Close menu overlay" />
-          <aside className="relative h-full w-[286px] max-w-[88vw]"><SidebarContent isMobile /></aside>
+          <aside className="relative h-full w-[286px] max-w-[88vw]">{renderSidebarContent(true)}</aside>
         </div>
       )}
-      <aside className={`fixed bottom-0 left-0 top-0 z-50 hidden transition-[width] duration-200 lg:block ${collapsed ? 'w-[84px]' : 'w-[270px]'}`}><SidebarContent /></aside>
+      <aside className={`fixed bottom-0 left-0 top-0 z-50 hidden transition-[width] duration-200 lg:block ${collapsed ? 'w-[84px]' : 'w-[270px]'}`}>{renderSidebarContent()}</aside>
     </>
   );
 }
