@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { HelpTip } from '@/components/ui/help-tip';
 import { OperationsPeriodBar } from '@/components/operations/operations-period-bar';
+import { operationsNavKeys, roleLabel, type InternalRole } from '@/lib/auth/roles';
 import { OPERATIONS_NAV } from '@/lib/operations/help';
 
 const iconMap = {
@@ -30,8 +31,10 @@ const iconMap = {
   websiteLinks: Link2,
 } as const;
 
-export function OperationsShell({ children }: { children: React.ReactNode }) {
+export function OperationsShell({ children, role }: { children: React.ReactNode; role: InternalRole }) {
   const pathname = usePathname();
+  const allowedKeys = operationsNavKeys(role);
+  const visibleNav = OPERATIONS_NAV.filter((item) => allowedKeys.includes(item.key));
 
   return (
     <div className="min-h-screen bg-[#f7f9fc] text-slate-900">
@@ -51,7 +54,7 @@ export function OperationsShell({ children }: { children: React.ReactNode }) {
             <Search className="h-4 w-4 text-slate-400" />
             <span className="text-sm text-slate-400">Search orders, inventory, references...</span>
           </div>
-          <div className="ml-auto rounded-lg bg-[#032489] px-3 py-2 text-xs font-bold text-white">Administrator</div>
+          <div className="ml-auto rounded-lg bg-[#032489] px-3 py-2 text-xs font-bold text-white">{roleLabel(role)}</div>
         </div>
       </header>
 
@@ -66,7 +69,7 @@ export function OperationsShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="flex flex-col gap-1.5">
-          {OPERATIONS_NAV.map((item) => {
+          {visibleNav.map((item) => {
             const active = item.href === '/modules/operations' ? pathname === item.href : pathname.startsWith(item.href);
             const Icon = iconMap[item.key];
             const isProduct = item.key === 'products';
@@ -86,13 +89,13 @@ export function OperationsShell({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="mt-auto rounded-2xl border border-white/15 bg-white/[0.07] p-3.5 text-[11px] leading-5 text-[#c7d7f7]">
-          Orders, inventory, transfers, suppliers and repairs are the internal Operations flow. Products stays separate because it manages the shared website catalogue.
+          Orders, inventory, transfers, suppliers and repairs are the internal Operations flow. Your menu is limited to the responsibilities of your role.
         </div>
       </aside>
 
       <main className="min-w-0 p-4 md:p-6 lg:ml-[270px] lg:p-7">
         <div className="mb-5 flex gap-2 overflow-x-auto lg:hidden">
-          {OPERATIONS_NAV.map((item) => {
+          {visibleNav.map((item) => {
             const active = item.href === '/modules/operations' ? pathname === item.href : pathname.startsWith(item.href);
             return <Link key={item.href} href={item.href} className={`whitespace-nowrap rounded-lg px-3 py-2 text-xs font-bold ${active ? 'bg-[#032489] text-white' : 'border border-slate-200 bg-white text-slate-600'}`}>{item.label}</Link>;
           })}
