@@ -47,7 +47,8 @@ export default function AdminInvitePage() {
   }, [supabase]);
 
   useEffect(() => {
-    void fetchLinks();
+    const timer = window.setTimeout(() => void fetchLinks(), 0);
+    return () => window.clearTimeout(timer);
   }, [fetchLinks]);
 
   const generateLink = async () => {
