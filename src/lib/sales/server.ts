@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase-server';
+import { hasCapability } from '@/lib/auth/roles';
 import { resolveOrCreateOperationsIdentity, searchOperationsIdentities } from '@/lib/operations/identity-server';
 import { evaluateSalesPrice, resolveMinimumMargin, calculateGrossMargin } from './domain';
 import type { SalesActor, SalesOverviewData, SalesPricingContext } from './types';
@@ -13,9 +14,9 @@ export async function requireSalesActor(): Promise<{ supabase: Awaited<ReturnTyp
     .select('role')
     .eq('id', user.id)
     .single();
-  if (profileError || !profile) throw new Error('Not authorized');
+  if (profileError || !profile || !hasCapability(profile.role, 'sales.read')) throw new Error('Not authorized for Sales');
 
-  if (profile.role === 'admin') {
+  if (profile.role === 'super_admin' || profile.role === 'admin') {
     return {
       supabase,
       actor: { userId: user.id, appRole: profile.role, authorityLevel: 'admin', discountLimitPercent: 100 },
@@ -28,15 +29,15 @@ export async function requireSalesActor(): Promise<{ supabase: Awaited<ReturnTyp
     .eq('user_id', user.id)
     .eq('is_active', true)
     .maybeSingle();
-  if (salesProfileError || !salesProfile) throw new Error('Not authorized for Sales');
+  if (salesProfileError) throw new Error(salesProfileError.message);
 
   return {
     supabase,
     actor: {
       userId: user.id,
       appRole: profile.role,
-      authorityLevel: salesProfile.authority_level as SalesActor['authorityLevel'],
-      discountLimitPercent: Number(salesProfile.discount_limit_percent || 0),
+      authorityLevel: salesProfile?.authority_level as SalesActor['authorityLevel'] || 'salesperson',
+      discountLimitPercent: Number(salesProfile?.discount_limit_percent || 0),
     },
   };
 }
