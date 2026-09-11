@@ -4,10 +4,11 @@ import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Loader2, LockKeyhole, Mail } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
+import { isInternalRole } from '@/lib/auth/roles';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
-export default function OsAdminLoginPage() {
+export default function OsLoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -37,9 +38,9 @@ export default function OsAdminLoginPage() {
       .eq('id', data.user.id)
       .single();
 
-    if (profileError || profile?.role !== 'admin') {
+    if (profileError || !isInternalRole(profile?.role)) {
       await supabase.auth.signOut();
-      setError('This workspace is available to EmmyTech administrators only.');
+      setError('This sign-in is for EmmyTech internal staff. Ambassador accounts use the Ambassador workspace.');
       setLoading(false);
       return;
     }
@@ -57,12 +58,10 @@ export default function OsAdminLoginPage() {
         </a>
 
         <img src="/emmytech-logo.png" alt="EmmyTech" className="mt-7 h-12 w-auto object-contain" />
-        <p className="mt-6 text-xs font-bold uppercase tracking-[0.16em] text-emmy-primary">
-          Marketing administration
-        </p>
-        <h1 className="mt-2 text-3xl font-bold tracking-[-0.04em] text-slate-950">Admin sign in</h1>
+        <p className="mt-6 text-xs font-bold uppercase tracking-[0.16em] text-emmy-primary">Company operating system</p>
+        <h1 className="mt-2 text-3xl font-bold tracking-[-0.04em] text-slate-950">Staff sign in</h1>
         <p className="mt-2 text-sm leading-6 text-slate-500">
-          Use your EmmyTech administrator account to manage Ambassadors, leads and campaigns.
+          Sign in with your EmmyTech staff account. Your workspace will automatically match your assigned role.
         </p>
 
         <form onSubmit={handleSubmit} className="mt-7 space-y-4">
@@ -70,14 +69,7 @@ export default function OsAdminLoginPage() {
             <span className="mb-1.5 block text-sm font-semibold text-slate-700">Email address</span>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                className="pl-10"
-                required
-                autoComplete="email"
-              />
+              <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="pl-10" required autoComplete="email" />
             </div>
           </label>
 
@@ -85,26 +77,15 @@ export default function OsAdminLoginPage() {
             <span className="mb-1.5 block text-sm font-semibold text-slate-700">Password</span>
             <div className="relative">
               <LockKeyhole className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                className="pl-10"
-                required
-                autoComplete="current-password"
-              />
+              <Input type="password" value={password} onChange={(event) => setPassword(event.target.value)} className="pl-10" required autoComplete="current-password" />
             </div>
           </label>
 
-          {error && (
-            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {error}
-            </div>
-          )}
+          {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
           <Button type="submit" className="w-full" disabled={loading}>
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Sign in to Marketing
+            Sign in to EmmyTech OS
           </Button>
         </form>
       </section>
