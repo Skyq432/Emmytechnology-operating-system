@@ -1,5 +1,5 @@
 import { randomInt } from 'node:crypto';
-import { createClient } from '@/lib/supabase-server';
+import { requireStaffCapability } from '@/lib/auth/capability-server';
 import { resolveOrCreateOperationsIdentity } from './identity-server';
 import type {
   OperationsRepair,
@@ -15,13 +15,8 @@ import type {
 
 const REPAIR_PIN_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
-async function requireAdmin() {
-  const supabase = await createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) throw new Error('Not authenticated');
-  const { data: profile, error: profileError } = await supabase.from('users').select('role').eq('id', user.id).single();
-  if (profileError || profile?.role !== 'admin') throw new Error('Not authorized');
-  return { supabase, user };
+async function requireRepairAccess() {
+  return requireStaffCapability('operations.repair.read');
 }
 
 export function generateRepairPin() {
@@ -29,7 +24,7 @@ export function generateRepairPin() {
 }
 
 export async function getAvailableRepairCards() {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireRepairAccess();
   const { data, error } = await supabase
     .from('ops_repair_cards')
     .select('id,card_code,status')
@@ -40,7 +35,7 @@ export async function getAvailableRepairCards() {
 }
 
 export async function getRepairAdminDetail(repairId: string) {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireRepairAccess();
   const [repairResult, assignmentsResult, quotesResult, paymentsResult, consentsResult, eventsResult] = await Promise.all([
     supabase.from('ops_repairs').select('*').eq('id', repairId).single(),
     supabase.from('ops_repair_card_assignments').select('*,card:ops_repair_cards(*)').eq('repair_id', repairId).order('assigned_at', { ascending: false }),
@@ -96,7 +91,7 @@ export async function updateRepairWorkDetails(input: {
   warrantyExpiresAt?: string | null;
   notes?: string | null;
 }) {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireRepairAccess();
   const { error } = await supabase.from('ops_repairs').update({
     diagnosis: input.diagnosis?.trim() || null,
     repair_type: input.repairType?.trim() || null,
@@ -141,7 +136,7 @@ export async function createRepairWithCard(input: {
   technicianName?: string | null;
   notes?: string | null;
 }) {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireRepairAccess();
   const identityId = await resolveOrCreateOperationsIdentity({
     existingIdentityId: input.identityId,
     name: input.customerName,
@@ -194,7 +189,7 @@ export async function publishRepairQuote(input: {
   paymentRequirement: RepairPaymentRequirement;
   requiredBeforeStart?: number;
 }) {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireRepairAccess();
   const { data, error } = await supabase.rpc('ops_publish_repair_quote', {
     p_repair_id: input.repairId,
     p_diagnosis_public: input.diagnosisPublic?.trim() || null,
@@ -215,7 +210,7 @@ export async function recordRepairPayment(input: {
   paidAt?: string | null;
   note?: string | null;
 }) {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireRepairAccess();
   const { data, error } = await supabase.rpc('ops_record_repair_payment', {
     p_repair_id: input.repairId,
     p_amount: Math.max(0, Number(input.amount || 0)),
@@ -228,7 +223,7 @@ export async function recordRepairPayment(input: {
 }
 
 export async function regenerateRepairPin(repairId: string) {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireRepairAccess();
   const accessPin = generateRepairPin();
   const { data, error } = await supabase.rpc('ops_regenerate_repair_pin', {
     p_repair_id: repairId,
@@ -238,7 +233,7 @@ export async function regenerateRepairPin(repairId: string) {
 }
 
 export async function advanceRepairWorkflow(repairId: string, status: RepairStatus, note?: string | null) {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireRepairAccess();
   const { data, error } = await supabase.rpc('ops_change_repair_status', {
     p_repair_id: repairId,
     p_new_status: status,
@@ -248,7 +243,7 @@ export async function advanceRepairWorkflow(repairId: string, status: RepairStat
 }
 
 export async function beginRepairHandover(repairId: string) {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireRepairAccess();
   const { data, error } = await supabase.rpc('ops_begin_repair_handover', { p_repair_id: repairId });
   return error ? { success: false as const, message: error.message } : { success: true as const, message: 'Customer handover started', data };
 }
@@ -258,7 +253,7 @@ export async function completeRepairCollection(input: {
   cardReturned: boolean;
   missingCardReason?: string | null;
 }) {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireRepairAccess();
   const { data, error } = await supabase.rpc('ops_complete_repair_collection', {
     p_repair_id: input.repairId,
     p_card_returned: input.cardReturned,
