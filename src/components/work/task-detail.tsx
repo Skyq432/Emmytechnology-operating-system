@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import type { getTaskDetail, listAssignableStaff } from '@/lib/work/server';
 import ReturnedTaskControls from '@/components/work/returned-task-controls';
 import styles from './task-detail.module.css';
@@ -33,16 +33,33 @@ const eventLabels: Record<string, string> = {
   task_cancelled: 'Task cancelled',
 };
 
-export default function TaskDetail({ detail, staff }: { detail: Detail; staff: Staff }) {
+export default function TaskDetail({
+  detail,
+  staff,
+  currentUserId,
+  isAdmin,
+}: {
+  detail: Detail;
+  staff: Staff;
+  currentUserId: string;
+  isAdmin: boolean;
+}) {
   const router = useRouter();
   const [busy, startTransition] = useTransition();
+  const [message, setMessage] = useState<string | null>(null);
   const people = new Map(detail.people.map((person) => [person.id, person]));
+  const canManageReturned = detail.task.created_by === currentUserId || isAdmin;
 
   function run(action: () => Promise<unknown>, success: string) {
+    setMessage(null);
     startTransition(async () => {
-      await action();
-      window.alert(success);
-      router.refresh();
+      try {
+        await action();
+        setMessage(success);
+        router.refresh();
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : 'Unable to update Task.');
+      }
     });
   }
 
@@ -57,6 +74,7 @@ export default function TaskDetail({ detail, staff }: { detail: Detail; staff: S
       </header>
 
       <main className={styles.content}>
+        {message && <div className={styles.message}>{message}</div>}
         <section className={styles.summary}>
           <div><span>Status</span><strong>{label(detail.task.status)}</strong></div>
           <div><span>Priority</span><strong>{label(detail.task.priority)}</strong></div>
@@ -79,7 +97,7 @@ export default function TaskDetail({ detail, staff }: { detail: Detail; staff: S
                   </div>
                   {assignment.rejection_note && <p><strong>Return reason:</strong> {assignment.rejection_note}</p>}
                   {assignment.completion_note && <p><strong>Completion note:</strong> {assignment.completion_note}</p>}
-                  {assignment.status === 'returned' && <ReturnedTaskControls assignment={assignment} staff={staff} busy={busy} run={run} />}
+                  {assignment.status === 'returned' && canManageReturned && <ReturnedTaskControls assignment={assignment} staff={staff} busy={busy} run={run} />}
                 </div>
               );
             })}
