@@ -7,18 +7,18 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const inviteRoute = path.join(repoRoot, 'src', 'app', 'auth', 'invite', 'page.tsx');
 
-test('public ambassador invite route exists and keeps the invite signup contract', () => {
+test('public invite route exists and keeps the secure signup contract', () => {
   assert.equal(
     existsSync(inviteRoute),
     true,
-    'Expected src/app/auth/invite/page.tsx to exist so generated Ambassador invite URLs resolve.',
+    'Expected src/app/auth/invite/page.tsx to exist so generated invite URLs resolve.',
   );
 
   const source = readFileSync(inviteRoute, 'utf8');
-  assert.match(source, /\.from\(['"]invite_links['"]\)/, 'Invite route must validate against invite_links.');
+  assert.match(source, /\.rpc\(['"]get_invite_link['"]/, 'Invite route must validate through the secure invite RPC.');
   assert.match(source, /\.auth\.signUp\(/, 'Invite route must create the invited Supabase Auth account.');
   assert.match(source, /invite_code\s*:\s*code/, 'Invite route must pass the invite code in signup metadata.');
-  assert.match(source, /role\s*:\s*inviteData\?\.role\s*\|\|\s*['"]ambassador['"]/, 'Invite route must preserve the Ambassador role metadata.');
+  assert.match(source, /role\s*:\s*inviteData\?\.role\s*\|\|\s*['"]ambassador['"]/, 'Invite route should preserve display/backward-compatible role metadata while the database remains authoritative.');
 });
 
 test('invite code badge is not nested inside a paragraph', () => {
