@@ -1,13 +1,8 @@
-import { createClient } from '@/lib/supabase-server';
+import { requireStaffCapability } from '@/lib/auth/capability-server';
 import type { OrderItemType } from './sales-model';
 
-async function requireAdmin() {
-  const supabase = await createClient();
-  const { data: { user }, error } = await supabase.auth.getUser();
-  if (error || !user) throw new Error('Not authenticated');
-  const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
-  if (profile?.role !== 'admin') throw new Error('Not authorized');
-  return { supabase };
+async function requireInventoryAccess() {
+  return requireStaffCapability('operations.inventory.read');
 }
 
 export async function createInventoryItemWithOpeningStock(input: {
@@ -28,7 +23,7 @@ export async function createInventoryItemWithOpeningStock(input: {
   openingLocationId?: string | null;
   openingQuantity?: number;
 }) {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireInventoryAccess();
   const { data, error } = await supabase.rpc('ops_create_inventory_item', {
     p_name: input.name,
     p_description: input.description || null,
@@ -58,7 +53,7 @@ export async function addInventoryStock(input: {
   supplierId?: string | null;
   note?: string | null;
 }) {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireInventoryAccess();
   const { data, error } = await supabase.rpc('ops_add_inventory_stock', {
     p_inventory_item_id: input.inventoryItemId,
     p_location_id: input.locationId,
