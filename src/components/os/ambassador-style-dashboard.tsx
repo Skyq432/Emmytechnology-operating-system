@@ -21,6 +21,7 @@ import {
 import { canAccessModule, roleLabel, type InternalRole, type ModuleSlug } from '@/lib/auth/roles';
 import type { getMyWorkDashboard } from '@/lib/work/server';
 import CommandCentreWorkSummary from '@/components/work/command-centre-work-summary';
+import WorkNotificationCenter from '@/components/work/work-notification-center';
 import styles from './ambassador-style-dashboard.module.css';
 
 type WorkSummary = Awaited<ReturnType<typeof getMyWorkDashboard>>;
@@ -43,10 +44,12 @@ const departments: Array<{
 
 export default function AmbassadorStyleDashboard({
   administratorName,
+  currentUserId,
   role,
   workSummary,
 }: {
   administratorName: string;
+  currentUserId: string;
   role: InternalRole;
   workSummary: WorkSummary;
 }) {
@@ -121,7 +124,7 @@ export default function AmbassadorStyleDashboard({
           </div>
 
           <div className={styles.topActions}>
-            <button className={styles.bellButton} aria-label="Notifications"><Bell size={20} /></button>
+            <WorkNotificationCenter currentUserId={currentUserId} />
             <div className={styles.profileCard}>
               <div className={styles.profileAvatar}><UserRound size={18} /></div>
               <div>
