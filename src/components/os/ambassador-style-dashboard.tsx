@@ -1,5 +1,5 @@
-import Link from "next/link";
-import Image from "next/image";
+import Link from 'next/link';
+import Image from 'next/image';
 import {
   Activity,
   Bell,
@@ -17,86 +17,49 @@ import {
   Users,
   UserRound,
   BarChart3,
-} from "lucide-react";
-import styles from "./ambassador-style-dashboard.module.css";
+} from 'lucide-react';
+import { canAccessModule, roleLabel, type InternalRole, type ModuleSlug } from '@/lib/auth/roles';
+import styles from './ambassador-style-dashboard.module.css';
 
-const departments = [
-  {
-    name: "CRM",
-    slug: "crm",
-    description: "Customers, leads, opportunities, follow-ups and pipeline movement.",
-    icon: Users,
-    color: "blue",
-  },
-  {
-    name: "Marketing",
-    slug: "marketing",
-    description: "Campaigns, ambassadors, referrals, Spin Wheel, SMS and WhatsApp.",
-    icon: Megaphone,
-    color: "purple",
-  },
-  {
-    name: "Sales",
-    slug: "sales",
-    description: "Quotations, orders, payments, discounts and sales performance.",
-    icon: ShoppingCart,
-    color: "orange",
-  },
-  {
-    name: "Operations",
-    slug: "operations",
-    description: "Inventory, fulfilment, delivery, repairs, procurement and service flow.",
-    icon: PackageCheck,
-    color: "green",
-  },
-  {
-    name: "Finance",
-    slug: "finance",
-    description: "Income, expenses, receivables, payables, payroll and budgets.",
-    icon: CircleDollarSign,
-    color: "blue",
-  },
-  {
-    name: "Reports",
-    slug: "reports",
-    description: "Company-wide performance, trends, management reports and insights.",
-    icon: BarChart3,
-    color: "orange",
-  },
-  {
-    name: "Administration",
-    slug: "administration",
-    description: "Staff, departments, permissions, approvals and company controls.",
-    icon: Settings,
-    color: "green",
-  },
+const departments: Array<{
+  name: string;
+  slug: ModuleSlug;
+  description: string;
+  icon: typeof Users;
+  color: string;
+}> = [
+  { name: 'CRM', slug: 'crm', description: 'Customers, leads, opportunities, follow-ups and pipeline movement.', icon: Users, color: 'blue' },
+  { name: 'Marketing', slug: 'marketing', description: 'Campaigns, ambassadors, referrals, Spin Wheel, SMS and WhatsApp.', icon: Megaphone, color: 'purple' },
+  { name: 'Sales', slug: 'sales', description: 'Quotations, orders, payments, discounts and sales performance.', icon: ShoppingCart, color: 'orange' },
+  { name: 'Operations', slug: 'operations', description: 'Inventory, fulfilment, delivery, repairs, procurement and service flow.', icon: PackageCheck, color: 'green' },
+  { name: 'Finance', slug: 'finance', description: 'Income, expenses, receivables, payables, payroll and budgets.', icon: CircleDollarSign, color: 'blue' },
+  { name: 'Reports', slug: 'reports', description: 'Company-wide performance, trends, management reports and insights.', icon: BarChart3, color: 'orange' },
+  { name: 'Administration', slug: 'administration', description: 'Staff, departments, permissions, approvals and company controls.', icon: Settings, color: 'green' },
 ];
 
 export default function AmbassadorStyleDashboard({
   administratorName,
+  role,
 }: {
   administratorName: string;
+  role: InternalRole;
 }) {
   const initials = administratorName
     .split(/\s+/)
     .filter(Boolean)
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
-    .join('') || 'AD';
+    .join('') || 'ET';
+  const label = roleLabel(role);
+  const visibleDepartments = departments.filter((department) => canAccessModule(role, department.slug));
+  const canOpenAdministration = canAccessModule(role, 'administration');
 
   return (
     <div className={styles.shell}>
       <aside className={styles.sidebar}>
         <div className={styles.logoArea}>
           <div className={styles.logoCard}>
-            <Image
-              src="/branding/emmytech-logo.png"
-              alt="Emmy Technology"
-              width={170}
-              height={64}
-              className={styles.logoImage}
-              priority
-            />
+            <Image src="/branding/emmytech-logo.png" alt="Emmy Technology" width={170} height={64} className={styles.logoImage} priority />
           </div>
         </div>
 
@@ -123,19 +86,22 @@ export default function AmbassadorStyleDashboard({
             <span>Favorites</span>
           </button>
 
-          <div className={styles.divider} />
-
-          <Link href="/modules/administration" className={styles.navLink}>
-            <Settings size={19} />
-            <span>Settings</span>
-          </Link>
+          {canOpenAdministration && (
+            <>
+              <div className={styles.divider} />
+              <Link href="/modules/administration" className={styles.navLink}>
+                <Settings size={19} />
+                <span>Administration</span>
+              </Link>
+            </>
+          )}
         </nav>
 
         <div className={styles.sidebarUser}>
           <div className={styles.sidebarAvatar}>{initials}</div>
           <div className={styles.sidebarUserText}>
             <strong>{administratorName}</strong>
-            <span>EmmyTech OS</span>
+            <span>{label}</span>
           </div>
           <ChevronRight size={17} />
         </div>
@@ -149,16 +115,12 @@ export default function AmbassadorStyleDashboard({
           </div>
 
           <div className={styles.topActions}>
-            <button className={styles.bellButton} aria-label="Notifications">
-              <Bell size={20} />
-            </button>
+            <button className={styles.bellButton} aria-label="Notifications"><Bell size={20} /></button>
             <div className={styles.profileCard}>
-              <div className={styles.profileAvatar}>
-                <UserRound size={18} />
-              </div>
+              <div className={styles.profileAvatar}><UserRound size={18} /></div>
               <div>
                 <strong>{administratorName}</strong>
-                <span>Admin</span>
+                <span>{label}</span>
               </div>
             </div>
           </div>
@@ -173,22 +135,20 @@ export default function AmbassadorStyleDashboard({
 
           <section className={styles.pageHeading}>
             <div>
-              <h1>Company Departments</h1>
-              <p>Select a workspace to manage that part of Emmy Technology.</p>
+              <h1>Your Workspaces</h1>
+              <p>Open the EmmyTech departments available to your role.</p>
             </div>
             <div className={styles.roleBadge}>
               <Activity size={15} />
-              Administrator
+              {label}
             </div>
           </section>
 
           <section className={styles.controlBar}>
-            <div className={styles.controlIcon}>
-              <ClipboardCheck size={20} />
-            </div>
+            <div className={styles.controlIcon}><ClipboardCheck size={20} /></div>
             <div className={styles.controlText}>
               <strong>EmmyTech OS workspace</strong>
-              <span>One operating system. Seven core departments.</span>
+              <span>{visibleDepartments.length} department{visibleDepartments.length === 1 ? '' : 's'} available to your role.</span>
             </div>
             <div className={styles.searchBox}>
               <Search size={17} />
@@ -197,18 +157,12 @@ export default function AmbassadorStyleDashboard({
           </section>
 
           <section className={styles.departmentGrid}>
-            {departments.map((department) => {
+            {visibleDepartments.map((department) => {
               const Icon = department.icon;
               return (
-                <Link
-                  key={department.slug}
-                  href={`/modules/${department.slug}`}
-                  className={styles.departmentCard}
-                >
+                <Link key={department.slug} href={`/modules/${department.slug}`} className={styles.departmentCard}>
                   <div className={styles.cardTop}>
-                    <div className={`${styles.iconBox} ${styles[department.color]}`}>
-                      <Icon size={23} />
-                    </div>
+                    <div className={`${styles.iconBox} ${styles[department.color]}`}><Icon size={23} /></div>
                     <ChevronRight className={styles.cardArrow} size={19} />
                   </div>
                   <div className={styles.cardCopy}>
