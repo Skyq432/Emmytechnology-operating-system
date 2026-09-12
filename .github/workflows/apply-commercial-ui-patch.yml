@@ -1,4 +1,4 @@
-name: Apply commercial UI patch
+name: Apply receipt access patch
 
 on:
   push:
@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: testing/vscode-real-life-validation-20260912
-      - name: Apply exact Cash-Off UI replacements
+      - name: Apply exact receipt access replacements
         shell: python
         run: |
           from pathlib import Path
@@ -30,66 +30,245 @@ jobs:
                   raise SystemExit(f'{path}: expected one match, found {count}')
               p.write_text(text.replace(old, new, 1))
 
+          service = 'src/lib/sales/documents/document-service.ts'
+          old = '''export async function renderAndStoreSalesDocument(documentId: string) {
+            const { supabase } = await requireSalesActor();
+            return renderAndStoreWithClient(supabase, documentId);
+          }
+
+          export async function createSignedSalesDocumentUrl(documentId: string, expiresIn = 300) {
+            const { supabase } = await requireSalesActor();
+            const document = await renderAndStoreWithClient(supabase, documentId);
+            if (!document.storage_path) throw new Error('Document PDF is unavailable');
+            const { data, error } = await supabase.storage.from(DOCUMENT_BUCKET).createSignedUrl(document.storage_path, expiresIn);
+            if (error || !data?.signedUrl) throw new Error(error?.message || 'Unable to create document download link');
+            return data.signedUrl;
+          }
+
+          export async function processSalesDocumentDeliveries(documentId: string) {
+            const { supabase, actor } = await requireSalesActor();
+            return processDeliveriesWithClient(supabase, actor.userId, documentId);
+          }
+
+          export async function processSalesDocument(documentId: string) {
+            const { supabase, actor } = await requireSalesActor();
+            return processDocumentWithClient(supabase, actor.userId, documentId);
+          }
+
+          export async function retrySalesDocument(documentId: string) {
+            const { supabase, actor } = await requireSalesActor();
+            const document = await getDocumentWithClient(supabase, documentId);
+            if (document.voided_at) throw new Error('Void documents cannot be retried');
+            if (document.render_status === 'failed') {
+              await supabase.from('sales_documents').update({ render_status: 'pending', render_error: null }).eq('id', documentId);
+            }
+            await supabase
+              .from('sales_document_deliveries')
+              .update({ delivery_state: 'pending', last_error: null })
+              .eq('document_id', documentId)
+              .eq('delivery_state', 'failed');
+            return processDocumentWithClient(supabase, actor.userId, documentId);
+          }
+
+          async function processDocumentsByReference(
+            supabase: SupabaseClient,
+            actorId: string | null,
+            column: 'order_id' | 'repair_id',
+            referenceId: string,
+          ) {
+            const { data, error } = await supabase
+              .from('sales_documents')
+              .select('id')
+              .eq(column, referenceId)
+              .is('voided_at', null)
+              .order('created_at', { ascending: true });
+            if (error) throw new Error(error.message);
+            const results = [];
+            for (const row of data || []) {
+              try {
+                results.push({ id: row.id, success: true, result: await processDocumentWithClient(supabase, actorId, row.id) });
+              } catch (processError) {
+                results.push({
+                  id: row.id,
+                  success: false,
+                  error: processError instanceof Error ? processError.message : 'Unknown error',
+                });
+              }
+            }
+            return results;
+          }
+
+          export async function processDocumentsForOrder(orderId: string) {
+            const { supabase, actor } = await requireSalesActor();
+            return processDocumentsByReference(supabase, actor.userId, 'order_id', orderId);
+          }
+
+          export async function processDocumentsForRepair(repairId: string) {
+            const { supabase, actor } = await requireSalesActor();
+            return processDocumentsByReference(supabase, actor.userId, 'repair_id', repairId);
+          }
+
+          export async function processPendingSalesDocuments(limit = 10) {
+            const { supabase, actor } = await requireSalesActor();
+            return processPendingWithClient(supabase, actor.userId, limit);
+          }
+'''.replace('          ', '')
+
+          new = '''async function requireAuthorizedDocument(documentId: string) {
+            const { supabase, actor } = await requireSalesActor();
+            // This SELECT is intentionally performed with the caller's authenticated
+            // client first. Existing sales_documents RLS remains the authorization boundary.
+            const document = await getDocumentWithClient(supabase, documentId);
+            return { actor, document, admin: getSupabaseAdmin() };
+          }
+
+          export async function renderAndStoreSalesDocument(documentId: string) {
+            const { admin } = await requireAuthorizedDocument(documentId);
+            return renderAndStoreWithClient(admin, documentId);
+          }
+
+          export async function createSignedSalesDocumentUrl(documentId: string, expiresIn = 300) {
+            const { admin } = await requireAuthorizedDocument(documentId);
+            const document = await renderAndStoreWithClient(admin, documentId);
+            if (!document.storage_path) throw new Error('Document PDF is unavailable');
+            const { data, error } = await admin.storage.from(DOCUMENT_BUCKET).createSignedUrl(document.storage_path, expiresIn);
+            if (error || !data?.signedUrl) throw new Error(error?.message || 'Unable to create document download link');
+            return data.signedUrl;
+          }
+
+          export async function processSalesDocumentDeliveries(documentId: string) {
+            const { actor, admin } = await requireAuthorizedDocument(documentId);
+            return processDeliveriesWithClient(admin, actor.userId, documentId);
+          }
+
+          export async function processSalesDocument(documentId: string) {
+            const { actor, admin } = await requireAuthorizedDocument(documentId);
+            return processDocumentWithClient(admin, actor.userId, documentId);
+          }
+
+          export async function retrySalesDocument(documentId: string) {
+            const { actor, document, admin } = await requireAuthorizedDocument(documentId);
+            if (document.voided_at) throw new Error('Void documents cannot be retried');
+            if (document.render_status === 'failed') {
+              await admin.from('sales_documents').update({ render_status: 'pending', render_error: null }).eq('id', documentId);
+            }
+            await admin
+              .from('sales_document_deliveries')
+              .update({ delivery_state: 'pending', last_error: null })
+              .eq('document_id', documentId)
+              .eq('delivery_state', 'failed');
+            return processDocumentWithClient(admin, actor.userId, documentId);
+          }
+
+          async function processDocumentsByReference(
+            discoveryClient: SupabaseClient,
+            actorId: string | null,
+            column: 'order_id' | 'repair_id',
+            referenceId: string,
+          ) {
+            // Discovery stays caller-scoped/RLS-protected; privileged storage and
+            // document-state mutations happen only for rows the caller could read.
+            const { data, error } = await discoveryClient
+              .from('sales_documents')
+              .select('id')
+              .eq(column, referenceId)
+              .is('voided_at', null)
+              .order('created_at', { ascending: true });
+            if (error) throw new Error(error.message);
+            const admin = getSupabaseAdmin();
+            const results = [];
+            for (const row of data || []) {
+              try {
+                results.push({ id: row.id, success: true, result: await processDocumentWithClient(admin, actorId, row.id) });
+              } catch (processError) {
+                results.push({
+                  id: row.id,
+                  success: false,
+                  error: processError instanceof Error ? processError.message : 'Unknown error',
+                });
+              }
+            }
+            return results;
+          }
+
+          export async function processDocumentsForOrder(orderId: string) {
+            const { supabase, actor } = await requireSalesActor();
+            return processDocumentsByReference(supabase, actor.userId, 'order_id', orderId);
+          }
+
+          export async function processDocumentsForRepair(repairId: string) {
+            const { supabase, actor } = await requireSalesActor();
+            return processDocumentsByReference(supabase, actor.userId, 'repair_id', repairId);
+          }
+
+          export async function processPendingSalesDocuments(limit = 10) {
+            const { supabase, actor } = await requireSalesActor();
+            const safeLimit = Math.min(50, Math.max(1, Number(limit || 10)));
+            const [documentsResult, deliveriesResult] = await Promise.all([
+              supabase.from('sales_documents').select('id').eq('render_status', 'pending').is('voided_at', null).order('created_at', { ascending: true }).limit(safeLimit),
+              supabase.from('sales_document_deliveries').select('document_id').eq('delivery_state', 'pending').order('created_at', { ascending: true }).limit(safeLimit),
+            ]);
+            if (documentsResult.error) throw new Error(documentsResult.error.message);
+            if (deliveriesResult.error) throw new Error(deliveriesResult.error.message);
+            const ids = Array.from(new Set([
+              ...(documentsResult.data || []).map((row) => row.id),
+              ...(deliveriesResult.data || []).map((row) => row.document_id),
+            ])).slice(0, safeLimit);
+            const admin = getSupabaseAdmin();
+            const results = [];
+            for (const id of ids) {
+              try {
+                results.push({ id, success: true, result: await processDocumentWithClient(admin, actor.userId, id) });
+              } catch (processError) {
+                results.push({ id, success: false, error: processError instanceof Error ? processError.message : 'Unknown error' });
+              }
+            }
+            return results;
+          }
+'''.replace('          ', '')
+          replace_once(service, old, new)
+
+          # Repair details should expose final documents directly in the real workflow.
+          repair_server = 'src/lib/operations/repair-server.ts'
           replace_once(
-              'src/app/modules/sales/actions.ts',
-              "    salesStaffName: String(formData.get('sales_staff_name') || ''),\n    items,",
-              "    salesStaffName: String(formData.get('sales_staff_name') || ''),\n    cashOffAmount: Number(formData.get('cash_off_amount') || 0),\n    items,",
+              repair_server,
+              "  const [repairResult, assignmentsResult, quotesResult, paymentsResult, consentsResult, eventsResult] = await Promise.all([\n",
+              "  const [repairResult, assignmentsResult, quotesResult, paymentsResult, consentsResult, eventsResult, documentsResult] = await Promise.all([\n",
+          )
+          replace_once(
+              repair_server,
+              "    supabase.from('ops_repair_events').select('*').eq('repair_id', repairId).order('created_at', { ascending: false }),\n  ]);",
+              "    supabase.from('ops_repair_events').select('*').eq('repair_id', repairId).order('created_at', { ascending: false }),\n    supabase.from('sales_documents').select('id,document_number,document_type,render_status,storage_path,voided_at').eq('repair_id', repairId).is('voided_at', null).order('issued_at', { ascending: false }),\n  ]);",
+          )
+          replace_once(
+              repair_server,
+              "  const error = repairResult.error || assignmentsResult.error || quotesResult.error || paymentsResult.error || consentsResult.error || eventsResult.error;",
+              "  const error = repairResult.error || assignmentsResult.error || quotesResult.error || paymentsResult.error || consentsResult.error || eventsResult.error || documentsResult.error;",
+          )
+          replace_once(
+              repair_server,
+              "    events: (eventsResult.data || []) as OperationsRepairEvent[],\n  };",
+              "    events: (eventsResult.data || []) as OperationsRepairEvent[],\n    documents: documentsResult.data || [],\n  };",
           )
 
+          repair_page = 'src/app/modules/operations/repairs/[id]/page.tsx'
           replace_once(
-              'src/components/sales/direct-sale-workspace.tsx',
-              "  const [customerEmail, setCustomerEmail] = useState('');\n",
-              "  const [customerEmail, setCustomerEmail] = useState('');\n  const [cashOffAmount, setCashOffAmount] = useState(0);\n",
+              repair_page,
+              "  const quoteAmount = Number(detail.currentQuote?.quote_amount || r.amount_charged || 0);\n",
+              "  const quoteAmount = Number(detail.currentQuote?.quote_amount || r.amount_charged || 0);\n  const finalReceipt = detail.documents.find((document) => document.document_type === 'final_sales_receipt');\n",
           )
-
           replace_once(
-              'src/components/sales/direct-sale-workspace.tsx',
-              "  const total = lines.reduce((sum, line) => sum + Number(line.finalUnitPrice || 0) * line.quantity, 0);\n",
-              "  const total = lines.reduce((sum, line) => sum + Number(line.finalUnitPrice || 0) * line.quantity, 0);\n  const cashOffLimit = Math.max(0, Math.min(Number(selectedIdentity?.cash_off_balance || 0), total));\n  const appliedCashOff = Math.min(cashOffAmount, cashOffLimit);\n  const amountPayable = Math.max(total - appliedCashOff, 0);\n",
+              repair_page,
+              "    <div className=\"grid gap-5 lg:grid-cols-3\">",
+              "    {finalReceipt ? <div className=\"mb-5 flex justify-end\"><a href={`/api/sales/documents/${finalReceipt.id}`} target=\"_blank\" rel=\"noreferrer\" className=\"rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-black text-white\">View Final Receipt</a></div> : null}\n    <div className=\"grid gap-5 lg:grid-cols-3\">",
           )
-
-          replace_once(
-              'src/components/sales/direct-sale-workspace.tsx',
-              "  function clearIdentity() {\n    setSelectedIdentity(null); setIdentityQuery(''); setCustomerName(''); setCustomerPhone(''); setCustomerEmail('');\n  }",
-              "  function clearIdentity() {\n    setSelectedIdentity(null); setIdentityQuery(''); setCustomerName(''); setCustomerPhone(''); setCustomerEmail(''); setCashOffAmount(0);\n  }",
-          )
-
-          replace_once(
-              'src/components/sales/direct-sale-workspace.tsx',
-              "          <div className=\"flex flex-wrap items-center justify-between gap-3\"><h2 className=\"font-black text-slate-900\">2. Build the sale</h2><div className=\"rounded-xl bg-blue-50 px-3 py-2 text-sm font-black text-[#032489]\">Total {money(total)}</div></div>",
-              "          <div className=\"flex flex-wrap items-center justify-between gap-3\"><h2 className=\"font-black text-slate-900\">2. Build the sale</h2><div className=\"rounded-xl bg-blue-50 px-3 py-2 text-sm font-black text-[#032489]\">Payable {money(amountPayable)}</div></div>",
-          )
-
-          replace_once(
-              'src/components/sales/direct-sale-workspace.tsx',
-              "          <input type=\"hidden\" name=\"items_json\" value={JSON.stringify(lines.map(({ key: _key, ...line }) => line))} />",
-              "          <div className=\"mt-5 rounded-xl border border-emerald-200 bg-emerald-50/60 p-4\">\n            <div className=\"flex flex-wrap items-center justify-between gap-3\"><div><div className=\"text-sm font-black text-emerald-900\">Customer Cash-Off</div><div className=\"mt-1 text-xs text-emerald-700\">Available {money(Number(selectedIdentity?.cash_off_balance || 0))}. Nothing is debited until you confirm this sale.</div></div><div className=\"text-right text-xs text-slate-500\">Gross {money(total)}<br/><b className=\"text-emerald-800\">Payable {money(amountPayable)}</b></div></div>\n            <input name=\"cash_off_amount\" type=\"number\" min=\"0\" max={cashOffLimit} value={cashOffAmount || ''} disabled={!selectedIdentity || cashOffLimit <= 0} onChange={(event) => setCashOffAmount(Math.max(0, Math.min(Number(event.target.value || 0), cashOffLimit)))} placeholder=\"Cash-Off to use\" className=\"mt-3 w-full rounded-xl border border-emerald-200 bg-white px-3 py-2.5 text-sm disabled:bg-slate-100\" />\n          </div>\n\n          <input type=\"hidden\" name=\"items_json\" value={JSON.stringify(lines.map(({ key: _key, ...line }) => line))} />",
-          )
-
-          replace_once(
-              'src/components/sales/direct-sale-workspace.tsx',
-              "        <div className=\"mt-5 grid gap-3 sm:grid-cols-3\">\n          <div className=\"rounded-xl bg-slate-50 p-3\"><div className=\"text-[10px] font-black uppercase text-slate-400\">Total</div><div className=\"mt-1 font-black\">{money(checkout.totalAmount)}</div></div>",
-              "        <div className=\"mt-5 grid gap-3 sm:grid-cols-4\">\n          <div className=\"rounded-xl bg-slate-50 p-3\"><div className=\"text-[10px] font-black uppercase text-slate-400\">Gross</div><div className=\"mt-1 font-black\">{money(checkout.grossAmount)}</div></div>\n          <div className=\"rounded-xl bg-emerald-50 p-3\"><div className=\"text-[10px] font-black uppercase text-emerald-600\">Cash-Off</div><div className=\"mt-1 font-black text-emerald-800\">-{money(checkout.cashOffAmount)}</div></div>\n          <div className=\"rounded-xl bg-slate-50 p-3\"><div className=\"text-[10px] font-black uppercase text-slate-400\">Payable</div><div className=\"mt-1 font-black\">{money(checkout.totalAmount)}</div></div>",
-          )
-
-          replace_once(
-              'src/components/operations/repairs/repair-admin-workspace.tsx',
-              "  const workflowActions = useMemo(() => getRepairWorkflowActions({\n    status: repair.status,\n    quoteStatus: currentQuote?.status || null,\n    amountPaid: repair.amount_paid,\n    requiredBeforeStart: currentQuote?.required_before_start || 0,\n  }), [repair.status, repair.amount_paid, currentQuote]);\n\n  const startRequired = currentQuote?.required_before_start || 0;\n  const remainingBeforeStart = Math.max(0, startRequired - repair.amount_paid);",
-              "  const cashOffAmount = Number((repair as OperationsRepair & { cash_off_amount?: number }).cash_off_amount || 0);\n  const effectivePaid = repair.amount_paid + cashOffAmount;\n  const workflowActions = useMemo(() => getRepairWorkflowActions({\n    status: repair.status,\n    quoteStatus: currentQuote?.status || null,\n    amountPaid: effectivePaid,\n    requiredBeforeStart: currentQuote?.required_before_start || 0,\n  }), [repair.status, effectivePaid, currentQuote]);\n\n  const startRequired = currentQuote?.required_before_start || 0;\n  const remainingBeforeStart = Math.max(0, startRequired - effectivePaid);",
-          )
-
-          replace_once(
-              'src/components/operations/repairs/repair-admin-workspace.tsx',
-              "          <Metric label=\"Paid\" value={money(repair.amount_paid)} />\n          <Metric label=\"Balance\" value={money(repair.balance_due)} />",
-              "          <Metric label=\"Cash paid\" value={money(repair.amount_paid)} />\n          <Metric label=\"Cash-Off\" value={money(cashOffAmount)} />\n          <Metric label=\"Balance\" value={money(repair.balance_due)} />",
-          )
-      - name: Commit bounded UI changes
+      - name: Commit bounded receipt changes
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/app/modules/sales/actions.ts src/components/sales/direct-sale-workspace.tsx src/components/operations/repairs/repair-admin-workspace.tsx
+          git add src/lib/sales/documents/document-service.ts src/lib/operations/repair-server.ts src/app/modules/operations/repairs/[id]/page.tsx
           git diff --cached --check
-          git commit -m "feat: wire cash-off into direct sale and repair UI"
+          git commit -m "fix: authorise server-side receipt rendering and viewing"
           git push origin HEAD:testing/vscode-real-life-validation-20260912
