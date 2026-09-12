@@ -1,0 +1,95 @@
+name: Apply commercial UI patch
+
+on:
+  push:
+    branches:
+      - testing/vscode-real-life-validation-20260912
+    paths:
+      - .github/workflows/apply-commercial-ui-patch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: testing/vscode-real-life-validation-20260912
+      - name: Apply exact Cash-Off UI replacements
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected one match, found {count}')
+              p.write_text(text.replace(old, new, 1))
+
+          replace_once(
+              'src/app/modules/sales/actions.ts',
+              "    salesStaffName: String(formData.get('sales_staff_name') || ''),\n    items,",
+              "    salesStaffName: String(formData.get('sales_staff_name') || ''),\n    cashOffAmount: Number(formData.get('cash_off_amount') || 0),\n    items,",
+          )
+
+          replace_once(
+              'src/components/sales/direct-sale-workspace.tsx',
+              "  const [customerEmail, setCustomerEmail] = useState('');\n",
+              "  const [customerEmail, setCustomerEmail] = useState('');\n  const [cashOffAmount, setCashOffAmount] = useState(0);\n",
+          )
+
+          replace_once(
+              'src/components/sales/direct-sale-workspace.tsx',
+              "  const total = lines.reduce((sum, line) => sum + Number(line.finalUnitPrice || 0) * line.quantity, 0);\n",
+              "  const total = lines.reduce((sum, line) => sum + Number(line.finalUnitPrice || 0) * line.quantity, 0);\n  const cashOffLimit = Math.max(0, Math.min(Number(selectedIdentity?.cash_off_balance || 0), total));\n  const appliedCashOff = Math.min(cashOffAmount, cashOffLimit);\n  const amountPayable = Math.max(total - appliedCashOff, 0);\n",
+          )
+
+          replace_once(
+              'src/components/sales/direct-sale-workspace.tsx',
+              "  function clearIdentity() {\n    setSelectedIdentity(null); setIdentityQuery(''); setCustomerName(''); setCustomerPhone(''); setCustomerEmail('');\n  }",
+              "  function clearIdentity() {\n    setSelectedIdentity(null); setIdentityQuery(''); setCustomerName(''); setCustomerPhone(''); setCustomerEmail(''); setCashOffAmount(0);\n  }",
+          )
+
+          replace_once(
+              'src/components/sales/direct-sale-workspace.tsx',
+              "          <div className=\"flex flex-wrap items-center justify-between gap-3\"><h2 className=\"font-black text-slate-900\">2. Build the sale</h2><div className=\"rounded-xl bg-blue-50 px-3 py-2 text-sm font-black text-[#032489]\">Total {money(total)}</div></div>",
+              "          <div className=\"flex flex-wrap items-center justify-between gap-3\"><h2 className=\"font-black text-slate-900\">2. Build the sale</h2><div className=\"rounded-xl bg-blue-50 px-3 py-2 text-sm font-black text-[#032489]\">Payable {money(amountPayable)}</div></div>",
+          )
+
+          replace_once(
+              'src/components/sales/direct-sale-workspace.tsx',
+              "          <input type=\"hidden\" name=\"items_json\" value={JSON.stringify(lines.map(({ key: _key, ...line }) => line))} />",
+              "          <div className=\"mt-5 rounded-xl border border-emerald-200 bg-emerald-50/60 p-4\">\n            <div className=\"flex flex-wrap items-center justify-between gap-3\"><div><div className=\"text-sm font-black text-emerald-900\">Customer Cash-Off</div><div className=\"mt-1 text-xs text-emerald-700\">Available {money(Number(selectedIdentity?.cash_off_balance || 0))}. Nothing is debited until you confirm this sale.</div></div><div className=\"text-right text-xs text-slate-500\">Gross {money(total)}<br/><b className=\"text-emerald-800\">Payable {money(amountPayable)}</b></div></div>\n            <input name=\"cash_off_amount\" type=\"number\" min=\"0\" max={cashOffLimit} value={cashOffAmount || ''} disabled={!selectedIdentity || cashOffLimit <= 0} onChange={(event) => setCashOffAmount(Math.max(0, Math.min(Number(event.target.value || 0), cashOffLimit)))} placeholder=\"Cash-Off to use\" className=\"mt-3 w-full rounded-xl border border-emerald-200 bg-white px-3 py-2.5 text-sm disabled:bg-slate-100\" />\n          </div>\n\n          <input type=\"hidden\" name=\"items_json\" value={JSON.stringify(lines.map(({ key: _key, ...line }) => line))} />",
+          )
+
+          replace_once(
+              'src/components/sales/direct-sale-workspace.tsx',
+              "        <div className=\"mt-5 grid gap-3 sm:grid-cols-3\">\n          <div className=\"rounded-xl bg-slate-50 p-3\"><div className=\"text-[10px] font-black uppercase text-slate-400\">Total</div><div className=\"mt-1 font-black\">{money(checkout.totalAmount)}</div></div>",
+              "        <div className=\"mt-5 grid gap-3 sm:grid-cols-4\">\n          <div className=\"rounded-xl bg-slate-50 p-3\"><div className=\"text-[10px] font-black uppercase text-slate-400\">Gross</div><div className=\"mt-1 font-black\">{money(checkout.grossAmount)}</div></div>\n          <div className=\"rounded-xl bg-emerald-50 p-3\"><div className=\"text-[10px] font-black uppercase text-emerald-600\">Cash-Off</div><div className=\"mt-1 font-black text-emerald-800\">-{money(checkout.cashOffAmount)}</div></div>\n          <div className=\"rounded-xl bg-slate-50 p-3\"><div className=\"text-[10px] font-black uppercase text-slate-400\">Payable</div><div className=\"mt-1 font-black\">{money(checkout.totalAmount)}</div></div>",
+          )
+
+          replace_once(
+              'src/components/operations/repairs/repair-admin-workspace.tsx',
+              "  const workflowActions = useMemo(() => getRepairWorkflowActions({\n    status: repair.status,\n    quoteStatus: currentQuote?.status || null,\n    amountPaid: repair.amount_paid,\n    requiredBeforeStart: currentQuote?.required_before_start || 0,\n  }), [repair.status, repair.amount_paid, currentQuote]);\n\n  const startRequired = currentQuote?.required_before_start || 0;\n  const remainingBeforeStart = Math.max(0, startRequired - repair.amount_paid);",
+              "  const cashOffAmount = Number((repair as OperationsRepair & { cash_off_amount?: number }).cash_off_amount || 0);\n  const effectivePaid = repair.amount_paid + cashOffAmount;\n  const workflowActions = useMemo(() => getRepairWorkflowActions({\n    status: repair.status,\n    quoteStatus: currentQuote?.status || null,\n    amountPaid: effectivePaid,\n    requiredBeforeStart: currentQuote?.required_before_start || 0,\n  }), [repair.status, effectivePaid, currentQuote]);\n\n  const startRequired = currentQuote?.required_before_start || 0;\n  const remainingBeforeStart = Math.max(0, startRequired - effectivePaid);",
+          )
+
+          replace_once(
+              'src/components/operations/repairs/repair-admin-workspace.tsx',
+              "          <Metric label=\"Paid\" value={money(repair.amount_paid)} />\n          <Metric label=\"Balance\" value={money(repair.balance_due)} />",
+              "          <Metric label=\"Cash paid\" value={money(repair.amount_paid)} />\n          <Metric label=\"Cash-Off\" value={money(cashOffAmount)} />\n          <Metric label=\"Balance\" value={money(repair.balance_due)} />",
+          )
+      - name: Commit bounded UI changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/modules/sales/actions.ts src/components/sales/direct-sale-workspace.tsx src/components/operations/repairs/repair-admin-workspace.tsx
+          git diff --cached --check
+          git commit -m "feat: wire cash-off into direct sale and repair UI"
+          git push origin HEAD:testing/vscode-real-life-validation-20260912
