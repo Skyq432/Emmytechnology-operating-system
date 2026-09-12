@@ -1,9 +1,6 @@
 name: Security migration reconciliation
 
 on:
-  push:
-    branches:
-      - security/supabase-reconciliation-20260912
   workflow_dispatch:
 
 permissions:
@@ -11,7 +8,6 @@ permissions:
 
 jobs:
   reconcile:
-    if: "${{ github.event_name == 'workflow_dispatch' || github.event.head_commit.message != 'chore: reconcile migration history from live ledger' }}"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -33,31 +29,23 @@ jobs:
           python - <<'PY'
           import json
           from pathlib import Path
-
           rows = json.loads(Path('/tmp/live-migrations.json').read_text())
           if len(rows) < 60:
               raise SystemExit(f'Expected at least 60 live migrations, got {len(rows)}')
-
           active = Path('supabase/migrations')
           archive = Path('supabase/migrations_archive/2026-09-12-pre-reconciliation')
           archive.mkdir(parents=True, exist_ok=True)
-
           for old in sorted(active.glob('*.sql')):
               target = archive / old.name
               if target.exists():
                   target.unlink()
               old.rename(target)
-
           active.mkdir(parents=True, exist_ok=True)
           manifest = []
           for row in rows:
-              version = row['version']
-              name = row['name']
-              sql = row['sql'] or ''
-              filename = f'{version}_{name}.sql'
-              (active / filename).write_text(sql.rstrip() + '\n', encoding='utf-8')
-              manifest.append({'version': version, 'name': name, 'file': filename})
-
+              filename = f"{row['version']}_{row['name']}.sql"
+              (active / filename).write_text((row['sql'] or '').rstrip() + '\n', encoding='utf-8')
+              manifest.append(filename)
           Path('/tmp/live-migration-manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
           print(f'Reconstructed {len(rows)} exact live migration files.')
           PY
@@ -68,12 +56,10 @@ jobs:
           python - <<'PY'
           import json
           from pathlib import Path
-          expected = [x['file'] for x in json.loads(Path('/tmp/live-migration-manifest.json').read_text())]
+          expected = sorted(json.loads(Path('/tmp/live-migration-manifest.json').read_text()))
           actual = sorted(p.name for p in Path('supabase/migrations').glob('*.sql'))
-          if sorted(expected) != actual:
-              missing = sorted(set(expected)-set(actual))
-              extra = sorted(set(actual)-set(expected))
-              raise SystemExit(f'Migration mismatch. Missing={missing} Extra={extra}')
+          if expected != actual:
+              raise SystemExit(f'Migration mismatch. Missing={sorted(set(expected)-set(actual))} Extra={sorted(set(actual)-set(expected))}')
           print(f'Active migration directory exactly matches {len(actual)} live versions.')
           PY
       - name: Commit reconciliation back to security branch
