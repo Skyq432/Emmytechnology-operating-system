@@ -10,6 +10,8 @@ export type DirectSaleCheckoutSnapshot = {
   customerEmail: string | null;
   commercialState: string;
   fulfilmentStatus: string;
+  grossAmount: number;
+  cashOffAmount: number;
   totalAmount: number;
   paidAmount: number;
   outstanding: number;
@@ -24,7 +26,11 @@ async function getDirectSaleCheckoutSnapshot(
   orderId: string,
 ): Promise<DirectSaleCheckoutSnapshot> {
   const [orderResult, itemsResult, paymentsResult, creditResult, documentsResult] = await Promise.all([
-    supabase.from('ops_orders').select('id,order_code,identity_id,customer_name,customer_phone,customer_email,commercial_state,status,total_amount,handover_completed_at').eq('id', orderId).single(),
+    supabase
+      .from('ops_orders')
+      .select('id,order_code,identity_id,customer_name,customer_phone,customer_email,commercial_state,status,subtotal,discount_amount,cash_off_amount,delivery_charge,total_amount,handover_completed_at')
+      .eq('id', orderId)
+      .single(),
     supabase.from('ops_order_items').select('id,item_name,quantity,unit_price,line_total').eq('order_id', orderId).order('created_at'),
     supabase.from('ops_order_payments').select('amount,is_void').eq('order_id', orderId),
     supabase.from('sales_credit_releases').select('id,approved_outstanding_amount,due_at,status').eq('order_id', orderId).eq('status', 'active').order('approved_at', { ascending: false }).limit(1).maybeSingle(),
@@ -34,7 +40,12 @@ async function getDirectSaleCheckoutSnapshot(
   if (error) throw new Error(error.message);
   const order = orderResult.data;
   const paidAmount = (paymentsResult.data || []).filter((row) => !row.is_void).reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  const cashOffAmount = Number(order.cash_off_amount || 0);
   const totalAmount = Number(order.total_amount || 0);
+  const grossAmount = Math.max(
+    Number(order.subtotal || 0) - Number(order.discount_amount || 0) + Number(order.delivery_charge || 0),
+    0,
+  );
   return {
     id: order.id,
     orderCode: order.order_code,
@@ -44,6 +55,8 @@ async function getDirectSaleCheckoutSnapshot(
     customerEmail: order.customer_email,
     commercialState: order.commercial_state,
     fulfilmentStatus: order.status,
+    grossAmount,
+    cashOffAmount,
     totalAmount,
     paidAmount,
     outstanding: Math.max(totalAmount - paidAmount, 0),
@@ -78,6 +91,7 @@ export async function createDirectSaleDraft(input: {
   customerEmail?: string | null;
   customerAddress?: string | null;
   salesStaffName?: string | null;
+  cashOffAmount?: number;
   items: Array<{
     inventoryItemId?: string | null;
     inventoryUnitId?: string | null;
@@ -103,7 +117,7 @@ export async function createDirectSaleDraft(input: {
     address: input.customerAddress,
   });
 
-  const { data, error } = await supabase.rpc('sales_create_direct_sale_draft', {
+  const { data, error } = await supabase.rpc('sales_create_direct_sale_draft_with_cash_off', {
     p_identity_id: identityId,
     p_customer_name: input.customerName ?? null,
     p_customer_phone: input.customerPhone ?? null,
@@ -124,17 +138,28 @@ export async function createDirectSaleDraft(input: {
       note: item.note ?? '',
     })),
     p_sales_staff_name: input.salesStaffName ?? null,
+    p_cash_off_amount: Math.max(0, Number(input.cashOffAmount || 0)),
   });
   if (error) return { success: false as const, message: error.message };
   const checkout = await getDirectSaleCheckoutSnapshot(supabase, String(data));
   return { success: true as const, message: 'Direct Sale draft created', data: checkout };
 }
 
+export async function setDirectSaleCashOff(orderId: string, amount: number) {
+  const { supabase } = await requireSalesActor();
+  const { error } = await supabase.rpc('commercial_set_draft_cash_off', {
+    p_order_id: orderId,
+    p_amount: Math.max(0, Number(amount || 0)),
+  });
+  if (error) return { success: false as const, message: error.message };
+  return { success: true as const, message: 'Cash-Off updated', data: await getDirectSaleCheckoutSnapshot(supabase, orderId) };
+}
+
 export async function confirmDirectSale(orderId: string) {
   const { supabase } = await requireSalesActor();
   const { error } = await supabase.rpc('sales_confirm_direct_sale', { p_order_id: orderId });
   if (error) return { success: false as const, message: error.message };
-  return { success: true as const, message: 'Direct Sale confirmed and stock reserved', data: await getDirectSaleCheckoutSnapshot(supabase, orderId) };
+  return { success: true as const, message: 'Direct Sale confirmed and Cash-Off/stock reserved safely', data: await getDirectSaleCheckoutSnapshot(supabase, orderId) };
 }
 
 export async function recordDirectSalePayment(input: {
