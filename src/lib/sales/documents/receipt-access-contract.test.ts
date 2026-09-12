@@ -40,6 +40,6 @@ test('repair final receipt settlement counts Cash-Off separately from cash payme
 test('zero-net confirmed orders can still queue a final receipt', () => {
   const sql = loadReceiptMigration();
   assert.match(sql, /after update of commercial_state/i);
-  assert.match(sql, /total_amount\s*<=\s*0|total_amount<=0/i);
+  assert.match(sql, /(?:coalesce\(new\.total_amount\s*,\s*0\)|new\.total_amount)\s*<=\s*0/i);
   assert.match(sql, /sales_ensure_final_sales_receipt_metadata/i);
 });
