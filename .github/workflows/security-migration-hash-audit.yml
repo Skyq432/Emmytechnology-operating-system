@@ -15,3 +15,11 @@ jobs:
         shell: bash
         run: |
           find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print0 | sort -z | xargs -0 md5sum
+      - name: Find direct client access to security-review tables
+        shell: bash
+        run: |
+          TABLES='ambassador_bonuses|identities|identity_signals|identity_events|identity_signal_weights|identity_ambassador_conflicts|identity_match_suggestions|lead_events|lead_signals|product_interests|referral_route_logs|admin_notifications|crm_notifications|crm_audit_logs|crm_followups|crm_communications|crm_files|crm_quote_items|crm_funnel_stages|crm_funnel_events|crm_quotes|crm_products|crm_sale_items|crm_sales|crm_invoices|crm_receipts|conversation_message_bank|spin_user_prizes|spin_players|spin_cashout_requests|spin_prizes|spin_dm_clicks|spin_referrals|spin_logs|spin_game_settings|spin_letter_segments|spin_rule_groups|spin_rule_items|spin_transactions|spin_user_rule_usage|spin_referral_awards'
+          echo '=== Direct Supabase .from(...) references ==='
+          grep -RInE "\.from\(['\"]($TABLES)['\"]\)" src scripts 2>/dev/null || true
+          echo '=== Any source references to reviewed tables ==='
+          grep -RInE "($TABLES)" src scripts 2>/dev/null | head -1000 || true
