@@ -12,13 +12,14 @@ async function requireOperationsAccess() {
 
 export async function getOperationsOrderDetail(orderId: string): Promise<OperationsOrderDetail> {
   const { supabase } = await requireOperationsAccess();
-  const [orderResult, eventsResult, handoffsResult, usersResult, reservationsResult, locationsResult] = await Promise.all([
+  const [orderResult, eventsResult, handoffsResult, usersResult, reservationsResult, locationsResult, finalReceiptResult] = await Promise.all([
     supabase.from('ops_orders').select('*, items:ops_order_items(*)').eq('id', orderId).single(),
     supabase.from('ops_order_events').select('*').eq('order_id', orderId).order('created_at', { ascending: false }),
     supabase.from('ops_order_handoffs').select('*').eq('order_id', orderId).order('created_at', { ascending: false }),
     supabase.from('users').select('id,name,email').order('name'),
     supabase.from('ops_inventory_reservations').select('*').eq('order_id', orderId).order('created_at', { ascending: false }),
     supabase.from('ops_locations').select('id,code,name,location_type').eq('is_active', true).order('name'),
+    supabase.from('sales_documents').select('id,document_number').eq('order_id', orderId).eq('document_type', 'final_sales_receipt').is('voided_at', null).order('issued_at', { ascending: false }).limit(1).maybeSingle(),
   ]);
 
   if (orderResult.error) throw new Error(orderResult.error.message);
@@ -27,8 +28,13 @@ export async function getOperationsOrderDetail(orderId: string): Promise<Operati
   if (usersResult.error) throw new Error(usersResult.error.message);
   if (reservationsResult.error) throw new Error(reservationsResult.error.message);
   if (locationsResult.error) throw new Error(locationsResult.error.message);
+  if (finalReceiptResult.error) throw new Error(finalReceiptResult.error.message);
 
-  const order = orderResult.data as OperationsOrderDetail['order'];
+  const order = {
+    ...(orderResult.data as OperationsOrderDetail['order']),
+    final_receipt_id: finalReceiptResult.data?.id ?? null,
+    final_receipt_number: finalReceiptResult.data?.document_number ?? null,
+  } as OperationsOrderDetail['order'] & { final_receipt_id: string | null; final_receipt_number: string | null };
   let identity: OperationsOrderDetail['identity'] = null;
   let ambassador: OperationsOrderDetail['ambassador'] = null;
 
