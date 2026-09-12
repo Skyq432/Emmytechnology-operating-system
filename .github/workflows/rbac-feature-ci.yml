@@ -5,6 +5,7 @@ on:
     branches:
       - feature/staff-rbac-mvp
       - security/**
+      - testing/**
   workflow_dispatch:
 
 jobs:
