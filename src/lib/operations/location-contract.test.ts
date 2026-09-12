@@ -5,7 +5,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
-const migrationPath = path.join(root, 'supabase/migrations/20260912060000_staff_default_branch_and_transaction_location.sql');
+const migrationPath = path.join(root, 'supabase/migrations/20260912090855_staff_default_branch_and_transaction_location_20260912.sql');
 
 test('staff branch migration exists', () => {
   assert.equal(existsSync(migrationPath), true, 'staff branch migration must be committed before it is applied live');
