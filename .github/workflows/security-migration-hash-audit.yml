@@ -1,0 +1,17 @@
+name: Security migration hash audit
+
+on:
+  push:
+    branches:
+      - security/supabase-reconciliation-20260912
+  workflow_dispatch:
+
+jobs:
+  hash:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Hash checked-in migrations
+        shell: bash
+        run: |
+          find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print0 | sort -z | xargs -0 md5sum
