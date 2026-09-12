@@ -10,7 +10,6 @@ permissions:
 
 jobs:
   fix:
-    if: github.event.head_commit.message == 'chore: stage one-time spin route lint cleanup'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
