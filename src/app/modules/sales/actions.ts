@@ -54,6 +54,7 @@ export async function createDirectSaleAction(_prev: SalesActionState, formData: 
     customerEmail: String(formData.get('customer_email') || ''),
     customerAddress: String(formData.get('customer_address') || ''),
     salesStaffName: String(formData.get('sales_staff_name') || ''),
+    cashOffAmount: Number(formData.get('cash_off_amount') || 0),
     items,
   });
   if (result.success) revalidateSales();

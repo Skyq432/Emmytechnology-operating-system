@@ -79,8 +79,10 @@ function DirectSaleCheckout({ initialCheckout, isAdmin }: { initialCheckout: Dir
           <div className="rounded-xl bg-blue-50 px-4 py-2 text-lg font-black text-[#032489]">{money(checkout.totalAmount)}</div>
         </div>
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-3">
-          <div className="rounded-xl bg-slate-50 p-3"><div className="text-[10px] font-black uppercase text-slate-400">Total</div><div className="mt-1 font-black">{money(checkout.totalAmount)}</div></div>
+        <div className="mt-5 grid gap-3 sm:grid-cols-4">
+          <div className="rounded-xl bg-slate-50 p-3"><div className="text-[10px] font-black uppercase text-slate-400">Gross</div><div className="mt-1 font-black">{money(checkout.grossAmount)}</div></div>
+          <div className="rounded-xl bg-emerald-50 p-3"><div className="text-[10px] font-black uppercase text-emerald-600">Cash-Off</div><div className="mt-1 font-black text-emerald-800">-{money(checkout.cashOffAmount)}</div></div>
+          <div className="rounded-xl bg-slate-50 p-3"><div className="text-[10px] font-black uppercase text-slate-400">Payable</div><div className="mt-1 font-black">{money(checkout.totalAmount)}</div></div>
           <div className="rounded-xl bg-emerald-50 p-3"><div className="text-[10px] font-black uppercase text-emerald-600">Paid</div><div className="mt-1 font-black text-emerald-800">{money(checkout.paidAmount)}</div></div>
           <div className="rounded-xl bg-amber-50 p-3"><div className="text-[10px] font-black uppercase text-amber-600">Outstanding</div><div className="mt-1 font-black text-amber-800">{money(checkout.outstanding)}</div></div>
         </div>
@@ -170,6 +172,7 @@ export function DirectSaleWorkspace({ inventory, availability, units, locations,
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
+  const [cashOffAmount, setCashOffAmount] = useState(0);
 
   useEffect(() => {
     const query = identityQuery.trim();
@@ -190,6 +193,9 @@ export function DirectSaleWorkspace({ inventory, availability, units, locations,
   const itemUnits = useMemo(() => units.filter((unit) => unit.inventory_item_id === selectedItemId), [units, selectedItemId]);
   const itemAvailability = useMemo(() => availability.filter((row) => row.inventory_item_id === selectedItemId && Number(row.available) > 0), [availability, selectedItemId]);
   const total = lines.reduce((sum, line) => sum + Number(line.finalUnitPrice || 0) * line.quantity, 0);
+  const cashOffLimit = Math.max(0, Math.min(Number(selectedIdentity?.cash_off_balance || 0), total));
+  const appliedCashOff = Math.min(cashOffAmount, cashOffLimit);
+  const amountPayable = Math.max(total - appliedCashOff, 0);
   const standardPrice = Number(selectedItem?.default_selling_price || 0);
   const productDiscount = Math.min(100, Math.max(0, Number(selectedItem?.salesperson_discount_limit_percent ?? actor.discountLimitPercent ?? 0)));
   const discountFloor = standardPrice > 0 ? standardPrice * (1 - productDiscount / 100) : 0;
@@ -210,7 +216,7 @@ export function DirectSaleWorkspace({ inventory, availability, units, locations,
   }
 
   function clearIdentity() {
-    setSelectedIdentity(null); setIdentityQuery(''); setCustomerName(''); setCustomerPhone(''); setCustomerEmail('');
+    setSelectedIdentity(null); setIdentityQuery(''); setCustomerName(''); setCustomerPhone(''); setCustomerEmail(''); setCashOffAmount(0);
   }
 
   function addStockLine() {
@@ -272,7 +278,7 @@ export function DirectSaleWorkspace({ inventory, availability, units, locations,
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-black text-slate-900">2. Build the sale</h2><div className="rounded-xl bg-blue-50 px-3 py-2 text-sm font-black text-[#032489]">Total {money(total)}</div></div>
+          <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-black text-slate-900">2. Build the sale</h2><div className="rounded-xl bg-blue-50 px-3 py-2 text-sm font-black text-[#032489]">Payable {money(amountPayable)}</div></div>
           <div className="mt-4 flex gap-2"><button type="button" onClick={() => setMode('stock')} className={`rounded-lg px-3 py-2 text-xs font-bold ${mode === 'stock' ? 'bg-[#032489] text-white' : 'bg-slate-100 text-slate-600'}`}>Physical stock</button><button type="button" onClick={() => setMode('service')} className={`rounded-lg px-3 py-2 text-xs font-bold ${mode === 'service' ? 'bg-[#032489] text-white' : 'bg-slate-100 text-slate-600'}`}>Service / non-stock</button></div>
 
           {mode === 'stock' ? <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -294,6 +300,11 @@ export function DirectSaleWorkspace({ inventory, availability, units, locations,
           </div>}
 
           <div className="mt-5 space-y-2">{lines.length === 0 ? <div className="rounded-xl border border-dashed border-slate-300 p-5 text-center text-sm text-slate-400">No items added.</div> : lines.map((line) => <div key={line.key} className="flex items-center gap-3 rounded-xl border border-slate-200 p-3"><div className="min-w-0 flex-1"><div className="truncate text-sm font-bold text-slate-800">{line.itemName}</div><div className="text-xs text-slate-400">{line.quantity} × {money(Number(line.finalUnitPrice || 0))}</div></div><div className="text-sm font-black">{money(Number(line.finalUnitPrice || 0) * line.quantity)}</div><button type="button" onClick={() => setLines((current) => current.filter((row) => row.key !== line.key))} className="text-xs font-bold text-rose-600">Remove</button></div>)}</div>
+
+          <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3"><div><div className="text-sm font-black text-emerald-900">Customer Cash-Off</div><div className="mt-1 text-xs text-emerald-700">Available {money(Number(selectedIdentity?.cash_off_balance || 0))}. Nothing is debited until you confirm this sale.</div></div><div className="text-right text-xs text-slate-500">Gross {money(total)}<br/><b className="text-emerald-800">Payable {money(amountPayable)}</b></div></div>
+            <input name="cash_off_amount" type="number" min="0" max={cashOffLimit} value={cashOffAmount || ''} disabled={!selectedIdentity || cashOffLimit <= 0} onChange={(event) => setCashOffAmount(Math.max(0, Math.min(Number(event.target.value || 0), cashOffLimit)))} placeholder="Cash-Off to use" className="mt-3 w-full rounded-xl border border-emerald-200 bg-white px-3 py-2.5 text-sm disabled:bg-slate-100" />
+          </div>
 
           <input type="hidden" name="items_json" value={JSON.stringify(lines.map(({ key: _key, ...line }) => line))} />
           {state.message ? <div className={`mt-4 rounded-xl px-3 py-2 text-sm font-semibold ${state.success ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{state.message}</div> : null}

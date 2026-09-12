@@ -43,15 +43,17 @@ export function RepairAdminWorkspace({
   const [pinState, pinAction, pinPending] = useActionState(regenerateRepairPinAction, initialState);
   const [workflowState, workflowAction, workflowPending] = useActionState(updateRepairStatusAction, initialState);
 
+  const cashOffAmount = Number((repair as OperationsRepair & { cash_off_amount?: number }).cash_off_amount || 0);
+  const effectivePaid = repair.amount_paid + cashOffAmount;
   const workflowActions = useMemo(() => getRepairWorkflowActions({
     status: repair.status,
     quoteStatus: currentQuote?.status || null,
-    amountPaid: repair.amount_paid,
+    amountPaid: effectivePaid,
     requiredBeforeStart: currentQuote?.required_before_start || 0,
-  }), [repair.status, repair.amount_paid, currentQuote]);
+  }), [repair.status, effectivePaid, currentQuote]);
 
   const startRequired = currentQuote?.required_before_start || 0;
-  const remainingBeforeStart = Math.max(0, startRequired - repair.amount_paid);
+  const remainingBeforeStart = Math.max(0, startRequired - effectivePaid);
 
   return <div className="mt-5 space-y-5">
     <div className="grid gap-5 xl:grid-cols-3">
@@ -75,7 +77,8 @@ export function RepairAdminWorkspace({
         <div className="grid grid-cols-2 gap-3">
           <Metric label="Current quote" value={currentQuote ? money(currentQuote.quote_amount) : 'Not published'} />
           <Metric label="Quote status" value={currentQuote?.status.replaceAll('_', ' ') || 'None'} />
-          <Metric label="Paid" value={money(repair.amount_paid)} />
+          <Metric label="Cash paid" value={money(repair.amount_paid)} />
+          <Metric label="Cash-Off" value={money(cashOffAmount)} />
           <Metric label="Balance" value={money(repair.balance_due)} />
         </div>
         {currentQuote && <div className={`mt-4 rounded-lg px-3 py-2.5 text-sm font-bold ${remainingBeforeStart > 0 ? 'bg-amber-50 text-amber-800' : currentQuote.status === 'approved' ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-[#032489]'}`}>
