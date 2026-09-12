@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/staff-rbac-mvp
+      - security/**
   workflow_dispatch:
 
 jobs:
