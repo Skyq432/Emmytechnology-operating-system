@@ -13,6 +13,16 @@ function loadMigration() {
   return readFileSync(path.join(migrationsDir, file), 'utf8');
 }
 
+function extractFunction(sql: string, functionName: string) {
+  const pattern = new RegExp(
+    `create\\s+or\\s+replace\\s+function\\s+public\\.${functionName}\\b[\\s\\S]*?\\$\\$;`,
+    'i',
+  );
+  const match = sql.match(pattern);
+  assert.ok(match, `${functionName} must exist in the Cash-Off migration`);
+  return match[0];
+}
+
 test('commercial Cash-Off migration supports Direct Sale, Order and Repair redemption', () => {
   const sql = loadMigration();
   assert.match(sql, /commercial_set_draft_cash_off/i);
@@ -33,11 +43,12 @@ test('order confirmation rechecks balance and debits Cash-Off atomically with an
 
 test('repair Cash-Off requires an approved quote and contributes to settlement without becoming a cash payment', () => {
   const sql = loadMigration();
-  assert.match(sql, /current repair quote must be approved/i);
-  assert.match(sql, /repair_redemption:/i);
-  assert.match(sql, /cash_off_amount/i);
-  assert.match(sql, /amount_paid[\s\S]*cash_off_amount|cash_off_amount[\s\S]*amount_paid/i);
-  assert.doesNotMatch(sql, /insert\s+into\s+public\.ops_repair_payments[\s\S]{0,500}cash[_ ]?off/i);
+  const repairCashOffFunction = extractFunction(sql, 'ops_apply_repair_cash_off');
+  assert.match(repairCashOffFunction, /current repair quote must be approved/i);
+  assert.match(repairCashOffFunction, /repair_redemption:/i);
+  assert.match(repairCashOffFunction, /cash_off_amount/i);
+  assert.match(repairCashOffFunction, /amount_paid[\s\S]*cash_off_amount|cash_off_amount[\s\S]*amount_paid/i);
+  assert.doesNotMatch(repairCashOffFunction, /insert\s+into\s+public\.ops_repair_payments/i);
 });
 
 test('cancellation reverses only a real prior redemption through a compensating Cash-Off ledger entry', () => {
