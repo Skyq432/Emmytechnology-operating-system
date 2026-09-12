@@ -12,8 +12,8 @@ const returnedControlsUrl = new URL('../../components/work/returned-task-control
 const activitiesPageUrl = new URL('../../app/modules/activities/page.tsx', import.meta.url);
 const dashboardUrl = new URL('../../components/os/ambassador-style-dashboard.tsx', import.meta.url);
 const notificationCenterUrl = new URL('../../components/work/work-notification-center.tsx', import.meta.url);
-const notificationMigrationUrl = new URL('../../../supabase/migrations/20260911123000_work_notifications.sql', import.meta.url);
-const notificationHardeningUrl = new URL('../../../supabase/migrations/20260911123500_work_notifications_harden_updates.sql', import.meta.url);
+const notificationMigrationUrl = new URL('../../../supabase/migrations/20260911103901_work_notifications_20260911.sql', import.meta.url);
+const notificationHardeningUrl = new URL('../../../supabase/migrations/20260911104349_work_notifications_harden_updates_20260911.sql', import.meta.url);
 
 const detailPage = read(detailPageUrl);
 const detailComponent = read(detailComponentUrl);
