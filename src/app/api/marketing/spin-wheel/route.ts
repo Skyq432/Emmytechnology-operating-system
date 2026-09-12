@@ -5,12 +5,12 @@ import { canAccessModule, isInternalRole } from "@/lib/auth/roles";
 
 export const dynamic = "force-dynamic";
 
-const db: any = new Proxy(
-  {},
+const db = new Proxy(
+  {} as ReturnType<typeof getSupabaseAdmin>,
   {
     get(_target, property) {
-      const client: any = getSupabaseAdmin();
-      const value = client[property];
+      const client = getSupabaseAdmin();
+      const value = client[property as keyof typeof client];
       return typeof value === "function" ? value.bind(client) : value;
     },
   }
@@ -18,10 +18,10 @@ const db: any = new Proxy(
 
 const MAX_ROWS = 5000;
 
-type Row = Record<string, any>;
+type Row = Record<string, unknown>;
 type SafeRowsResult = { rows: Row[]; warning: string | null };
 
-async function authorized(_req?: NextRequest) {
+async function authorized() {
   const supabase = await createServerClient();
 
   const {
@@ -182,7 +182,7 @@ async function tableRows(table: string, limit = MAX_ROWS) {
 }
 
 export async function GET(req: NextRequest) {
-  if (!(await authorized(req))) return deny();
+  if (!(await authorized())) return deny();
 
   const { searchParams } = new URL(req.url);
   const fromIso = searchParams.get("from") || "1970-01-01T00:00:00.000Z";
@@ -422,7 +422,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  if (!(await authorized(req))) return deny();
+  if (!(await authorized())) return deny();
 
   const body = (await req.json().catch(() => ({}))) as Row;
   const action = textValue(body.action);
