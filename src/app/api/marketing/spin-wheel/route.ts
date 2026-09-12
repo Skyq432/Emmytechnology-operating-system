@@ -67,7 +67,10 @@ function timestampOf(row: Row) {
     row.updated_at ??
     row.updatedAt ??
     null;
-  const time = value ? new Date(value).getTime() : 0;
+
+  if (typeof value !== "string" && typeof value !== "number") return 0;
+
+  const time = new Date(value).getTime();
   return Number.isFinite(time) ? time : 0;
 }
 
