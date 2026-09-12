@@ -36,16 +36,17 @@ export async function getAvailableRepairCards() {
 
 export async function getRepairAdminDetail(repairId: string) {
   const { supabase } = await requireRepairAccess();
-  const [repairResult, assignmentsResult, quotesResult, paymentsResult, consentsResult, eventsResult] = await Promise.all([
+  const [repairResult, assignmentsResult, quotesResult, paymentsResult, consentsResult, eventsResult, documentsResult] = await Promise.all([
     supabase.from('ops_repairs').select('*').eq('id', repairId).single(),
     supabase.from('ops_repair_card_assignments').select('*,card:ops_repair_cards(*)').eq('repair_id', repairId).order('assigned_at', { ascending: false }),
     supabase.from('ops_repair_quotes').select('*').eq('repair_id', repairId).order('version', { ascending: false }),
     supabase.from('ops_repair_payments').select('*').eq('repair_id', repairId).order('paid_at', { ascending: false }),
     supabase.from('ops_repair_consents').select('*').eq('repair_id', repairId).order('created_at', { ascending: false }),
     supabase.from('ops_repair_events').select('*').eq('repair_id', repairId).order('created_at', { ascending: false }),
+    supabase.from('sales_documents').select('id,document_number,document_type,render_status,storage_path,voided_at').eq('repair_id', repairId).is('voided_at', null).order('issued_at', { ascending: false }),
   ]);
 
-  const error = repairResult.error || assignmentsResult.error || quotesResult.error || paymentsResult.error || consentsResult.error || eventsResult.error;
+  const error = repairResult.error || assignmentsResult.error || quotesResult.error || paymentsResult.error || consentsResult.error || eventsResult.error || documentsResult.error;
   if (error) throw new Error(error.message);
 
   const repair = {
@@ -75,6 +76,7 @@ export async function getRepairAdminDetail(repairId: string) {
     payments,
     consents: (consentsResult.data || []) as OperationsRepairConsent[],
     events: (eventsResult.data || []) as OperationsRepairEvent[],
+    documents: documentsResult.data || [],
   };
 }
 

@@ -14,10 +14,12 @@ export default async function RepairDetailPage({ params }:{ params:Promise<{id:s
   const cashOff = await getRepairCashOffContext(r.identity_id);
   const currentCashOff = Number((r as typeof r & { cash_off_amount?: number }).cash_off_amount || 0);
   const quoteAmount = Number(detail.currentQuote?.quote_amount || r.amount_charged || 0);
+  const finalReceipt = detail.documents.find((document) => document.document_type === 'final_sales_receipt');
 
   return <div className="mx-auto max-w-[1450px]">
     <Link href="/modules/operations/repairs" className="mb-4 inline-flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-[#032489]"><ArrowLeft className="h-4 w-4"/> Back to repairs</Link>
     <div className="mb-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex flex-col justify-between gap-4 md:flex-row"><div><h1 className="text-2xl font-black text-[#032489]">{r.repair_code}</h1><p className="mt-2 text-sm font-black text-slate-900">{r.customer_name || 'Unknown customer'}</p><p className="mt-1 text-xs text-slate-500">{r.customer_phone || 'No phone'} · {[r.brand,r.model].filter(Boolean).join(' ') || r.device_type || 'Device'}</p></div><span className="self-start rounded-full bg-blue-50 px-3 py-1.5 text-xs font-black capitalize text-[#032489]">{r.status.replaceAll('_',' ')}</span></div></div>
+    {finalReceipt ? <div className="mb-5 flex justify-end"><a href={`/api/sales/documents/${finalReceipt.id}`} target="_blank" rel="noreferrer" className="rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-black text-white">View Final Receipt</a></div> : null}
     <div className="grid gap-5 lg:grid-cols-3">
       <Card title="Problem"><Row label="Fault reported" value={r.fault_reported}/><Row label="Diagnosis" value={r.diagnosis || 'Not recorded'}/><Row label="Repair type" value={r.repair_type || '—'}/><Row label="Parts replaced" value={r.parts_replaced || '—'}/></Card>
       <Card title="Device"><Row label="Device" value={[r.brand,r.model].filter(Boolean).join(' ') || r.device_type || '—'}/><Row label="Serial / IMEI" value={r.serial_or_imei || '—'}/><Row label="Bought from EmmyTech?" value={r.purchased_from_us.replaceAll('_',' ')}/><Row label="Condition received" value={r.condition_received || '—'}/><Row label="Accessories received" value={r.accessories_received || '—'}/></Card>
