@@ -6,7 +6,7 @@ import { getUnifiedSalesOverview } from '@/lib/sales/unified-report-server';
 
 export default async function SalesPage() {
   const { role } = await requireModuleAccess('sales');
-  if (role === 'front_desk') redirect('/modules/sales/direct');
+  if (role === 'front_desk' || role === 'technician') redirect('/modules/sales/direct');
 
   const range = await getServerReportingRange();
   const data = await getUnifiedSalesOverview(range);
