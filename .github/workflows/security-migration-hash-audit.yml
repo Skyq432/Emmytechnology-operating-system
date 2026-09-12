@@ -23,6 +23,11 @@ jobs:
           grep -RInE "\.from\(['\"]($TABLES)['\"]\)" src scripts 2>/dev/null || true
           echo '=== Any source references to reviewed tables ==='
           grep -RInE "($TABLES)" src scripts 2>/dev/null | head -1000 || true
+      - name: Inventory application RPC calls
+        shell: bash
+        run: |
+          echo '=== Supabase RPC call sites ==='
+          grep -RInE "\.rpc\(" src scripts 2>/dev/null | head -1500 || true
       - name: Detect safe Supabase CLI connection method
         id: creds
         env:
@@ -40,46 +45,3 @@ jobs:
           echo "SUPABASE_DB_PASSWORD_SET=$([[ -n ${DB_PASSWORD:-} ]] && echo yes || echo no)"
           echo "DATABASE_URL_SET=$([[ -n ${DATABASE_URL:-} ]] && echo yes || echo no)"
           echo "SUPABASE_DATABASE_URL_SET=$([[ -n ${SUPABASE_DATABASE_URL:-} ]] && echo yes || echo no)"
-      - name: Fetch migration history via database URL
-        if: steps.creds.outputs.database_url == 'yes' || steps.creds.outputs.supabase_database_url == 'yes'
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          SUPABASE_DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          DB_URL="${SUPABASE_DATABASE_URL:-${DATABASE_URL:-}}"
-          rm -rf /tmp/supabase-history
-          mkdir -p /tmp/supabase-history
-          cd /tmp/supabase-history
-          npx --yes supabase@latest init
-          echo '=== REMOTE MIGRATION LIST BEFORE FETCH ==='
-          npx --yes supabase@latest migration list --db-url "$DB_URL"
-          npx --yes supabase@latest migration fetch --db-url "$DB_URL"
-          echo '=== FETCHED REMOTE MIGRATIONS ==='
-          find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print | sort
-          echo '=== FETCHED HASHES ==='
-          find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print0 | sort -z | xargs -0 md5sum
-      - name: Fetch migration history via linked project
-        if: steps.creds.outputs.database_url != 'yes' && steps.creds.outputs.supabase_database_url != 'yes' && steps.creds.outputs.access_token == 'yes' && steps.creds.outputs.db_password == 'yes'
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          rm -rf /tmp/supabase-history
-          mkdir -p /tmp/supabase-history
-          cd /tmp/supabase-history
-          npx --yes supabase@latest init
-          npx --yes supabase@latest link --project-ref autndhyvgfndaiahonlx --password "$SUPABASE_DB_PASSWORD"
-          npx --yes supabase@latest migration list --linked
-          npx --yes supabase@latest migration fetch --linked
-          find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print | sort
-      - name: Upload fetched migration history
-        if: always() && hashFiles('/tmp/supabase-history/supabase/migrations/*.sql') != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: linked-supabase-migrations
-          path: /tmp/supabase-history/supabase/migrations
-          if-no-files-found: ignore
