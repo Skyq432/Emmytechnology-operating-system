@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Check, Copy, Link2, ShieldCheck, UserCog, UsersRound } from 'lucide-react';
+import { Check, Copy, Link2, MapPin, ShieldCheck, UserCog, UsersRound } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
 import { ROLE_LABELS, type EmmyRole, type InternalRole } from '@/lib/auth/roles';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +15,13 @@ type StaffRow = {
   email: string;
   role: string;
   created_at: string | null;
+  default_location_id: string | null;
+};
+
+type StaffLocation = {
+  id: string;
+  code: string;
+  name: string;
 };
 
 const STAFF_INVITE_ROLES: InternalRole[] = [
@@ -40,10 +47,12 @@ const STAFF_ASSIGNABLE_ROLES: InternalRole[] = [
 
 export function StaffAdmin({
   initialStaff,
+  locations,
   currentRole,
   currentUserId,
 }: {
   initialStaff: StaffRow[];
+  locations: StaffLocation[];
   currentRole: InternalRole;
   currentUserId: string;
 }) {
@@ -87,7 +96,8 @@ export function StaffAdmin({
     const previous = staff.find((member) => member.id === userId)?.role;
     if (!previous || previous === nextRole) return;
 
-    setBusy(userId);
+    const busyKey = `role:${userId}`;
+    setBusy(busyKey);
     setMessage(null);
     setStaff((rows) => rows.map((row) => row.id === userId ? { ...row, role: nextRole } : row));
 
@@ -105,15 +115,40 @@ export function StaffAdmin({
     setBusy(null);
   };
 
+  const changeLocation = async (userId: string, locationId: string) => {
+    const previous = staff.find((member) => member.id === userId)?.default_location_id ?? null;
+    const nextLocation = locationId || null;
+    if (previous === nextLocation) return;
+
+    const busyKey = `location:${userId}`;
+    setBusy(busyKey);
+    setMessage(null);
+    setStaff((rows) => rows.map((row) => row.id === userId ? { ...row, default_location_id: nextLocation } : row));
+
+    const { error } = await supabase.rpc('set_staff_default_location', {
+      p_user_id: userId,
+      p_location_id: nextLocation,
+    });
+
+    if (error) {
+      setStaff((rows) => rows.map((row) => row.id === userId ? { ...row, default_location_id: previous } : row));
+      setMessage(`Error: ${error.message}`);
+    } else {
+      const branch = locations.find((location) => location.id === nextLocation);
+      setMessage(branch ? `Default branch updated to ${branch.name}.` : 'Default branch cleared.');
+    }
+    setBusy(null);
+  };
+
   return (
     <main className="min-h-screen bg-[#f7f9fc] p-4 md:p-7">
-      <div className="mx-auto max-w-6xl space-y-6">
+      <div className="mx-auto max-w-7xl space-y-6">
         <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.16em] text-[#073995]">Administration</p>
             <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-950">Staff & Access</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-              Invite EmmyTech staff and control their operational role. Ambassador invitations remain inside Marketing.
+              Invite EmmyTech staff, control their operational role, and assign the branch their customer work belongs to.
             </p>
           </div>
           <Badge variant="secondary" className="w-fit">{ROLE_LABELS[currentRole as EmmyRole]}</Badge>
@@ -165,16 +200,21 @@ export function StaffAdmin({
             <CardTitle className="flex items-center gap-2"><UsersRound className="h-5 w-5" /> Current Staff</CardTitle>
           </CardHeader>
           <CardContent>
+            <div className="mb-4 flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50/60 p-4 text-sm text-blue-950">
+              <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
+              <p><b>Default branch</b> is stamped automatically on new sales, orders and repairs. Staff without a branch cannot create customer transactions until an administrator assigns one.</p>
+            </div>
             {staff.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center text-sm text-slate-500">No internal staff accounts yet.</div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[720px] border-separate border-spacing-y-2 text-left">
+                <table className="w-full min-w-[900px] border-separate border-spacing-y-2 text-left">
                   <thead>
                     <tr className="text-xs uppercase tracking-[0.1em] text-slate-400">
                       <th className="px-3 py-2">Staff member</th>
                       <th className="px-3 py-2">Email</th>
                       <th className="px-3 py-2">Role</th>
+                      <th className="px-3 py-2">Default branch</th>
                       <th className="px-3 py-2">Status</th>
                     </tr>
                   </thead>
@@ -182,6 +222,8 @@ export function StaffAdmin({
                     {staff.map((member) => {
                       const role = STAFF_ASSIGNABLE_ROLES.includes(member.role as InternalRole) ? member.role as InternalRole : 'front_desk';
                       const isSelf = member.id === currentUserId;
+                      const roleBusy = busy === `role:${member.id}`;
+                      const locationBusy = busy === `location:${member.id}`;
                       return (
                         <tr key={member.id} className="bg-white shadow-sm">
                           <td className="rounded-l-xl px-3 py-3">
@@ -197,7 +239,7 @@ export function StaffAdmin({
                           <td className="px-3 py-3">
                             <Select
                               value={role}
-                              disabled={busy === member.id}
+                              disabled={roleBusy}
                               onChange={(event) => void changeRole(member.id, event.target.value as InternalRole)}
                             >
                               {STAFF_ASSIGNABLE_ROLES.map((option) => (
@@ -205,7 +247,24 @@ export function StaffAdmin({
                               ))}
                             </Select>
                           </td>
-                          <td className="rounded-r-xl px-3 py-3"><Badge variant="secondary">Active</Badge></td>
+                          <td className="px-3 py-3">
+                            <Select
+                              aria-label={`Default branch for ${member.name}`}
+                              value={member.default_location_id || ''}
+                              disabled={locationBusy}
+                              onChange={(event) => void changeLocation(member.id, event.target.value)}
+                            >
+                              <option value="">Not assigned</option>
+                              {locations.map((location) => (
+                                <option key={location.id} value={location.id}>{location.name} ({location.code})</option>
+                              ))}
+                            </Select>
+                          </td>
+                          <td className="rounded-r-xl px-3 py-3">
+                            <Badge variant={member.default_location_id ? 'secondary' : 'outline'}>
+                              {member.default_location_id ? 'Active' : 'Needs branch'}
+                            </Badge>
+                          </td>
                         </tr>
                       );
                     })}
