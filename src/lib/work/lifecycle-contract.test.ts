@@ -29,14 +29,14 @@ test('all lifecycle RPCs exist and use auth.uid for the acting user', () => {
 
 test('private event writer is not executable by ordinary client roles', () => {
   assert.match(migration, /create or replace function public\.work_append_task_event/i);
-  assert.match(migration, /revoke all on function public\.work_append_task_event[\s\S]*from public, anon, authenticated/i);
+  assert.match(migration, /revoke all on function public\.work_append_task_event[\s\S]*from\s+public\s*,\s*anon\s*,\s*authenticated/i);
 });
 
 test('broadcast creation is restricted to admin and super admin', () => {
   const start = migration.indexOf('create or replace function public.work_create_broadcast_task');
   assert.notEqual(start, -1);
   const fragment = migration.slice(start, start + 6500);
-  assert.match(fragment, /work_is_admin\(auth\.uid\(\)\)/i);
+  assert.match(fragment, /work_is_admin\(\s*auth\.uid\(\)\s*\)/i);
 });
 
 test('extension decisions require assigner, creator, or admin authority', () => {
@@ -45,14 +45,14 @@ test('extension decisions require assigner, creator, or admin authority', () => 
   const fragment = migration.slice(start, start + 7000);
   assert.match(fragment, /assigned_by\s*<>\s*v_actor/i);
   assert.match(fragment, /created_by\s*<>\s*v_actor/i);
-  assert.match(fragment, /work_is_admin\(v_actor\)/i);
+  assert.match(fragment, /work_is_admin\(\s*v_actor\s*\)/i);
 });
 
 test('completion requires a non-empty completion note', () => {
   const start = migration.indexOf('create or replace function public.work_complete_task');
   assert.notEqual(start, -1);
   const fragment = migration.slice(start, start + 4500);
-  assert.match(fragment, /length\(trim\(coalesce\(p_completion_note, ''\)\)\)\s*=\s*0/i);
+  assert.match(fragment, /length\(\s*trim\(\s*coalesce\(\s*p_completion_note\s*,\s*''\s*\)\s*\)\s*\)\s*=\s*0/i);
 });
 
 test('rejection supports only the approved reason codes and requires explanation', () => {
@@ -62,5 +62,5 @@ test('rejection supports only the approved reason codes and requires explanation
   for (const value of ['outside_authority','wrong_assignee','insufficient_information','workload_unavailable','outside_skill','other']) {
     assert.match(fragment, new RegExp(`'${value}'`));
   }
-  assert.match(fragment, /length\(trim\(coalesce\(p_note, ''\)\)\)\s*=\s*0/i);
+  assert.match(fragment, /length\(\s*trim\(\s*coalesce\(\s*p_note\s*,\s*''\s*\)\s*\)\s*\)\s*=\s*0/i);
 });
