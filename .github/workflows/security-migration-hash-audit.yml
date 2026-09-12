@@ -1,4 +1,4 @@
-name: Security migration hash audit
+name: Security migration reconciliation
 
 on:
   push:
@@ -6,42 +6,86 @@ on:
       - security/supabase-reconciliation-20260912
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
-  hash:
+  reconcile:
+    if: github.event_name == 'workflow_dispatch' || github.event.head_commit.message != 'chore: reconcile migration history from live ledger'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Hash checked-in migrations
+        with:
+          fetch-depth: 0
+      - name: Export exact live migration ledger
         shell: bash
-        run: |
-          find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print0 | sort -z | xargs -0 md5sum
-      - name: Find direct client access to security-review tables
-        shell: bash
-        run: |
-          TABLES='ambassador_bonuses|identities|identity_signals|identity_events|identity_signal_weights|identity_ambassador_conflicts|identity_match_suggestions|lead_events|lead_signals|product_interests|referral_route_logs|admin_notifications|crm_notifications|crm_audit_logs|crm_followups|crm_communications|crm_files|crm_quote_items|crm_funnel_stages|crm_funnel_events|crm_quotes|crm_products|crm_sale_items|crm_sales|crm_invoices|crm_receipts|conversation_message_bank|spin_user_prizes|spin_players|spin_cashout_requests|spin_prizes|spin_dm_clicks|spin_referrals|spin_logs|spin_game_settings|spin_letter_segments|spin_rule_groups|spin_rule_items|spin_transactions|spin_user_rule_usage|spin_referral_awards'
-          echo '=== Direct Supabase .from(...) references ==='
-          grep -RInE "\.from\(['\"]($TABLES)['\"]\)" src scripts 2>/dev/null || true
-          echo '=== Any source references to reviewed tables ==='
-          grep -RInE "($TABLES)" src scripts 2>/dev/null | head -1000 || true
-      - name: Inventory application RPC calls
-        shell: bash
-        run: |
-          echo '=== Supabase RPC call sites ==='
-          grep -RInE "\.rpc\(" src scripts 2>/dev/null | head -1500 || true
-      - name: Detect safe Supabase CLI connection method
-        id: creds
         env:
-          ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          SUPABASE_DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
+          SUPABASE_URL: https://autndhyvgfndaiahonlx.supabase.co
+          SUPABASE_PUBLISHABLE_KEY: sb_publishable_mdVQiRLR6HVJhEcv7KnWOQ_1Yc1fz70
+        run: |
+          set -euo pipefail
+          curl --fail-with-body --silent --show-error \
+            -X POST "$SUPABASE_URL/rest/v1/rpc/_temporary_migration_history_export" \
+            -H "apikey: $SUPABASE_PUBLISHABLE_KEY" \
+            -H 'Content-Type: application/json' \
+            -d '{}' \
+            -o /tmp/live-migrations.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          rows = json.loads(Path('/tmp/live-migrations.json').read_text())
+          if len(rows) < 60:
+              raise SystemExit(f'Expected at least 60 live migrations, got {len(rows)}')
+
+          active = Path('supabase/migrations')
+          archive = Path('supabase/migrations_archive/2026-09-12-pre-reconciliation')
+          archive.mkdir(parents=True, exist_ok=True)
+
+          for old in sorted(active.glob('*.sql')):
+              target = archive / old.name
+              if target.exists():
+                  target.unlink()
+              old.rename(target)
+
+          active.mkdir(parents=True, exist_ok=True)
+          manifest = []
+          for row in rows:
+              version = row['version']
+              name = row['name']
+              sql = row['sql'] or ''
+              filename = f'{version}_{name}.sql'
+              (active / filename).write_text(sql.rstrip() + '\n', encoding='utf-8')
+              manifest.append({'version': version, 'name': name, 'file': filename})
+
+          Path('/tmp/live-migration-manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
+          print(f'Reconstructed {len(rows)} exact live migration files.')
+          PY
+      - name: Verify active migration versions match exported ledger
         shell: bash
         run: |
-          echo "access_token=$([[ -n ${ACCESS_TOKEN:-} ]] && echo yes || echo no)" >> "$GITHUB_OUTPUT"
-          echo "db_password=$([[ -n ${DB_PASSWORD:-} ]] && echo yes || echo no)" >> "$GITHUB_OUTPUT"
-          echo "database_url=$([[ -n ${DATABASE_URL:-} ]] && echo yes || echo no)" >> "$GITHUB_OUTPUT"
-          echo "supabase_database_url=$([[ -n ${SUPABASE_DATABASE_URL:-} ]] && echo yes || echo no)" >> "$GITHUB_OUTPUT"
-          echo "SUPABASE_ACCESS_TOKEN_SET=$([[ -n ${ACCESS_TOKEN:-} ]] && echo yes || echo no)"
-          echo "SUPABASE_DB_PASSWORD_SET=$([[ -n ${DB_PASSWORD:-} ]] && echo yes || echo no)"
-          echo "DATABASE_URL_SET=$([[ -n ${DATABASE_URL:-} ]] && echo yes || echo no)"
-          echo "SUPABASE_DATABASE_URL_SET=$([[ -n ${SUPABASE_DATABASE_URL:-} ]] && echo yes || echo no)"
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          expected = [x['file'] for x in json.loads(Path('/tmp/live-migration-manifest.json').read_text())]
+          actual = sorted(p.name for p in Path('supabase/migrations').glob('*.sql'))
+          if sorted(expected) != actual:
+              missing = sorted(set(expected)-set(actual))
+              extra = sorted(set(actual)-set(expected))
+              raise SystemExit(f'Migration mismatch. Missing={missing} Extra={extra}')
+          print(f'Active migration directory exactly matches {len(actual)} live versions.')
+          PY
+      - name: Commit reconciliation back to security branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add supabase/migrations supabase/migrations_archive
+          if git diff --cached --quiet; then
+            echo 'No migration-history changes to commit.'
+            exit 0
+          fi
+          git commit -m 'chore: reconcile migration history from live ledger'
+          git push origin HEAD:security/supabase-reconciliation-20260912
