@@ -33,19 +33,14 @@ type IdentityResult = {
 };
 
 function DirectSaleCheckout({ initialCheckout, isAdmin }: { initialCheckout: DirectSaleCheckoutSnapshot; isAdmin: boolean }) {
-  const [checkout, setCheckout] = useState(initialCheckout);
   const [confirmState, confirmAction, confirming] = useActionState(confirmDirectSaleAction, initialState);
   const [paymentState, paymentAction, paying] = useActionState(recordSalesPaymentAction, initialState);
   const [creditState, creditAction, crediting] = useActionState(approveCreditAction, initialState);
   const [handoverState, handoverAction, handing] = useActionState(completeHandoverAction, initialState);
 
-  useEffect(() => {
-    const candidates = [confirmState, paymentState, creditState, handoverState];
-    for (const candidate of candidates) {
-      if (candidate.success && candidate.data) setCheckout(candidate.data as DirectSaleCheckoutSnapshot);
-    }
-  }, [confirmState, paymentState, creditState, handoverState]);
-
+  const actionCheckout = [handoverState, paymentState, creditState, confirmState]
+    .find((candidate) => candidate.success && candidate.data)?.data as DirectSaleCheckoutSnapshot | undefined;
+  const checkout = actionCheckout ?? initialCheckout;
   const latestState = [handoverState, paymentState, creditState, confirmState].find((row) => row.message);
   const confirmed = checkout.commercialState === 'confirmed';
   const completed = Boolean(checkout.handoverCompletedAt) || checkout.fulfilmentStatus === 'completed';
@@ -176,7 +171,7 @@ export function DirectSaleWorkspace({ inventory, availability, units, locations,
 
   useEffect(() => {
     const query = identityQuery.trim();
-    if (query.length < 3 || selectedIdentity) { setIdentityResults([]); return; }
+    if (query.length < 3 || selectedIdentity) return;
     const timer = window.setTimeout(async () => {
       setIdentityLoading(true);
       try {
@@ -216,7 +211,7 @@ export function DirectSaleWorkspace({ inventory, availability, units, locations,
   }
 
   function clearIdentity() {
-    setSelectedIdentity(null); setIdentityQuery(''); setCustomerName(''); setCustomerPhone(''); setCustomerEmail(''); setCashOffAmount(0);
+    setSelectedIdentity(null); setIdentityQuery(''); setIdentityResults([]); setCustomerName(''); setCustomerPhone(''); setCustomerEmail(''); setCashOffAmount(0);
   }
 
   function addStockLine() {
@@ -262,11 +257,11 @@ export function DirectSaleWorkspace({ inventory, availability, units, locations,
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between gap-3"><div><h2 className="font-black text-slate-900">1. Find customer</h2><p className="mt-1 text-xs text-slate-500">Search existing CRM data before creating a new customer.</p></div>{selectedIdentity ? <button type="button" onClick={clearIdentity} className="text-xs font-bold text-[#032489]">Change</button> : null}</div>
           <div className="relative mt-4">
-            <input value={identityQuery} onChange={(e) => { setSelectedIdentity(null); setIdentityQuery(e.target.value); }} placeholder="Phone, email, name or CRM code" className="w-full rounded-xl border border-slate-200 px-3 py-3 text-sm outline-none focus:border-[#032489]" />
+            <input value={identityQuery} onChange={(e) => { const next = e.target.value; setSelectedIdentity(null); setIdentityQuery(next); if (next.trim().length < 3) setIdentityResults([]); }} placeholder="Phone, email, name or CRM code" className="w-full rounded-xl border border-slate-200 px-3 py-3 text-sm outline-none focus:border-[#032489]" />
             {identityLoading ? <span className="absolute right-3 top-3 text-xs text-slate-400">Searching…</span> : null}
             {!selectedIdentity && identityResults.length ? <div className="absolute z-20 mt-2 max-h-72 w-full overflow-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl">{identityResults.map((identity) => <button key={identity.id} type="button" onClick={() => chooseIdentity(identity)} className="block w-full rounded-lg px-3 py-2.5 text-left hover:bg-slate-50"><div className="text-sm font-bold text-slate-900">{identity.primary_name || 'Unnamed customer'}</div><div className="mt-0.5 text-xs text-slate-500">{[identity.primary_phone,identity.primary_email,identity.identity_code].filter(Boolean).join(' · ')}</div></button>)}</div> : null}
           </div>
-          {selectedIdentity ? <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50/60 p-3"><div className="text-sm font-black text-[#032489]">{selectedIdentity.primary_name || 'Existing customer'}</div><div className="mt-1 text-xs text-slate-600">{selectedIdentity.crm_stage_name || 'CRM customer'}{selectedIdentity.acquisition_source ? ` · ${selectedIdentity.acquisition_source}` : ''}</div>{selectedIdentity.ambassador_name ? <div className="mt-1 text-xs text-slate-500">Ambassador: {selectedIdentity.ambassador_name}</div> : null}{Number(selectedIdentity.cash_off_balance || 0) > 0 ? <div className="mt-2 text-xs font-bold text-emerald-700">Cash-Off available: {money(Number(selectedIdentity.cash_off_balance))}</div> : null}</div> : <p className="mt-2 text-xs text-slate-400">No match? Enter the customer's details below and a CRM Identity will be resolved when the draft is created.</p>}
+          {selectedIdentity ? <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50/60 p-3"><div className="text-sm font-black text-[#032489]">{selectedIdentity.primary_name || 'Existing customer'}</div><div className="mt-1 text-xs text-slate-600">{selectedIdentity.crm_stage_name || 'CRM customer'}{selectedIdentity.acquisition_source ? ` · ${selectedIdentity.acquisition_source}` : ''}</div>{selectedIdentity.ambassador_name ? <div className="mt-1 text-xs text-slate-500">Ambassador: {selectedIdentity.ambassador_name}</div> : null}{Number(selectedIdentity.cash_off_balance || 0) > 0 ? <div className="mt-2 text-xs font-bold text-emerald-700">Cash-Off available: {money(Number(selectedIdentity.cash_off_balance))}</div> : null}</div> : <p className="mt-2 text-xs text-slate-400">No match? Enter the customer&apos;s details below and a CRM Identity will be resolved when the draft is created.</p>}
           <input type="hidden" name="identity_id" value={selectedIdentity?.id || ''} />
           <div className="mt-4 space-y-3">
             <input name="customer_name" value={customerName} onChange={(e)=>setCustomerName(e.target.value)} placeholder="Customer name" className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
