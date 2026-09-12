@@ -22,17 +22,18 @@ test('department access follows the approved role matrix', () => {
   assert.deepEqual(accessibleModules('super_admin'), ['crm','marketing','sales','operations','finance','reports','administration']);
   assert.deepEqual(accessibleModules('growth_lead'), ['crm','marketing','sales','operations','reports']);
   assert.deepEqual(accessibleModules('marketing_manager'), ['crm','marketing']);
-  assert.deepEqual(accessibleModules('front_desk'), ['crm','sales','operations']);
+  assert.deepEqual(accessibleModules('front_desk'), ['sales','operations']);
   assert.deepEqual(accessibleModules('operations_lead'), ['crm','sales','operations']);
   assert.deepEqual(accessibleModules('technician'), ['crm','sales','operations']);
   assert.deepEqual(accessibleModules('sales_analyst'), ['crm','sales','reports']);
   assert.deepEqual(accessibleModules('ambassador'), []);
   assert.equal(canAccessModule('marketing_manager', 'sales'), false);
   assert.equal(canAccessModule('front_desk', 'operations'), true);
+  assert.equal(canAccessModule('front_desk', 'crm'), false);
 });
 
 test('sales navigation is filtered by role', () => {
-  assert.deepEqual(salesNavKeys('front_desk'), ['overview','direct','orders','payments','receipts','customers']);
+  assert.deepEqual(salesNavKeys('front_desk'), ['direct','orders','payments','receipts','customers']);
   assert.deepEqual(salesNavKeys('operations_lead'), ['overview','direct','orders','payments','receipts','customers']);
   assert.deepEqual(salesNavKeys('technician'), ['direct','receipts','customers']);
   assert.deepEqual(salesNavKeys('sales_analyst'), ['overview','quotations','orders','customers','reports']);
