@@ -15,6 +15,8 @@ const operationsGuardFiles = [
   'src/lib/operations/tracking-server.ts',
   'src/lib/operations/identity-server.ts',
   'src/lib/operations/sales-server.ts',
+  'src/lib/operations/reporting-server.ts',
+  'src/lib/operations/attribution-server.ts',
 ];
 
 test('core Operations server modules no longer block every non-admin role', () => {
