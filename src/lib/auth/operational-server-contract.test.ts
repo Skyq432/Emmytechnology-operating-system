@@ -39,7 +39,7 @@ test('Sales actor supports internal staff while reserving admin authority for ad
 });
 
 test('pricing exceptions are protected at the database security boundary', () => {
-  const code = source('supabase/migrations/20260911103500_protect_pricing_exceptions.sql');
+  const code = source('supabase/migrations/20260911093234_protect_pricing_exceptions_20260911.sql');
   assert.match(code, /sales\.pricing\.admin/, 'Pricing exception migration must require the pricing-admin capability.');
   assert.match(code, /sales_create_direct_sale_draft/, 'Direct Sale pricing exceptions must be hardened.');
   assert.match(code, /sales_create_order_draft/, 'Sales Order pricing exceptions must be hardened.');
@@ -48,7 +48,7 @@ test('pricing exceptions are protected at the database security boundary', () =>
 
 test('technician repair edits go through the narrow field-specific RPC', () => {
   const server = source('src/lib/operations/repair-server.ts');
-  const migration = source('supabase/migrations/20260911105000_repair_technical_write_boundary.sql');
+  const migration = source('supabase/migrations/20260911093735_repair_technical_write_boundary_20260911.sql');
   assert.match(server, /\.rpc\(['"]ops_update_repair_work_details['"]/, 'Repair work edits must use the scoped RPC.');
   assert.match(migration, /drop policy if exists "technical staff update repair work"/, 'Generic technician UPDATE policy must be removed.');
 });
