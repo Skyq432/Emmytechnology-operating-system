@@ -43,7 +43,7 @@ const MODULE_ACCESS: Record<InternalRole, readonly ModuleSlug[]> = {
   marketing_manager: ['crm', 'marketing'],
   front_desk: ['sales', 'operations'],
   operations_lead: ['crm', 'sales', 'operations'],
-  technician: ['crm', 'sales', 'operations'],
+  technician: ['sales', 'operations'],
   sales_analyst: ['crm', 'sales', 'reports'],
 };
 

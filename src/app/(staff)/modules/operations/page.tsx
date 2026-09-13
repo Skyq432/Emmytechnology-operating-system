@@ -9,6 +9,7 @@ import {
 export default async function OperationsPage() {
   const { role } = await requireModuleAccess('operations');
   if (role === 'front_desk') redirect('/modules/operations/orders');
+  if (role === 'technician') redirect('/modules/operations/repairs');
 
   const range = await getOperationsReportingRange();
   const data = await getOperationsOverviewForRange(range);
