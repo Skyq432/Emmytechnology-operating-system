@@ -9,21 +9,21 @@ const source = (relative: string) => readFileSync(path.join(root, relative), 'ut
 
 test('Marketing, Sales and Operations layouts use server-side module guards', () => {
   for (const [file, module] of [
-    ['src/app/modules/marketing/layout.tsx', 'marketing'],
-    ['src/app/modules/sales/layout.tsx', 'sales'],
-    ['src/app/modules/operations/layout.tsx', 'operations'],
+    ['src/app/(staff)/modules/marketing/layout.tsx', 'marketing'],
+    ['src/app/(staff)/modules/sales/layout.tsx', 'sales'],
+    ['src/app/(staff)/modules/operations/layout.tsx', 'operations'],
   ] as const) {
     assert.match(source(file), new RegExp(`requireModuleAccess\\(['\"]${module}['\"]\\)`));
   }
 });
 
-test('Sales and Operations shells filter their existing navigation through the centralized policy', () => {
-  assert.match(source('src/components/sales/sales-shell.tsx'), /salesNavKeys\(role\)/);
-  assert.match(source('src/components/operations/operations-shell.tsx'), /operationsNavKeys\(role\)/);
+test('Sales and Operations layouts filter their sub-nav through the centralized policy', () => {
+  assert.match(source('src/app/(staff)/modules/sales/layout.tsx'), /salesNavKeys\(role\)/);
+  assert.match(source('src/app/(staff)/modules/operations/layout.tsx'), /operationsNavKeys\(role\)/);
 });
 
-test('Marketing sidebar treats approved internal roles as staff and shows a friendly role label', () => {
-  const sidebar = source('src/components/marketing/sidebar.tsx');
-  assert.match(sidebar, /isInternalRole\(role\)/);
-  assert.match(sidebar, /roleLabel\(role\)/);
+test('AppShell shows a friendly role label from the centralized policy', () => {
+  const shell = source('src/components/os/app-shell.tsx');
+  assert.match(shell, /roleLabel\(role\)/);
+  assert.match(shell, /accessibleModules\(role\)/);
 });

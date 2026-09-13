@@ -141,8 +141,7 @@ export function StaffAdmin({
   };
 
   return (
-    <main className="min-h-screen bg-[#f7f9fc] p-4 md:p-7">
-      <div className="mx-auto max-w-7xl space-y-6">
+    <div className="mx-auto max-w-7xl space-y-6">
         <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.16em] text-[#073995]">Administration</p>
@@ -275,6 +274,5 @@ export function StaffAdmin({
           </CardContent>
         </Card>
       </div>
-    </main>
   );
 }

@@ -9,6 +9,9 @@ import {
   Truck,
 } from 'lucide-react';
 import { HelpTip } from '@/components/ui/help-tip';
+import { buttonVariants } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { OPERATIONS_HELP } from '@/lib/operations/help';
 import { getOrderStatusLabel } from '@/lib/operations/domain';
 import type { OperationsOverview as OperationsOverviewData } from '@/lib/operations/types';
@@ -37,7 +40,7 @@ function MetricCard({
           <p className="mt-2 text-2xl font-black tracking-tight text-slate-950">{value}</p>
           <p className="mt-1 text-xs leading-5 text-slate-500">{helper}</p>
         </div>
-        <div className="rounded-lg bg-blue-50 p-2.5 text-[#032489]">
+        <div className="rounded-lg bg-blue-50 p-2.5 text-emmy-primary">
           <Icon className="h-4 w-4" />
         </div>
       </div>
@@ -50,16 +53,13 @@ export function OperationsOverview({ data }: { data: OperationsOverviewData }) {
     <div className="mx-auto max-w-[1500px]">
       <div className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.16em] text-[#032489]">Operations overview</p>
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-emmy-primary">Operations overview</p>
           <h1 className="mt-1.5 text-3xl font-black tracking-[-0.035em] text-slate-950">What needs attention?</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
             See active orders, internal stock and recent team activity in one simple view.
           </p>
         </div>
-        <Link
-          href="/modules/operations/orders"
-          className="inline-flex items-center gap-2 self-start rounded-lg bg-[#032489] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#021d70]"
-        >
+        <Link href="/modules/operations/orders" className={buttonVariants({ className: 'gap-2 self-start' })}>
           Open orders <ArrowRight className="h-4 w-4" />
         </Link>
       </div>
@@ -74,17 +74,17 @@ export function OperationsOverview({ data }: { data: OperationsOverviewData }) {
       </div>
 
       <div className="mt-5 grid gap-5 xl:grid-cols-[1.35fr_1fr]">
-        <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+        <Card>
+          <CardHeader className="flex-row items-center justify-between space-y-0 border-b border-slate-100">
             <div>
               <div className="flex items-center gap-1.5">
-                <h2 className="text-sm font-black text-slate-900">Recent orders</h2>
+                <CardTitle className="text-sm">Recent orders</CardTitle>
                 <HelpTip text={OPERATIONS_HELP.recentOrders} label="About Recent orders" />
               </div>
-              <p className="mt-0.5 text-xs text-slate-500">Latest work moving through Operations</p>
+              <CardDescription>Latest work moving through Operations</CardDescription>
             </div>
-            <Link href="/modules/operations/orders" className="text-xs font-black text-[#032489]">View all</Link>
-          </div>
+            <Link href="/modules/operations/orders" className="text-xs font-black text-emmy-primary">View all</Link>
+          </CardHeader>
 
           {data.recentOrders.length === 0 ? (
             <div className="px-5 py-12 text-center">
@@ -99,10 +99,8 @@ export function OperationsOverview({ data }: { data: OperationsOverviewData }) {
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-sm font-black text-slate-900">{order.order_code}</span>
-                      <span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-[#032489]">
-                        {getOrderStatusLabel(order.status)}
-                      </span>
-                      {order.priority === 'urgent' && <span className="rounded-full bg-rose-50 px-2 py-1 text-[10px] font-black uppercase text-rose-700">Urgent</span>}
+                      <Badge>{getOrderStatusLabel(order.status)}</Badge>
+                      {order.priority === 'urgent' && <Badge variant="danger">Urgent</Badge>}
                     </div>
                     <p className="mt-1 text-xs text-slate-500">{order.customer_name || order.reference_label || 'Internal order'}{order.current_team ? ` · ${order.current_team}` : ''}</p>
                   </div>
@@ -111,16 +109,16 @@ export function OperationsOverview({ data }: { data: OperationsOverviewData }) {
               ))}
             </div>
           )}
-        </section>
+        </Card>
 
-        <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-100 px-5 py-4">
+        <Card>
+          <CardHeader className="border-b border-slate-100">
             <div className="flex items-center gap-1.5">
-              <h2 className="text-sm font-black text-slate-900">Activity timeline</h2>
+              <CardTitle className="text-sm">Activity timeline</CardTitle>
               <HelpTip text={OPERATIONS_HELP.activityTimeline} label="About Activity timeline" />
             </div>
-            <p className="mt-0.5 text-xs text-slate-500">Order changes and team handovers</p>
-          </div>
+            <CardDescription>Order changes and team handovers</CardDescription>
+          </CardHeader>
 
           {data.recentEvents.length === 0 ? (
             <div className="px-5 py-12 text-center">
@@ -139,7 +137,7 @@ export function OperationsOverview({ data }: { data: OperationsOverviewData }) {
               ))}
             </div>
           )}
-        </section>
+        </Card>
       </div>
     </div>
   );

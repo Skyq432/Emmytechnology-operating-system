@@ -8,8 +8,8 @@ test('help tip uses a plain question mark without a circle icon', () => {
   assert.equal(source.includes('CircleHelp'), false);
 });
 
-test('operations sidebar does not wrap help tips in a second round bubble', () => {
-  const source = readFileSync(new URL('../../components/operations/operations-shell.tsx', import.meta.url), 'utf8');
+test('operations sub-nav does not wrap help tips in a second round bubble', () => {
+  const source = readFileSync(new URL('../../components/ui/sub-nav.tsx', import.meta.url), 'utf8');
   assert.equal(source.includes("rounded-full bg-white/10"), false);
   assert.equal(source.includes("rounded-full bg-white"), false);
 });

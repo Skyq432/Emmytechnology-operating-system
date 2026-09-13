@@ -394,8 +394,8 @@ export async function getMyWorkDashboard() {
 
 export async function getTeamWorkSummary() {
   const { supabase, role } = await requireInternalUser();
-  if (role !== 'admin' && role !== 'super_admin') {
-    throw new Error('Only Admin or Super Admin can view the Team work summary');
+  if (role !== 'admin' && role !== 'super_admin' && role !== 'operations_lead') {
+    throw new Error('Only Admin, Super Admin, or Operations Lead can view the Team work summary');
   }
 
   const { data: staff, error: staffError } = await supabase

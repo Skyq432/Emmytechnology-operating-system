@@ -1,7 +1,9 @@
 'use client';
 
 import { useActionState } from 'react';
-import { applyRepairCashOffAction, type RepairCashOffActionState } from '@/app/modules/operations/cash-off-actions';
+import { Button } from '@/components/ui/button';
+import { ActionResult } from '@/components/ui/alert';
+import { applyRepairCashOffAction, type RepairCashOffActionState } from '@/app/(staff)/modules/operations/cash-off-actions';
 
 const initialState: RepairCashOffActionState = { success: false, message: '' };
 const money = (value: number) => `₦${Number(value || 0).toLocaleString('en-NG', { maximumFractionDigits: 0 })}`;
@@ -66,12 +68,12 @@ export function RepairCashOffPanel({
             />
             <span className="mt-1 block text-[11px] text-slate-500">Maximum currently allowed: {money(maximumTotal)}</span>
           </label>
-          <button disabled={pending} className="rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-black text-white disabled:opacity-50">
+          <Button type="submit" variant="success" disabled={pending}>
             {pending ? 'Applying…' : 'Apply Cash-Off'}
-          </button>
+          </Button>
         </form>
       )}
-      {state.message ? <div className={`mt-3 rounded-lg px-3 py-2 text-sm font-semibold ${state.success ? 'bg-white text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{state.message}</div> : null}
+      <ActionResult state={state} className="mt-3" />
     </section>
   );
 }

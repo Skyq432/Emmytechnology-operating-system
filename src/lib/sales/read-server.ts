@@ -130,7 +130,13 @@ export async function getSalesCredit() {
     .select('*,order:ops_orders(order_code,customer_name,customer_phone,identity_id,total_amount,balance_due)')
     .order('due_at');
   if (error) throw new Error(error.message);
-  return (data || []).map((row) => numeric(row, ['approved_outstanding_amount']));
+  // Compute "overdue" here (once, server-side) rather than in the page component's
+  // render body, which would call Date.now() impurely on every render.
+  const now = Date.now();
+  return (data || []).map((row) => {
+    const withNumbers = numeric(row, ['approved_outstanding_amount']);
+    return { ...withNumbers, overdue: withNumbers.status === 'active' && new Date(withNumbers.due_at).getTime() < now };
+  });
 }
 
 export async function getSalesReturns() {

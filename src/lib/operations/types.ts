@@ -3,6 +3,7 @@ import type { CommercialState, CommissionStatus, PaymentStatus } from './commerc
 import type { OrderItemType } from './sales-model';
 import type { RepairStatus, RepairPaymentRequirement, RepairQuoteStatus } from './repair-domain';
 export type { RepairStatus, RepairPaymentRequirement, RepairQuoteStatus } from './repair-domain';
+import type { TransferStatus, TransferCarrierType } from './transfer';
 
 export type OperationsPriority = 'low' | 'normal' | 'high' | 'urgent';
 export type OperationsSource = 'manual' | 'crm' | 'website' | 'whatsapp' | 'internal' | 'other';
@@ -38,6 +39,7 @@ export interface OperationsOrder {
   commission_rate: number; commission_amount: number; commission_status: CommissionStatus; confirmed_at: string | null;
   status: OrderStatus; priority: OperationsPriority; current_team: string | null; current_owner_id: string | null; due_at: string | null;
   created_at: string; updated_at: string; items?: OperationsOrderItem[];
+  final_receipt_id?: string | null; final_receipt_number?: string | null;
 }
 
 export interface OperationsOrderItem {
@@ -122,6 +124,17 @@ export interface OperationsOrderDetail {
   ambassador: { id: string; name: string } | null;
 }
 
+export interface RepairPartUsed {
+  id: string;
+  quantity: number;
+  unit_cost: number | null;
+  note: string | null;
+  created_at: string;
+  inventory_item: { id: string; sku: string; name: string } | null;
+  inventory_unit: { id: string; serial_number: string | null; imei_1: string | null } | null;
+  location: { id: string; name: string } | null;
+}
+
 export interface OperationsInventoryItem {
   id: string; sku: string; name: string; description: string | null; category: string | null; item_type: OrderItemType; brand: string | null; model: string | null;
   specs: Record<string, unknown>; default_condition: string | null; default_unit_cost: number | null; default_selling_price: number | null; salesperson_discount_limit_percent: number; preferred_supplier_id: string | null;
@@ -131,3 +144,37 @@ export interface OperationsInventoryItem {
 }
 
 export interface OperationsWebsiteLink { id: string; inventory_item_id: string; website_product_id: string; relationship_type: WebsiteRelationshipType; website_allocation: number | null; stock_sync_enabled: boolean; is_active: boolean; created_at: string; inventory_item?: { sku: string; name: string } | null; website_product?: { name: string; slug: string; status: string | null } | null; }
+
+export interface OperationsTransfer {
+  id: string; transfer_code: string;
+  inventory_item_id: string; from_location_id: string; to_location_id: string;
+  quantity: number; status: TransferStatus;
+  order_id: string | null; order_item_id: string | null;
+  carrier_type: TransferCarrierType; carrier_user_id: string | null;
+  carrier_name: string | null; carrier_phone: string | null; carrier_reference: string | null;
+  reason: string | null; note: string | null;
+  started_by: string | null; started_at: string;
+  received_by: string | null; received_at: string | null;
+  cancelled_by: string | null; cancelled_at: string | null;
+  created_at: string; updated_at: string;
+  inventory_item: { sku: string; name: string } | null;
+  from_location: { code: string; name: string } | null;
+  to_location: { code: string; name: string } | null;
+  order: { order_code: string; customer_name: string | null } | null;
+  carrier_user: { name: string | null; email: string | null } | null;
+}
+
+export interface OperationsTransferAvailabilityRow {
+  inventory_item_id: string; sku: string; name: string; reorder_level: number;
+  location_id: string; location_code: string; location_name: string;
+  on_hand: number; reserved: number; available: number;
+}
+
+export interface OperationsTransferUser { id: string; name: string | null; email: string | null; }
+
+export interface OperationsTransferReservation {
+  id: string; order_id: string; order_item_id: string; inventory_item_id: string;
+  location_id: string; quantity: number; status: 'active' | 'released' | 'fulfilled' | 'cancelled';
+  order: { order_code: string; customer_name: string | null } | null;
+  order_item: { item_name: string } | null;
+}

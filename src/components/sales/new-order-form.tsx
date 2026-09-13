@@ -1,8 +1,14 @@
 'use client';
 
 import { useActionState, useState } from 'react';
-import { createSalesOrderAction } from '@/app/modules/sales/actions';
-import { SalesIdentityPicker } from './sales-identity-picker';
+import { createSalesOrderAction } from '@/app/(staff)/modules/sales/actions';
+import { IdentityPicker } from '@/components/shared/identity-picker';
+import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
+import { ActionResult } from '@/components/ui/alert';
+import { SegmentedControl } from '@/components/ui/segmented-control';
 
 const initial = { success: false, message: '' };
 const money = (value: number) => `₦${Number(value || 0).toLocaleString('en-NG', { maximumFractionDigits: 0 })}`;
@@ -106,43 +112,45 @@ export function NewOrderForm({ inventory }: { inventory: InventoryItem[] }) {
           <h2 className="mt-1 text-xl font-black text-slate-900">Create Order</h2>
           <p className="mt-1 text-xs leading-5 text-slate-500">Creates a draft only. No stock is reserved until Operations fulfils the confirmed Order.</p>
         </div>
-        <div className="rounded-xl bg-blue-50 px-3 py-2 text-sm font-black text-[#032489]">Items {money(lineTotal)}</div>
+        <div className="rounded-xl bg-blue-50 px-3 py-2 text-sm font-black text-emmy-primary">Items {money(lineTotal)}</div>
       </div>
 
       <form action={action} className="mt-5 space-y-5">
         <div className="grid gap-4 xl:grid-cols-[1fr_420px]">
-          <SalesIdentityPicker compact title="1. Find customer" />
+          <IdentityPicker compact title="1. Find customer" />
           <div className="grid content-start gap-3">
-            <input name="sales_staff_name" placeholder="Salesperson" className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
-            <input name="delivery_charge" type="number" min="0" placeholder="Delivery charge" className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+            <Input name="sales_staff_name" placeholder="Salesperson" />
+            <Input name="delivery_charge" type="number" min="0" placeholder="Delivery charge" />
           </div>
         </div>
 
         <div className="rounded-xl border border-slate-200 p-4">
-          <div className="flex gap-2">
-            <button type="button" onClick={() => { setMode('product'); setSource('internal'); }} className={`rounded-lg px-3 py-2 text-xs font-bold ${mode === 'product' ? 'bg-[#032489] text-white' : 'bg-slate-100 text-slate-600'}`}>Catalog product</button>
-            <button type="button" onClick={() => { setMode('custom'); setSource('manual'); }} className={`rounded-lg px-3 py-2 text-xs font-bold ${mode === 'custom' ? 'bg-[#032489] text-white' : 'bg-slate-100 text-slate-600'}`}>Service / on-demand</button>
-          </div>
+          <SegmentedControl
+            size="sm"
+            value={mode}
+            onChange={(value) => { setMode(value); setSource(value === 'product' ? 'internal' : 'manual'); }}
+            options={[{ value: 'product', label: 'Catalog product' }, { value: 'custom', label: 'Service / on-demand' }]}
+          />
 
           <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            {mode === 'product' ? <select value={itemId} onChange={(event) => { setItemId(event.target.value); setPrice(''); }} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm"><option value="">Choose product</option>{inventory.map((item) => <option key={item.id} value={item.id}>{item.sku} · {item.name}</option>)}</select> : <>
-              <input value={customName} onChange={(event) => setCustomName(event.target.value)} placeholder="Item / service name" className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
-              <input value={customCategory} onChange={(event) => setCustomCategory(event.target.value)} placeholder="Category" className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+            {mode === 'product' ? <Select value={itemId} onChange={(event) => { setItemId(event.target.value); setPrice(''); }}><option value="">Choose product</option>{inventory.map((item) => <option key={item.id} value={item.id}>{item.sku} · {item.name}</option>)}</Select> : <>
+              <Input value={customName} onChange={(event) => setCustomName(event.target.value)} placeholder="Item / service name" />
+              <Input value={customCategory} onChange={(event) => setCustomCategory(event.target.value)} placeholder="Category" />
             </>}
-            <select value={source} onChange={(event) => setSource(event.target.value as FulfilmentSource)} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm">
+            <Select value={source} onChange={(event) => setSource(event.target.value as FulfilmentSource)}>
               {mode === 'product' ? <option value="internal">Internal stock</option> : null}
               <option value="supplier">Supplier sourced</option>
               <option value="dropship">Dropship</option>
               <option value="manual">Service / manual</option>
-            </select>
-            <input type="number" min="1" value={quantity} onChange={(event) => setQuantity(Number(event.target.value))} placeholder="Qty" className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
-            {mode === 'custom' ? <input value={customList} onChange={(event) => setCustomList(event.target.value)} placeholder="Normal price" className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" /> : null}
-            <input value={price} onChange={(event) => setPrice(event.target.value)} placeholder={selected ? `Final price · ${money(Number(selected.default_selling_price || 0))}` : 'Final price'} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
-            {(mode === 'custom' || source !== 'internal') ? <input value={cost} onChange={(event) => setCost(event.target.value)} placeholder="Supplier / service cost basis" className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" /> : null}
-            {mode === 'custom' ? <input value={customType} onChange={(event) => setCustomType(event.target.value)} placeholder="Item type" className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" /> : null}
-            <input value={lineNote} onChange={(event) => setLineNote(event.target.value)} placeholder="Line note" className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
-            <input value={exceptionReason} onChange={(event) => setExceptionReason(event.target.value)} placeholder="Admin pricing exception reason, if needed" className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm xl:col-span-2" />
-            <button type="button" onClick={mode === 'product' ? addProduct : addCustom} className="rounded-xl bg-[#032489] px-4 py-2.5 text-sm font-black text-white">Add order line</button>
+            </Select>
+            <Input type="number" min="1" value={quantity} onChange={(event) => setQuantity(Number(event.target.value))} placeholder="Qty" />
+            {mode === 'custom' ? <Input value={customList} onChange={(event) => setCustomList(event.target.value)} placeholder="Normal price" /> : null}
+            <Input value={price} onChange={(event) => setPrice(event.target.value)} placeholder={selected ? `Final price · ${money(Number(selected.default_selling_price || 0))}` : 'Final price'} />
+            {(mode === 'custom' || source !== 'internal') ? <Input value={cost} onChange={(event) => setCost(event.target.value)} placeholder="Supplier / service cost basis" /> : null}
+            {mode === 'custom' ? <Input value={customType} onChange={(event) => setCustomType(event.target.value)} placeholder="Item type" /> : null}
+            <Input value={lineNote} onChange={(event) => setLineNote(event.target.value)} placeholder="Line note" />
+            <Input value={exceptionReason} onChange={(event) => setExceptionReason(event.target.value)} placeholder="Admin pricing exception reason, if needed" className="xl:col-span-2" />
+            <Button type="button" onClick={mode === 'product' ? addProduct : addCustom}>Add order line</Button>
           </div>
         </div>
 
@@ -151,10 +159,10 @@ export function NewOrderForm({ inventory }: { inventory: InventoryItem[] }) {
           {!lines.length ? <div className="rounded-xl border border-dashed border-slate-300 p-5 text-center text-sm text-slate-400">No Order lines added yet.</div> : null}
         </div>
 
-        <textarea name="note" placeholder="Internal Sales note" className="min-h-20 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+        <Textarea name="note" placeholder="Internal Sales note" className="min-h-20" />
         <input type="hidden" name="items_json" value={JSON.stringify(lines.map(({ key: _key, ...line }) => line))} />
-        {state.message ? <div className={`rounded-xl px-3 py-2 text-sm font-semibold ${state.success ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{state.message}</div> : null}
-        <button disabled={pending || !lines.length} className="rounded-xl bg-[#032489] px-5 py-3 text-sm font-black text-white disabled:opacity-50">{pending ? 'Creating…' : 'Create Order Draft'}</button>
+        <ActionResult state={state} />
+        <Button type="submit" size="lg" disabled={pending || !lines.length}>{pending ? 'Creating…' : 'Create Order Draft'}</Button>
       </form>
     </section>
   );

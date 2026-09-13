@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const publicInvite = path.join(repoRoot, 'src', 'app', 'auth', 'invite', 'page.tsx');
-const marketingInvite = path.join(repoRoot, 'src', 'app', 'modules', 'marketing', 'invite', 'page.tsx');
+const marketingInvite = path.join(repoRoot, 'src', 'app', '(staff)', 'modules', 'marketing', 'invite', 'page.tsx');
 
 test('public invite validation uses the secure code RPC instead of listing invite rows', () => {
   const source = readFileSync(publicInvite, 'utf8');

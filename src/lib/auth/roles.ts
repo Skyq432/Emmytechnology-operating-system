@@ -227,6 +227,10 @@ export function canCreateAmbassadorInvite(role: string | null | undefined): bool
   return role === 'super_admin' || role === 'admin' || role === 'growth_lead' || role === 'marketing_manager';
 }
 
+export function canAssignSuperAdmin(role: string | null | undefined): boolean {
+  return role === 'super_admin';
+}
+
 export function roleLabel(role: string | null | undefined): string {
   if (!role) return 'User';
   if (role in ROLE_LABELS) return ROLE_LABELS[role as EmmyRole];

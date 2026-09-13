@@ -1,7 +1,12 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { changeOrderStatusAction } from '@/app/modules/operations/actions';
+import { PackageCheck } from 'lucide-react';
+import { changeOrderStatusAction, completeOrderHandoverAction } from '@/app/(staff)/modules/operations/actions';
+import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
+import { Alert } from '@/components/ui/alert';
 import {
   getOrderStatusLabel,
   getSkippedOrderStatuses,
@@ -13,39 +18,59 @@ export function FulfilmentControl({
   orderId,
   currentStatus,
   allowedStatuses,
+  hasActiveReservations,
 }: {
   orderId: string;
   currentStatus: OrderStatus;
   allowedStatuses: OrderStatus[];
+  /** Reserved stock is waiting on this order — completion must go through the handover
+   * action below (which actually consumes it), not the plain status-changer. */
+  hasActiveReservations: boolean;
 }) {
   const [status, setStatus] = useState<OrderStatus>(allowedStatuses[0] || currentStatus);
   const requiresReason = requiresStatusTransitionReason(currentStatus, status);
   const skipped = useMemo(() => getSkippedOrderStatuses(currentStatus, status), [currentStatus, status]);
 
-  if (allowedStatuses.length === 0) {
-    return <p className="mt-3 text-sm text-slate-500">No further status move.</p>;
-  }
-
   return (
-    <form action={changeOrderStatusAction} className="mt-4 space-y-3">
-      <input type="hidden" name="order_id" value={orderId} />
-      <input type="hidden" name="current_status" value={currentStatus} />
-      <select name="status" value={status} onChange={(e) => setStatus(e.target.value as OrderStatus)} className="input">
-        {allowedStatuses.map((item) => <option key={item} value={item}>{getOrderStatusLabel(item)}</option>)}
-      </select>
-      {skipped.length > 0 && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-          This will skip: {skipped.map(getOrderStatusLabel).join(', ')}. A reason is required.
+    <div className="mt-4 space-y-4">
+      {hasActiveReservations && (
+        <div className="rounded-xl border border-emmy-primary/20 bg-blue-50 p-4">
+          <div className="flex items-center gap-2 text-sm font-black text-emmy-primary">
+            <PackageCheck className="h-4 w-4" /> Reserved stock is waiting on this order
+          </div>
+          <p className="mt-1 text-xs text-slate-600">Completing handover hands the reserved item(s) to the customer and decrements stock. This is the only way to mark this order completed.</p>
+          <form action={completeOrderHandoverAction} className="mt-3 space-y-2">
+            <input type="hidden" name="order_id" value={orderId} />
+            <Textarea name="note" className="min-h-16" placeholder="Optional note" />
+            <Button type="submit" className="w-full">Complete handover</Button>
+          </form>
         </div>
       )}
-      <textarea
-        name="note"
-        required={requiresReason}
-        minLength={requiresReason ? 5 : undefined}
-        className="input min-h-20"
-        placeholder={requiresReason ? 'Reason for skipping these fulfilment steps *' : 'Optional note'}
-      />
-      <button className="w-full rounded-lg bg-[#032489] px-4 py-2.5 text-sm font-black text-white">Update fulfilment</button>
-    </form>
+
+      {allowedStatuses.length === 0 ? (
+        !hasActiveReservations && <p className="text-sm text-slate-500">No further status move.</p>
+      ) : (
+        <form action={changeOrderStatusAction} className="space-y-3">
+          <input type="hidden" name="order_id" value={orderId} />
+          <input type="hidden" name="current_status" value={currentStatus} />
+          <Select name="status" value={status} onChange={(e) => setStatus(e.target.value as OrderStatus)}>
+            {allowedStatuses.map((item) => <option key={item} value={item}>{getOrderStatusLabel(item)}</option>)}
+          </Select>
+          {skipped.length > 0 && (
+            <Alert variant="warning">
+              This will skip: {skipped.map(getOrderStatusLabel).join(', ')}. A reason is required.
+            </Alert>
+          )}
+          <Textarea
+            name="note"
+            required={requiresReason}
+            minLength={requiresReason ? 5 : undefined}
+            className="min-h-20"
+            placeholder={requiresReason ? 'Reason for skipping these fulfilment steps *' : 'Optional note'}
+          />
+          <Button type="submit" className="w-full">Update fulfilment</Button>
+        </form>
+      )}
+    </div>
   );
 }

@@ -12,10 +12,10 @@ const accountMenuPath = path.join(root, 'src/components/os/account-menu.tsx');
 test('command centre exposes a real Supabase logout action', () => {
   assert.equal(existsSync(accountMenuPath), true, 'account menu component must exist');
   const accountMenu = source('src/components/os/account-menu.tsx');
-  const dashboard = source('src/components/os/ambassador-style-dashboard.tsx');
+  const shell = source('src/components/os/app-shell.tsx');
 
   assert.match(accountMenu, /auth\.signOut\(\)/);
   assert.match(accountMenu, /router\.replace\(['"]\/auth\/login['"]\)/);
   assert.match(accountMenu, /Log out/i);
-  assert.match(dashboard, /AccountMenu/);
+  assert.match(shell, /AccountMenu/);
 });

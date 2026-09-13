@@ -5,7 +5,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
-const page = readFileSync(path.join(root, 'src/app/modules/operations/orders/[id]/page.tsx'), 'utf8');
+const page = readFileSync(path.join(root, 'src/app/(staff)/modules/operations/orders/[id]/page.tsx'), 'utf8');
 const payments = readFileSync(path.join(root, 'src/components/operations/orders/order-payments.tsx'), 'utf8');
 const tracking = readFileSync(path.join(root, 'src/lib/operations/tracking-server.ts'), 'utf8');
 

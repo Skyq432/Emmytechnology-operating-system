@@ -5,7 +5,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
-const pagePath = path.join(root, 'src/app/modules/administration/page.tsx');
+const pagePath = path.join(root, 'src/app/(staff)/modules/administration/page.tsx');
 const clientPath = path.join(root, 'src/components/administration/staff-admin.tsx');
 
 test('Administration is a real guarded staff route', () => {

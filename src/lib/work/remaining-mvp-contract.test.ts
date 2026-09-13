@@ -6,11 +6,11 @@ function read(path: URL) {
   return existsSync(path) ? readFileSync(path, 'utf8') : '';
 }
 
-const detailPageUrl = new URL('../../app/modules/activities/tasks/[taskId]/page.tsx', import.meta.url);
+const detailPageUrl = new URL('../../app/(staff)/modules/activities/tasks/[taskId]/page.tsx', import.meta.url);
 const detailComponentUrl = new URL('../../components/work/task-detail.tsx', import.meta.url);
 const returnedControlsUrl = new URL('../../components/work/returned-task-controls.tsx', import.meta.url);
-const activitiesPageUrl = new URL('../../app/modules/activities/page.tsx', import.meta.url);
-const dashboardUrl = new URL('../../components/os/ambassador-style-dashboard.tsx', import.meta.url);
+const activitiesPageUrl = new URL('../../app/(staff)/modules/activities/page.tsx', import.meta.url);
+const dashboardUrl = new URL('../../components/os/app-shell.tsx', import.meta.url);
 const notificationCenterUrl = new URL('../../components/work/work-notification-center.tsx', import.meta.url);
 const notificationMigrationUrl = new URL('../../../supabase/migrations/20260911103901_work_notifications_20260911.sql', import.meta.url);
 const notificationHardeningUrl = new URL('../../../supabase/migrations/20260911104349_work_notifications_harden_updates_20260911.sql', import.meta.url);

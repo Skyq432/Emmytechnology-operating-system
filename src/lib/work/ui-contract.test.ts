@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-const page = readFileSync(new URL('../../app/modules/activities/page.tsx', import.meta.url), 'utf8');
+const page = readFileSync(new URL('../../app/(staff)/modules/activities/page.tsx', import.meta.url), 'utf8');
 const workspace = readFileSync(new URL('../../components/work/my-work-workspace.tsx', import.meta.url), 'utf8');
-const dashboard = readFileSync(new URL('../../components/os/ambassador-style-dashboard.tsx', import.meta.url), 'utf8');
+const dashboard = readFileSync(new URL('../../components/os/app-shell.tsx', import.meta.url), 'utf8');
 
 test('activities is a real internal My Work route backed by all approved loaders', () => {
   assert.match(page, /requireInternalUser/);
@@ -35,6 +35,6 @@ test('workspace supports quick Todo task delegation and goal creation', () => {
 });
 
 test('Command Centre sidebar names the workspace My Work', () => {
-  assert.match(dashboard, />My Work</);
-  assert.doesNotMatch(dashboard, />My Tasks</);
+  assert.match(dashboard, />\s*My Work\s*</);
+  assert.doesNotMatch(dashboard, />\s*My Tasks\s*</);
 });
