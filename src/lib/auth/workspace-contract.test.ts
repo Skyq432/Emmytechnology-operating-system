@@ -17,9 +17,12 @@ test('Marketing, Sales and Operations layouts use server-side module guards', ()
   }
 });
 
-test('Sales and Operations layouts filter their sub-nav through the centralized policy', () => {
-  assert.match(source('src/app/(staff)/modules/sales/layout.tsx'), /salesNavKeys\(role\)/);
-  assert.match(source('src/app/(staff)/modules/operations/layout.tsx'), /operationsNavKeys\(role\)/);
+test('Sales and Operations sections filter through the centralized policy', () => {
+  // Sub-nav filtering moved out of each module's own layout and into the AppShell
+  // sidebar's Sections segment, which builds its list from these same policy functions.
+  const subNav = source('src/lib/os/sub-navigation.ts');
+  assert.match(subNav, /salesNavKeys\(role\)/);
+  assert.match(subNav, /operationsNavKeys\(role\)/);
 });
 
 test('AppShell shows a friendly role label from the centralized policy', () => {

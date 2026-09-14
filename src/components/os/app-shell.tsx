@@ -7,6 +7,7 @@ import { ChevronLeft, ClipboardCheck, Home, Menu, X } from 'lucide-react';
 import { Avatar } from '@/components/ui/avatar';
 import { NavItem } from '@/components/ui/nav-item';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { HelpTip } from '@/components/ui/tooltip';
 import WorkNotificationCenter from '@/components/work/work-notification-center';
 import AccountMenu from '@/components/os/account-menu';
 import { PRIMARY_MODULE_NAV } from '@/lib/os/navigation';
@@ -168,19 +169,21 @@ export function AppShell({
                 const active = item.exact ? pathname === item.href : pathname.startsWith(item.href);
                 const Icon = item.icon;
                 return (
-                  <Link
-                    key={item.key}
-                    href={item.href}
-                    onClick={() => setMobileOpen(false)}
-                    className={cn(
-                      'flex items-center gap-2.5 rounded-xl px-3 py-2 text-[12.5px] font-bold transition-colors',
-                      collapsed ? 'justify-center px-0' : '',
-                      active ? 'bg-emmy-primary text-white' : 'text-slate-500 hover:bg-blue-50/60 hover:text-emmy-primary'
-                    )}
-                  >
-                    <Icon className="h-[15px] w-[15px] shrink-0" />
-                    {!collapsed && <span className="truncate">{item.label}</span>}
-                  </Link>
+                  <div key={item.key} className={cn('flex items-center gap-1', collapsed && 'justify-center')}>
+                    <Link
+                      href={item.href}
+                      onClick={() => setMobileOpen(false)}
+                      className={cn(
+                        'flex min-w-0 flex-1 items-center gap-2.5 rounded-xl px-3 py-2 text-[12.5px] font-bold transition-colors',
+                        collapsed ? 'flex-none justify-center px-0' : '',
+                        active ? 'bg-emmy-primary text-white' : 'text-slate-500 hover:bg-blue-50/60 hover:text-emmy-primary'
+                      )}
+                    >
+                      <Icon className="h-[15px] w-[15px] shrink-0" />
+                      {!collapsed && <span className="truncate">{item.label}</span>}
+                    </Link>
+                    {!collapsed && item.help && <HelpTip text={item.help} label={`About ${item.label}`} />}
+                  </div>
                 );
               })}
             </div>
