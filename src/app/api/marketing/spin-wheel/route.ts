@@ -120,20 +120,8 @@ function tableIsAvailable(result: SafeRowsResult) {
   return !result.warning;
 }
 
-function hasColumn(rows: Row[], column: string) {
-  return rows.some((row) => Object.prototype.hasOwnProperty.call(row, column));
-}
-
 function rowPlayerId(row: Row) {
   return row.spin_player_id ?? row.player_id ?? null;
-}
-
-function rowReferralId(row: Row) {
-  return row.referral_id ?? row.spin_referral_id ?? null;
-}
-
-function rowReferralCode(row: Row) {
-  return row.referral_code ?? row.code ?? null;
 }
 
 function rowPhone(row: Row) {
@@ -164,20 +152,6 @@ function rowPlayerContact(row: Row) {
 
 function normalizeStatus(value: unknown) {
   return textValue(value).toLowerCase();
-}
-
-function truthy(value: unknown) {
-  return value === true || value === 1 || value === "1" || value === "true";
-}
-
-function uniqueBy<T>(items: T[], key: (item: T) => string) {
-  const seen = new Set<string>();
-  return items.filter((item) => {
-    const value = key(item);
-    if (!value || seen.has(value)) return false;
-    seen.add(value);
-    return true;
-  });
 }
 
 async function tableRows(table: string, limit = MAX_ROWS) {
@@ -278,10 +252,6 @@ export async function GET(req: NextRequest) {
 
   const activePlayerIds = new Set(
     periodLogs.map((row) => String(rowPlayerId(row) ?? "")).filter(Boolean)
-  );
-
-  const playerById = new Map(
-    players.map((row) => [String(row.id ?? ""), row] as const)
   );
 
   const recentActivity = newestFirst([
