@@ -13,6 +13,8 @@ export async function FrontDeskHome({ role, name }: { role: InternalRole; name: 
     <div className="space-y-6">
       <PageHeader eyebrow="Front Desk" title={`Good to see you, ${firstName}`} />
 
+      <CommandCentreWorkSummary summary={workSummary} />
+
       <div>
         <div className="text-sm font-extrabold text-slate-950">What do you need to do?</div>
         <div className="mt-0.5 text-xs text-slate-500">Pick a task to get started</div>
@@ -55,8 +57,6 @@ export async function FrontDeskHome({ role, name }: { role: InternalRole; name: 
           )}
         </ActionGrid>
       </div>
-
-      <CommandCentreWorkSummary summary={workSummary} />
     </div>
   );
 }

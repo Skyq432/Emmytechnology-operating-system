@@ -1,7 +1,9 @@
 import Link from 'next/link';
 import { AlertTriangle, ArrowRight, CheckCircle2, Clock3, Inbox } from 'lucide-react';
+import { StatGrid, StatTile } from '@/components/ui/stat-tile';
+import { buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import type { getMyWorkDashboard } from '@/lib/work/server';
-import styles from './command-centre-work-summary.module.css';
 
 type Summary = Awaited<ReturnType<typeof getMyWorkDashboard>>;
 
@@ -10,12 +12,20 @@ export default function CommandCentreWorkSummary({ summary }: { summary: Summary
   const clear = attention === 0 && summary.dueTodayCount === 0;
 
   return (
-    <section className={styles.wrap}>
-      <div className={styles.heading}>
+    <div
+      className={cn(
+        'rounded-2xl border p-5 shadow-[var(--shadow-card)]',
+        clear ? 'border-emerald-100 bg-gradient-to-br from-emerald-50 to-white' : 'border-amber-100 bg-gradient-to-br from-amber-50 to-white'
+      )}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <div className={styles.eyebrow}>Today</div>
-          <h2>{clear ? 'You’re clear for now.' : 'Your work needs attention.'}</h2>
-          <p>
+          <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-emmy-primary">
+            <span className={cn('h-1.5 w-1.5 rounded-full', clear ? 'bg-emerald-500' : 'bg-amber-500')} />
+            Today
+          </div>
+          <h2 className="mt-1 text-lg font-extrabold tracking-tight text-slate-950">{clear ? 'You’re clear for now.' : 'Your work needs attention.'}</h2>
+          <p className="mt-0.5 max-w-[48ch] text-sm text-slate-500">
             {clear
               ? summary.nextTask
                 ? `Your next accepted Task is due ${new Intl.DateTimeFormat('en-NG', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(summary.nextTask.assignment.agreed_due_at ?? summary.nextTask.assignment.requested_due_at))}.`
@@ -23,22 +33,28 @@ export default function CommandCentreWorkSummary({ summary }: { summary: Summary
               : 'Respond to new Tasks first, then handle accepted work by deadline.'}
           </p>
         </div>
-        <Link href="/modules/activities" className={styles.openButton}>Open My Work <ArrowRight size={16} /></Link>
+        <Link href="/modules/activities" className={cn(buttonVariants({ size: 'sm' }), 'shrink-0')}>
+          Open My Work <ArrowRight className="ml-1.5 h-4 w-4" />
+        </Link>
       </div>
 
-      <div className={styles.metrics}>
-        <div className={styles.metric}><Inbox size={18} /><div><strong>{summary.pendingAcceptanceCount}</strong><span>Need response</span></div></div>
-        <div className={styles.metric}><Clock3 size={18} /><div><strong>{summary.dueTodayCount}</strong><span>Due today</span></div></div>
-        <div className={`${styles.metric} ${summary.overdueCount ? styles.danger : ''}`}><AlertTriangle size={18} /><div><strong>{summary.overdueCount}</strong><span>Overdue</span></div></div>
-        <div className={styles.metric}><CheckCircle2 size={18} /><div><strong>{summary.todayTodoCount}</strong><span>Private Todos</span></div></div>
-      </div>
+      <StatGrid className="mt-4 sm:grid-cols-4">
+        <StatTile label="Need response" value={summary.pendingAcceptanceCount} icon={<Inbox className="h-[15px] w-[15px]" />} tone="primary" />
+        <StatTile label="Due today" value={summary.dueTodayCount} icon={<Clock3 className="h-[15px] w-[15px]" />} tone="secondary" />
+        <StatTile label="Overdue" value={summary.overdueCount} icon={<AlertTriangle className="h-[15px] w-[15px]" />} tone="danger" />
+        <StatTile label="Private Todos" value={summary.todayTodoCount} icon={<CheckCircle2 className="h-[15px] w-[15px]" />} tone="success" />
+      </StatGrid>
 
       {summary.extensionDecisionCount > 0 && (
-        <Link href="/modules/activities" className={styles.extension}>
-          <strong>{summary.extensionDecisionCount}</strong> deadline extension request{summary.extensionDecisionCount === 1 ? '' : 's'} waiting for your decision.
-          <ArrowRight size={15} />
+        <Link
+          href="/modules/activities"
+          className="mt-4 flex items-center gap-2 rounded-xl bg-amber-100/70 px-3.5 py-2.5 text-sm font-bold text-amber-800 hover:bg-amber-100"
+        >
+          <strong>{summary.extensionDecisionCount}</strong> deadline extension request{summary.extensionDecisionCount === 1 ? '' : 's'} waiting for your
+          decision.
+          <ArrowRight className="ml-auto h-4 w-4 shrink-0" />
         </Link>
       )}
-    </section>
+    </div>
   );
 }

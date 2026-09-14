@@ -7,7 +7,10 @@ import {
 } from '@/app/(staff)/modules/activities/actions';
 import type { getMyTasks, listAssignableStaff } from '@/lib/work/server';
 import type { WorkPriority } from '@/lib/work/types';
-import styles from './my-work-workspace.module.css';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 
 type Tasks = Awaited<ReturnType<typeof getMyTasks>>;
 type Staff = Awaited<ReturnType<typeof listAssignableStaff>>;
@@ -59,65 +62,65 @@ export default function ReturnedTaskControls({
 
   return (
     <div>
-      <div className={styles.actions}>
-        <button className={styles.secondary} disabled={busy} onClick={() => setMode(mode === 'reassign' ? null : 'reassign')}>
+      <div className="flex flex-wrap gap-1.5">
+        <Button size="sm" variant="outline" disabled={busy} onClick={() => setMode(mode === 'reassign' ? null : 'reassign')}>
           Reassign returned Task
-        </button>
-        <button className={styles.dangerButton} disabled={busy} onClick={() => setMode(mode === 'cancel' ? null : 'cancel')}>
+        </Button>
+        <Button size="sm" variant="danger" disabled={busy} onClick={() => setMode(mode === 'cancel' ? null : 'cancel')}>
           Cancel assignment
-        </button>
+        </Button>
       </div>
 
       {mode === 'reassign' && (
-        <form className={styles.modalForm} onSubmit={submitReassign}>
-          <div className={styles.formGrid}>
-            <label>
-              <span className={styles.label}>New assignee</span>
-              <select className={styles.select} name="assignee" defaultValue="" required>
+        <form className="mt-3 rounded-xl border border-slate-200 p-4" onSubmit={submitReassign}>
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-bold text-slate-600">New assignee</span>
+              <Select name="assignee" defaultValue="" required>
                 <option value="">Choose staff…</option>
                 {staff.map((person) => (
                   <option key={person.id} value={person.id}>{person.name || person.email}</option>
                 ))}
-              </select>
+              </Select>
             </label>
-            <label>
-              <span className={styles.label}>Priority</span>
-              <select className={styles.select} name="priority" defaultValue="normal">
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-bold text-slate-600">Priority</span>
+              <Select name="priority" defaultValue="normal">
                 <option value="low">Low</option>
                 <option value="normal">Normal</option>
                 <option value="high">High</option>
                 <option value="urgent">Urgent</option>
-              </select>
+              </Select>
             </label>
-            <label>
-              <span className={styles.label}>New start</span>
-              <input className={styles.input} name="start" type="datetime-local" required />
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-bold text-slate-600">New start</span>
+              <Input name="start" type="datetime-local" required />
             </label>
-            <label>
-              <span className={styles.label}>New deadline</span>
-              <input className={styles.input} name="due" type="datetime-local" required />
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-bold text-slate-600">New deadline</span>
+              <Input name="due" type="datetime-local" required />
             </label>
-            <label className={styles.full}>
-              <span className={styles.label}>Reassignment note</span>
-              <textarea className={styles.textarea} name="note" placeholder="Optional context for the new assignee" />
+            <label className="flex flex-col gap-1 md:col-span-2">
+              <span className="text-xs font-bold text-slate-600">Reassignment note</span>
+              <Textarea name="note" placeholder="Optional context for the new assignee" />
             </label>
           </div>
-          <div className={styles.actions}>
-            <button className={styles.primary} disabled={busy}>Reassign</button>
-            <button type="button" className={styles.ghost} onClick={() => setMode(null)}>Close</button>
+          <div className="mt-3 flex gap-2">
+            <Button size="sm" disabled={busy}>Reassign</Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setMode(null)}>Close</Button>
           </div>
         </form>
       )}
 
       {mode === 'cancel' && (
-        <form className={styles.modalForm} onSubmit={submitCancel}>
-          <label>
-            <span className={styles.label}>Cancellation reason</span>
-            <textarea className={styles.textarea} name="reason" required />
+        <form className="mt-3 rounded-xl border border-slate-200 p-4" onSubmit={submitCancel}>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-bold text-slate-600">Cancellation reason</span>
+            <Textarea name="reason" required />
           </label>
-          <div className={styles.actions}>
-            <button className={styles.dangerButton} disabled={busy}>Cancel assignment</button>
-            <button type="button" className={styles.ghost} onClick={() => setMode(null)}>Keep Task</button>
+          <div className="mt-3 flex gap-2">
+            <Button size="sm" variant="danger" disabled={busy}>Cancel assignment</Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setMode(null)}>Keep Task</Button>
           </div>
         </form>
       )}

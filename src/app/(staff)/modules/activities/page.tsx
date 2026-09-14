@@ -1,5 +1,4 @@
 import MyWorkWorkspace from '@/components/work/my-work-workspace';
-import WorkNotificationCenter from '@/components/work/work-notification-center';
 import { requireInternalUser } from '@/lib/auth/server';
 import {
   getMyGoals,
@@ -24,27 +23,22 @@ export default async function ActivitiesPage() {
   ]);
 
   return (
-    <>
-      <div style={{ position: 'fixed', top: 16, right: 18, zIndex: 120 }}>
-        <WorkNotificationCenter currentUserId={user.id} />
-      </div>
-      <MyWorkWorkspace
-        currentUser={{
-          id: user.id,
-          name: profile.name || user.email || 'EmmyTech Staff',
-          role,
-        }}
-        summary={summary}
-        todos={todos}
-        tasks={tasks}
-        goals={{
-          goals: goalsResult.goals,
-          contributors: goalsResult.contributors,
-          progress: Object.fromEntries(goalsResult.progress),
-        }}
-        staff={staff}
-        team={team}
-      />
-    </>
+    <MyWorkWorkspace
+      currentUser={{
+        id: user.id,
+        name: profile.name || user.email || 'EmmyTech Staff',
+        role,
+      }}
+      summary={summary}
+      todos={todos}
+      tasks={tasks}
+      goals={{
+        goals: goalsResult.goals,
+        contributors: goalsResult.contributors,
+        progress: Object.fromEntries(goalsResult.progress),
+      }}
+      staff={staff}
+      team={team}
+    />
   );
 }

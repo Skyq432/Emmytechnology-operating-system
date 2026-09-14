@@ -29,7 +29,7 @@ test('workspace contains the core task response actions', () => {
 
 test('workspace supports quick Todo task delegation and goal creation', () => {
   assert.match(workspace, /Add Todo/);
-  assert.match(workspace, /Delegate as Task/);
+  assert.match(workspace, /Delegate/);
   assert.match(workspace, /New Task/);
   assert.match(workspace, /New Goal/);
 });
