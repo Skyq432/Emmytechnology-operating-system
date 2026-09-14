@@ -17,6 +17,8 @@ export async function AdminHome({ role, name }: { role: InternalRole; name: stri
     <div className="space-y-6">
       <PageHeader eyebrow="Command Centre" title={`Good to see you, ${firstName}`} />
 
+      <CommandCentreWorkSummary summary={workSummary} />
+
       <StatGrid>
         <StatTile label="Today's Sales" value={money(overview.todaysSales)} icon={<ShieldCheck className="h-[15px] w-[15px]" />} tone="primary" />
         <StatTile label="Open Repairs" value={overview.openRepairs} icon={<Wrench className="h-[15px] w-[15px]" />} tone="secondary" />
@@ -45,8 +47,6 @@ export async function AdminHome({ role, name }: { role: InternalRole; name: stri
           )}
         </div>
       </div>
-
-      <CommandCentreWorkSummary summary={workSummary} />
     </div>
   );
 }

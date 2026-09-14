@@ -9,7 +9,6 @@ function read(path: URL) {
 const detailPageUrl = new URL('../../app/(staff)/modules/activities/tasks/[taskId]/page.tsx', import.meta.url);
 const detailComponentUrl = new URL('../../components/work/task-detail.tsx', import.meta.url);
 const returnedControlsUrl = new URL('../../components/work/returned-task-controls.tsx', import.meta.url);
-const activitiesPageUrl = new URL('../../app/(staff)/modules/activities/page.tsx', import.meta.url);
 const dashboardUrl = new URL('../../components/os/app-shell.tsx', import.meta.url);
 const notificationCenterUrl = new URL('../../components/work/work-notification-center.tsx', import.meta.url);
 const notificationMigrationUrl = new URL('../../../supabase/migrations/20260911103901_work_notifications_20260911.sql', import.meta.url);
@@ -18,7 +17,6 @@ const notificationHardeningUrl = new URL('../../../supabase/migrations/202609111
 const detailPage = read(detailPageUrl);
 const detailComponent = read(detailComponentUrl);
 const returnedControls = read(returnedControlsUrl);
-const activitiesPage = read(activitiesPageUrl);
 const dashboard = read(dashboardUrl);
 const notificationCenter = read(notificationCenterUrl);
 const notificationMigration = read(notificationMigrationUrl);
@@ -71,6 +69,8 @@ test('Work notification bell is live, recipient-scoped, and mounted on Command C
   assert.match(notificationCenter, /recipient_id=eq\./i);
   assert.match(notificationCenter, /Mark all read/i);
   assert.match(notificationCenter, /\/modules\/activities\/tasks\//i);
+  // AppShell is the one persistent layout every staff route renders inside — including
+  // both Command Centre and My Work — so a single mount there covers both; My Work no
+  // longer needs (and used to duplicate via a fixed-position copy) its own instance.
   assert.match(dashboard, /WorkNotificationCenter/i);
-  assert.match(activitiesPage, /WorkNotificationCenter/i);
 });

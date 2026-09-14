@@ -25,6 +25,9 @@ export async function GrowthLeadHome({ name }: { role: InternalRole; name: strin
   return (
     <div className="space-y-6">
       <PageHeader eyebrow="Growth" title={`Good to see you, ${firstName}`} />
+
+      <CommandCentreWorkSummary summary={workSummary} />
+
       <CrmMarketingOverviewSection data={marketing} />
 
       <div>
@@ -37,8 +40,6 @@ export async function GrowthLeadHome({ name }: { role: InternalRole; name: strin
           <StatTile label="Awaiting Dispatch" value={operations.awaitingDispatch} icon={<Truck className="h-[15px] w-[15px]" />} tone="neutral" />
         </StatGrid>
       </div>
-
-      <CommandCentreWorkSummary summary={workSummary} />
     </div>
   );
 }

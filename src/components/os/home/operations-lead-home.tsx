@@ -19,6 +19,8 @@ export async function OperationsLeadHome({ name }: { role: InternalRole; name: s
     <div className="space-y-6">
       <PageHeader eyebrow="Operations" title={`Good to see you, ${firstName}`} />
 
+      <CommandCentreWorkSummary summary={workSummary} />
+
       <StatGrid>
         <StatTile label="Open Orders" value={overview.openOrders} icon={<ClipboardList className="h-[15px] w-[15px]" />} tone="primary" />
         <StatTile label="Urgent" value={overview.urgentOrders} icon={<AlertTriangle className="h-[15px] w-[15px]" />} tone="danger" />
@@ -51,8 +53,6 @@ export async function OperationsLeadHome({ name }: { role: InternalRole; name: s
           </div>
         </CardContent>
       </Card>
-
-      <CommandCentreWorkSummary summary={workSummary} />
     </div>
   );
 }

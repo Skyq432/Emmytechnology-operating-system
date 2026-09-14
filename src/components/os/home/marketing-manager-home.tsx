@@ -12,8 +12,8 @@ export async function MarketingManagerHome({ name }: { role: InternalRole; name:
   return (
     <div className="space-y-6">
       <PageHeader eyebrow="Marketing" title={`Good to see you, ${firstName}`} />
-      <CrmMarketingOverviewSection data={overview} />
       <CommandCentreWorkSummary summary={workSummary} />
+      <CrmMarketingOverviewSection data={overview} />
     </div>
   );
 }
