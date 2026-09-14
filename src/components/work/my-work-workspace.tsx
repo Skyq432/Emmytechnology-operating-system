@@ -16,7 +16,7 @@ import {
   rejectTaskAction,
   requestExtensionAction,
   updateNumericGoalProgressAction,
-} from '@/app/modules/activities/actions';
+} from '@/app/(staff)/modules/activities/actions';
 import type {
   getMyGoals,
   getMyTasks,

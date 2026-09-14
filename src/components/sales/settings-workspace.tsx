@@ -1,7 +1,11 @@
 'use client';
 
 import { useActionState } from 'react';
-import { saveMarginPolicyAction, saveSalesAuthorityAction, saveSalesSettingsAction } from '@/app/modules/sales/actions';
+import { saveMarginPolicyAction, saveSalesAuthorityAction, saveSalesSettingsAction } from '@/app/(staff)/modules/sales/actions';
+import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import { ActionResult } from '@/components/ui/alert';
 
 const initial = { success: false, message: '' };
 
@@ -15,14 +19,102 @@ export function SettingsWorkspace({ settings, marginPolicies, authorityProfiles,
   const [settingsState, settingsAction, settingsPending] = useActionState(saveSalesSettingsAction, initial);
   const [marginState, marginAction, marginPending] = useActionState(saveMarginPolicyAction, initial);
   const [authorityState, authorityAction, authorityPending] = useActionState(saveSalesAuthorityAction, initial);
-  return <div className="mx-auto max-w-[1400px] space-y-5"><div><p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">Admin commercial policy</p><h1 className="mt-2 text-3xl font-black text-[#032489]">Sales Settings</h1><p className="mt-2 text-sm text-slate-500">Future decisions use current settings; frozen historical transactions and issued documents never get rewritten.</p></div>
 
-  <div className="grid gap-5 xl:grid-cols-2"><form action={settingsAction} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><h2 className="font-black">Company defaults</h2><div className="mt-4 space-y-3"><label className="block text-xs font-bold text-slate-500">Default minimum Gross Margin %<input name="company_default_margin_percent" type="number" step="0.01" min="0" max="99" defaultValue={settings.company_default_margin_percent} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" /></label><label className="block text-xs font-bold text-slate-500">Official company/archive email<input name="company_archive_email" type="email" defaultValue={settings.company_archive_email || ''} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" /></label><label className="block text-xs font-bold text-slate-500">Default quotation validity (days)<input name="quotation_valid_days" type="number" min="1" defaultValue={settings.quotation_valid_days || 7} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" /></label></div>{settingsState.message ? <div className={`mt-3 rounded-xl px-3 py-2 text-sm ${settingsState.success ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{settingsState.message}</div> : null}<button disabled={settingsPending} className="mt-4 rounded-xl bg-[#032489] px-5 py-3 text-sm font-black text-white">Save defaults</button></form>
+  return (
+    <div className="mx-auto max-w-[1400px] space-y-5">
+      <div>
+        <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">Admin commercial policy</p>
+        <h1 className="mt-2 text-3xl font-black text-emmy-primary">Sales Settings</h1>
+        <p className="mt-2 text-sm text-slate-500">Future decisions use current settings; frozen historical transactions and issued documents never get rewritten.</p>
+      </div>
 
-  <form action={marginAction} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><h2 className="font-black">Minimum margin policy</h2><div className="mt-4 grid gap-3"><select name="policy_scope" className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm"><option value="category">Category policy</option><option value="product">Product override</option></select><input name="category" placeholder="Category (for category policy)" className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" /><select name="inventory_item_id" className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm"><option value="">Product (for product override)</option>{inventory.map((item) => <option key={item.id} value={item.id}>{item.sku} · {item.name}</option>)}</select><input name="minimum_margin_percent" type="number" step="0.01" min="0" max="99" placeholder="Minimum Gross Margin %" className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" /></div>{marginState.message ? <div className={`mt-3 rounded-xl px-3 py-2 text-sm ${marginState.success ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{marginState.message}</div> : null}<button disabled={marginPending} className="mt-4 rounded-xl bg-slate-900 px-5 py-3 text-sm font-black text-white">Add margin policy</button></form></div>
+      <div className="grid gap-5 xl:grid-cols-2">
+        <form action={settingsAction} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="font-black">Company defaults</h2>
+          <div className="mt-4 space-y-3">
+            <label className="block text-xs font-bold text-slate-500">Default minimum Gross Margin %
+              <Input name="company_default_margin_percent" type="number" step="0.01" min="0" max="99" defaultValue={settings.company_default_margin_percent} className="mt-1" />
+            </label>
+            <label className="block text-xs font-bold text-slate-500">Official company/archive email
+              <Input name="company_archive_email" type="email" defaultValue={settings.company_archive_email || ''} className="mt-1" />
+            </label>
+            <label className="block text-xs font-bold text-slate-500">Default quotation validity (days)
+              <Input name="quotation_valid_days" type="number" min="1" defaultValue={settings.quotation_valid_days || 7} className="mt-1" />
+            </label>
+          </div>
+          <ActionResult state={settingsState} className="mt-3" />
+          <Button type="submit" disabled={settingsPending} className="mt-4">Save defaults</Button>
+        </form>
 
-  <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><h2 className="font-black">Active margin rules</h2><div className="mt-4 flex flex-wrap gap-2">{marginPolicies.map((policy) => <span key={policy.id} className="rounded-xl border border-slate-200 px-3 py-2 text-xs"><b>{policy.policy_scope === 'product' ? `${policy.inventory_item?.sku || ''} ${policy.inventory_item?.name || 'Product'}` : policy.category}</b> · {Number(policy.minimum_margin_percent).toFixed(1)}%</span>)}{!marginPolicies.length ? <span className="text-sm text-slate-400">No overrides yet — company default applies.</span> : null}</div></section>
+        <form action={marginAction} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="font-black">Minimum margin policy</h2>
+          <div className="mt-4 grid gap-3">
+            <Select name="policy_scope">
+              <option value="category">Category policy</option>
+              <option value="product">Product override</option>
+            </Select>
+            <Input name="category" placeholder="Category (for category policy)" />
+            <Select name="inventory_item_id" defaultValue="">
+              <option value="">Product (for product override)</option>
+              {inventory.map((item) => <option key={item.id} value={item.id}>{item.sku} · {item.name}</option>)}
+            </Select>
+            <Input name="minimum_margin_percent" type="number" step="0.01" min="0" max="99" placeholder="Minimum Gross Margin %" />
+          </div>
+          <ActionResult state={marginState} className="mt-3" />
+          <Button type="submit" disabled={marginPending} className="mt-4 bg-slate-900 hover:bg-slate-800">Add margin policy</Button>
+        </form>
+      </div>
 
-  <div className="grid gap-5 xl:grid-cols-[420px_1fr]"><form action={authorityAction} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><h2 className="font-black">Sales authority</h2><div className="mt-4 space-y-3"><select name="user_id" className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm"><option value="">Choose user</option>{users.map((user) => <option key={user.id} value={user.id}>{user.name || user.email || user.id}</option>)}</select><select name="authority_level" className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm"><option value="salesperson">Salesperson</option><option value="manager">Sales Manager</option><option value="admin">Admin</option></select><input name="discount_limit_percent" type="number" step="0.01" min="0" max="100" placeholder="Maximum discount %" className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" /></div>{authorityState.message ? <div className={`mt-3 rounded-xl px-3 py-2 text-sm ${authorityState.success ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{authorityState.message}</div> : null}<button disabled={authorityPending} className="mt-4 rounded-xl bg-[#032489] px-5 py-3 text-sm font-black text-white">Save authority</button></form><section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><h2 className="font-black">Configured team authority</h2><div className="mt-4 divide-y divide-slate-100">{authorityProfiles.map((profile) => { const user = users.find((u) => u.id === profile.user_id); return <div key={profile.user_id} className="flex items-center justify-between gap-3 py-3"><div><div className="text-sm font-bold">{user?.name || user?.email || profile.user_id}</div><div className="text-xs text-slate-400">{profile.authority_level}</div></div><div className="text-sm font-black">{Number(profile.discount_limit_percent).toFixed(1)}% max discount</div></div>; })}{!authorityProfiles.length ? <div className="py-5 text-sm text-slate-400">Only application Admin authority is active until Sales profiles are added.</div> : null}</div></section></div>
-  </div>;
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 className="font-black">Active margin rules</h2>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {marginPolicies.map((policy) => (
+            <span key={policy.id} className="rounded-xl border border-slate-200 px-3 py-2 text-xs">
+              <b>{policy.policy_scope === 'product' ? `${policy.inventory_item?.sku || ''} ${policy.inventory_item?.name || 'Product'}` : policy.category}</b> · {Number(policy.minimum_margin_percent).toFixed(1)}%
+            </span>
+          ))}
+          {!marginPolicies.length ? <span className="text-sm text-slate-400">No overrides yet — company default applies.</span> : null}
+        </div>
+      </section>
+
+      <div className="grid gap-5 xl:grid-cols-[420px_1fr]">
+        <form action={authorityAction} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="font-black">Sales authority</h2>
+          <div className="mt-4 space-y-3">
+            <Select name="user_id" defaultValue="">
+              <option value="">Choose user</option>
+              {users.map((user) => <option key={user.id} value={user.id}>{user.name || user.email || user.id}</option>)}
+            </Select>
+            <Select name="authority_level">
+              <option value="salesperson">Salesperson</option>
+              <option value="manager">Sales Manager</option>
+              <option value="admin">Admin</option>
+            </Select>
+            <Input name="discount_limit_percent" type="number" step="0.01" min="0" max="100" placeholder="Maximum discount %" />
+          </div>
+          <ActionResult state={authorityState} className="mt-3" />
+          <Button type="submit" disabled={authorityPending} className="mt-4">Save authority</Button>
+        </form>
+
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="font-black">Configured team authority</h2>
+          <div className="mt-4 divide-y divide-slate-100">
+            {authorityProfiles.map((profile) => {
+              const user = users.find((u) => u.id === profile.user_id);
+              return (
+                <div key={profile.user_id} className="flex items-center justify-between gap-3 py-3">
+                  <div>
+                    <div className="text-sm font-bold">{user?.name || user?.email || profile.user_id}</div>
+                    <div className="text-xs text-slate-400">{profile.authority_level}</div>
+                  </div>
+                  <div className="text-sm font-black">{Number(profile.discount_limit_percent).toFixed(1)}% max discount</div>
+                </div>
+              );
+            })}
+            {!authorityProfiles.length ? <div className="py-5 text-sm text-slate-400">Only application Admin authority is active until Sales profiles are added.</div> : null}
+          </div>
+        </section>
+      </div>
+    </div>
+  );
 }

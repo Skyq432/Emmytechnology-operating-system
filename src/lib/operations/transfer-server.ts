@@ -1,12 +1,19 @@
 import { requireStaffCapability } from '@/lib/auth/capability-server';
 import type { ReportingRange } from '@/lib/reporting-period';
 import type { TransferCarrierType } from './transfer';
+import type {
+  OperationsLocation,
+  OperationsTransfer,
+  OperationsTransferAvailabilityRow,
+  OperationsTransferReservation,
+  OperationsTransferUser,
+} from './types';
 
 async function requireOperationsAccess() {
   return requireStaffCapability('operations.read');
 }
 
-export async function getOperationsTransfers(range: ReportingRange) {
+export async function getOperationsTransfers(range: ReportingRange): Promise<OperationsTransfer[]> {
   const { supabase } = await requireOperationsAccess();
   const { data, error } = await supabase
     .from('ops_stock_transfers')
@@ -22,10 +29,19 @@ export async function getOperationsTransfers(range: ReportingRange) {
     .lt('created_at', range.endExclusiveIso)
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
-  return data || [];
+  // Supabase's select-string type inference can't resolve embed cardinality without
+  // generated DB types, so it conservatively types single-row embeds as arrays here —
+  // verified against the live schema that order_id/from_location_id/etc. each have
+  // exactly one FK, so these are genuinely single objects at runtime.
+  return (data || []) as unknown as OperationsTransfer[];
 }
 
-export async function getTransferFormData() {
+export async function getTransferFormData(): Promise<{
+  availability: OperationsTransferAvailabilityRow[];
+  locations: OperationsLocation[];
+  users: OperationsTransferUser[];
+  reservations: OperationsTransferReservation[];
+}> {
   const { supabase } = await requireOperationsAccess();
   const [inventoryResult, locationsResult, usersResult, reservationsResult] = await Promise.all([
     supabase.from('ops_inventory_availability').select('*').gt('on_hand', 0),
@@ -40,10 +56,12 @@ export async function getTransferFormData() {
   const errors = [inventoryResult.error, locationsResult.error, usersResult.error, reservationsResult.error].filter(Boolean);
   if (errors.length) throw new Error(errors[0]!.message);
   return {
-    availability: inventoryResult.data || [],
-    locations: locationsResult.data || [],
-    users: usersResult.data || [],
-    reservations: reservationsResult.data || [],
+    availability: (inventoryResult.data || []) as unknown as OperationsTransferAvailabilityRow[],
+    locations: (locationsResult.data || []) as unknown as OperationsLocation[],
+    users: (usersResult.data || []) as unknown as OperationsTransferUser[],
+    // Verified against the live schema: order_id/order_item_id each have exactly one
+    // FK, so these embeds are single objects at runtime despite the array inference.
+    reservations: (reservationsResult.data || []) as unknown as OperationsTransferReservation[],
   };
 }
 

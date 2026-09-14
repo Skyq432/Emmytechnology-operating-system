@@ -1,28 +1,46 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
-  --color-emmy-primary: #003399;
-  --color-emmy-secondary: #ef7305;
-  --color-emmy-primary-light: #1a4db3;
-  --color-emmy-primary-dark: #002266;
-  --color-emmy-secondary-light: #ff8f2b;
-  --color-emmy-secondary-dark: #cc5c00;
+  --color-emmy-primary: #032489;
+  --color-emmy-secondary: #ffb100;
+  --color-emmy-primary-light: #1e42ad;
+  --color-emmy-primary-dark: #021b68;
+  --color-emmy-secondary-light: #ffc640;
+  --color-emmy-secondary-dark: #cc8d00;
+
+  --color-surface: #ffffff;
+  --color-surface-muted: #f5f8ff;
+  --color-border: #e2e8f0;
+  --color-ink: #0f172a;
+  --color-ink-muted: #64748b;
+
+  --radius-shell: 28px;
+  --radius-card: 16px;
+  --radius-nav: 13px;
+  --shadow-card: 0 8px 26px rgba(15,23,42,0.045);
+  --shadow-nav-active: 0 6px 16px rgba(1,22,75,0.14);
+  --shadow-shell: 8px 0 24px rgba(15,23,42,0.08);
+
+  --font-sans: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
-:root {
-  --emmy-blue: #032489;
-  --emmy-blue-dark: #021b68;
-  --emmy-yellow: #ffb100;
-  --emmy-bg: #f5f8ff;
-  --emmy-ink: #0f172a;
+.dark {
+  --color-surface: #0f172a;
+  --color-surface-muted: #0b1224;
+  --color-border: #1e293b;
+  --color-ink: #f1f5f9;
+  --color-ink-muted: #94a3b8;
 }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; min-height: 100%; }
 body {
-  background: var(--emmy-bg);
-  color: var(--emmy-ink);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-surface-muted);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
 }
 button, a { font: inherit; }
 
@@ -38,10 +56,17 @@ button, a { font: inherit; }
   background: rgba(255, 255, 255, 0.2);
 }
 
-.bg-emmy-blue { background: var(--emmy-blue); }
-.bg-emmy-yellow { background: var(--emmy-yellow); }
-.text-emmy-blue { color: var(--emmy-blue); }
-.text-emmy-yellow { color: var(--emmy-yellow); }
+.light-nav-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(15, 23, 42, 0.14) transparent;
+}
+
+.light-nav-scroll::-webkit-scrollbar { width: 5px; }
+.light-nav-scroll::-webkit-scrollbar-track { background: transparent; }
+.light-nav-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.14);
+}
 
 canvas { display: block; }
 

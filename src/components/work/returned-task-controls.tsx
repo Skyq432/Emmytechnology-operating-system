@@ -4,7 +4,7 @@ import { type FormEvent, useState } from 'react';
 import {
   cancelTaskAssignmentAction,
   reassignReturnedTaskAction,
-} from '@/app/modules/activities/actions';
+} from '@/app/(staff)/modules/activities/actions';
 import type { getMyTasks, listAssignableStaff } from '@/lib/work/server';
 import type { WorkPriority } from '@/lib/work/types';
 import styles from './my-work-workspace.module.css';

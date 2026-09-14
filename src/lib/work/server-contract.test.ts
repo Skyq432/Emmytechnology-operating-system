@@ -52,12 +52,12 @@ test('dashboard summary contains the required attention counters', () => {
   }
 });
 
-test('team summary is admin-only and never queries private Todos', () => {
+test('team summary is restricted to Admin, Super Admin, or Operations Lead and never queries private Todos', () => {
   const start = server.indexOf('export async function getTeamWorkSummary');
   assert.notEqual(start, -1);
   const end = server.indexOf('export async function', start + 40);
   const fragment = server.slice(start, end === -1 ? undefined : end);
-  assert.match(fragment, /role !== 'admin' && role !== 'super_admin'/);
+  assert.match(fragment, /role !== 'admin' && role !== 'super_admin' && role !== 'operations_lead'/);
   assert.doesNotMatch(fragment, /work_todos/);
 });
 

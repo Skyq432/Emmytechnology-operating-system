@@ -223,6 +223,19 @@ export async function changeOperationsOrderStatus(orderId: string, status: Order
   return error ? { success: false as const, message: error.message } : { success: true as const, message: 'Order status updated' };
 }
 
+/**
+ * Marks an order completed AND actually consumes its reserved stock (decrements
+ * quantity-tracked items, marks serialized units sold) — the multi-stage Order
+ * pipeline's equivalent of what Direct Sale's handover already does. Required instead
+ * of `changeOperationsOrderStatus` whenever the order carries an active reservation;
+ * `ops_change_order_status` itself refuses that transition and points here.
+ */
+export async function completeOperationsOrderHandover(orderId: string, note?: string) {
+  const { supabase } = await requireOperationsAccess();
+  const { data, error } = await supabase.rpc('ops_complete_order_handover', { p_order_id: orderId, p_note: note ?? null });
+  return error ? { success: false as const, message: error.message } : { success: true as const, message: 'Order handed over to customer', data };
+}
+
 export async function createInventoryItem(input: {
   name: string;
   description?: string | null;

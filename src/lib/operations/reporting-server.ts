@@ -1,20 +1,11 @@
 import { cookies } from 'next/headers';
-import { createClient } from '@/lib/supabase-server';
+import { requireStaffCapability } from '@/lib/auth/capability-server';
 import { getReportingRange, type ReportingPreset, type ReportingRange } from '@/lib/reporting-period';
 import type { OperationsInventoryItem, OperationsOrder, OperationsOrderEvent, OperationsOverview } from './types';
 
 const COOKIE_KEY = 'emmytech-reporting-period-v1';
 
 type StoredPeriod = { preset: ReportingPreset; startDate?: string; endDate?: string };
-
-async function requireAdmin() {
-  const supabase = await createClient();
-  const { data: { user }, error } = await supabase.auth.getUser();
-  if (error || !user) throw new Error('Not authenticated');
-  const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
-  if (profile?.role !== 'admin') throw new Error('Not authorized');
-  return supabase;
-}
 
 export async function getOperationsReportingRange(): Promise<ReportingRange> {
   const store = await cookies();
@@ -29,7 +20,7 @@ export async function getOperationsReportingRange(): Promise<ReportingRange> {
 }
 
 export async function getOperationsOrdersForRange(range: ReportingRange): Promise<OperationsOrder[]> {
-  const supabase = await requireAdmin();
+  const { supabase } = await requireStaffCapability('operations.read');
   const { data, error } = await supabase
     .from('ops_orders')
     .select('*, items:ops_order_items(*)')
@@ -41,16 +32,15 @@ export async function getOperationsOrdersForRange(range: ReportingRange): Promis
 }
 
 export async function getOperationsOverviewForRange(range: ReportingRange): Promise<OperationsOverview> {
-  const supabase = await requireAdmin();
-  const period = (query: any, column = 'created_at') => query.gte(column, range.startIso).lt(column, range.endExclusiveIso);
+  const { supabase } = await requireStaffCapability('operations.read');
   const [open, urgent, dispatch, inventory, links, orders, events, availability] = await Promise.all([
-    period(supabase.from('ops_orders').select('id', { count: 'exact', head: true }).not('status', 'in', '(completed,cancelled)')),
-    period(supabase.from('ops_orders').select('id', { count: 'exact', head: true }).eq('priority', 'urgent').not('status', 'in', '(completed,cancelled)')),
-    period(supabase.from('ops_orders').select('id', { count: 'exact', head: true }).in('status', ['ready_dispatch', 'dispatched'])),
+    supabase.from('ops_orders').select('id', { count: 'exact', head: true }).not('status', 'in', '(completed,cancelled)').gte('created_at', range.startIso).lt('created_at', range.endExclusiveIso),
+    supabase.from('ops_orders').select('id', { count: 'exact', head: true }).eq('priority', 'urgent').not('status', 'in', '(completed,cancelled)').gte('created_at', range.startIso).lt('created_at', range.endExclusiveIso),
+    supabase.from('ops_orders').select('id', { count: 'exact', head: true }).in('status', ['ready_dispatch', 'dispatched']).gte('created_at', range.startIso).lt('created_at', range.endExclusiveIso),
     supabase.from('ops_inventory_items').select('id', { count: 'exact', head: true }).eq('is_active', true),
     supabase.from('ops_website_product_links').select('id', { count: 'exact', head: true }).eq('is_active', true),
-    period(supabase.from('ops_orders').select('*')).order('updated_at', { ascending: false }).limit(6),
-    period(supabase.from('ops_order_events').select('*')).order('created_at', { ascending: false }).limit(8),
+    supabase.from('ops_orders').select('*').gte('created_at', range.startIso).lt('created_at', range.endExclusiveIso).order('updated_at', { ascending: false }).limit(6),
+    supabase.from('ops_order_events').select('*').gte('created_at', range.startIso).lt('created_at', range.endExclusiveIso).order('created_at', { ascending: false }).limit(8),
     supabase.from('ops_inventory_availability').select('inventory_item_id,reorder_level,available'),
   ]);
   const errors = [open.error, urgent.error, dispatch.error, inventory.error, links.error, orders.error, events.error, availability.error].filter(Boolean);
@@ -74,7 +64,7 @@ export async function getOperationsOverviewForRange(range: ReportingRange): Prom
 }
 
 export async function getOperationsInventoryForRange(range: ReportingRange): Promise<OperationsInventoryItem[]> {
-  const supabase = await requireAdmin();
+  const { supabase } = await requireStaffCapability('operations.read');
   const [itemsResult, locationsResult, movementsResult, reservationsResult] = await Promise.all([
     supabase.from('ops_inventory_items').select('*').order('name'),
     supabase.from('ops_locations').select('id,code,name').eq('is_active', true),

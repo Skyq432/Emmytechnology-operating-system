@@ -10,7 +10,9 @@ const buttonVariants = cva(
         default:
           'bg-emmy-primary text-white shadow-sm hover:bg-emmy-primary-light hover:shadow-md',
         secondary:
-          'bg-emmy-secondary text-white shadow-sm hover:bg-emmy-secondary-light',
+          'bg-emmy-secondary text-slate-900 shadow-sm hover:bg-emmy-secondary-light',
+        launcher:
+          'flex-col gap-2 whitespace-normal rounded-2xl border border-slate-200 bg-white text-slate-800 shadow-[0_8px_26px_rgba(15,23,42,0.045)] hover:-translate-y-0.5 hover:border-emmy-primary/25 hover:shadow-lg',
         outline:
           'border border-slate-200 bg-white text-slate-700 shadow-sm hover:border-emmy-primary/25 hover:bg-blue-50/60 hover:text-emmy-primary',
         ghost: 'text-slate-600 hover:bg-slate-100 hover:text-slate-950',
@@ -22,6 +24,7 @@ const buttonVariants = cva(
         sm: 'h-8 px-3 text-sm',
         lg: 'h-12 px-6 text-base',
         icon: 'h-10 w-10',
+        launcher: 'h-auto min-h-28 w-full px-4 py-5 text-sm',
       },
     },
     defaultVariants: {

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const actions = readFileSync(
-  new URL('../../app/modules/activities/actions.ts', import.meta.url),
+  new URL('../../app/(staff)/modules/activities/actions.ts', import.meta.url),
   'utf8',
 );
 

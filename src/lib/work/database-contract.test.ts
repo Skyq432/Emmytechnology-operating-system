@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const migration = readFileSync(
-  new URL('../../../supabase/migrations/20260911113000_work_management_foundation.sql', import.meta.url),
+  new URL('../../../supabase/migrations/20260911101257_work_management_foundation_20260911.sql', import.meta.url),
   'utf8',
 );
 
@@ -45,14 +45,14 @@ test('todo privacy policy is owner-only and does not contain admin override', ()
   const start = migration.indexOf('create policy "owners manage their todos"');
   assert.notEqual(start, -1);
   const fragment = migration.slice(start, start + 700);
-  assert.match(fragment, /auth\.uid\(\) = owner_id/i);
+  assert.match(fragment, /auth\.uid\(\)\s*=\s*owner_id/i);
   assert.doesNotMatch(fragment, /super_admin|admin/i);
 });
 
 test('task visibility supports creator, assignee and admin roles through the authenticated viewer id', () => {
   assert.match(migration, /work_can_read_task/i);
-  assert.match(migration, /created_by = p_user_id/i);
-  assert.match(migration, /assignee_id = p_user_id/i);
-  assert.match(migration, /work_is_admin\(p_user_id\)/i);
-  assert.match(migration, /work_can_read_task\(id, auth\.uid\(\)\)/i);
+  assert.match(migration, /created_by\s*=\s*p_user_id/i);
+  assert.match(migration, /assignee_id\s*=\s*p_user_id/i);
+  assert.match(migration, /work_is_admin\(\s*p_user_id\s*\)/i);
+  assert.match(migration, /work_can_read_task\(\s*id\s*,\s*auth\.uid\(\)\s*\)/i);
 });

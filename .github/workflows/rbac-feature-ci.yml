@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - feature/staff-rbac-mvp
+      - security/**
+      - testing/**
   workflow_dispatch:
 
 jobs:
@@ -24,7 +26,12 @@ jobs:
       - name: Lint feature TypeScript changes
         shell: bash
         run: |
-          mapfile -t files < <(git diff --name-only origin/main...HEAD -- '*.ts' '*.tsx')
+          # -M100% classifies a rename as such only when the content is byte-identical,
+          # so a pure file move (no content change) is filtered out below instead of
+          # linting its full pre-existing content just because its path changed; a
+          # rename that also changes content falls through as a plain delete+add pair
+          # and is linted normally via the 'add' side.
+          mapfile -t files < <(git diff --name-status --diff-filter=d -M100% origin/main...HEAD -- '*.ts' '*.tsx' | awk '$1 !~ /^R100/ {print $NF}')
           if [ ${#files[@]} -eq 0 ]; then
             echo "No changed TypeScript files to lint."
             exit 0

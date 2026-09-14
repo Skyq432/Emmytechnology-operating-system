@@ -41,9 +41,9 @@ const MODULE_ACCESS: Record<InternalRole, readonly ModuleSlug[]> = {
   admin: MODULE_SLUGS,
   growth_lead: ['crm', 'marketing', 'sales', 'operations', 'reports'],
   marketing_manager: ['crm', 'marketing'],
-  front_desk: ['crm', 'sales', 'operations'],
+  front_desk: ['sales', 'operations'],
   operations_lead: ['crm', 'sales', 'operations'],
-  technician: ['crm', 'sales', 'operations'],
+  technician: ['sales', 'operations'],
   sales_analyst: ['crm', 'sales', 'reports'],
 };
 
@@ -69,7 +69,7 @@ const SALES_ACCESS: Record<InternalRole, readonly SalesNavKey[]> = {
   admin: SALES_NAV_KEYS,
   growth_lead: SALES_NAV_KEYS,
   marketing_manager: [],
-  front_desk: ['overview', 'direct', 'orders', 'payments', 'receipts', 'customers'],
+  front_desk: ['direct', 'orders', 'payments', 'receipts', 'customers'],
   operations_lead: ['overview', 'direct', 'orders', 'payments', 'receipts', 'customers'],
   technician: ['direct', 'receipts', 'customers'],
   sales_analyst: ['overview', 'quotations', 'orders', 'customers', 'reports'],
@@ -225,6 +225,10 @@ export function canCreateStaffInvite(role: string | null | undefined): boolean {
 
 export function canCreateAmbassadorInvite(role: string | null | undefined): boolean {
   return role === 'super_admin' || role === 'admin' || role === 'growth_lead' || role === 'marketing_manager';
+}
+
+export function canAssignSuperAdmin(role: string | null | undefined): boolean {
+  return role === 'super_admin';
 }
 
 export function roleLabel(role: string | null | undefined): string {

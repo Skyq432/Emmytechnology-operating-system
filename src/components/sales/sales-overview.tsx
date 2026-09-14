@@ -1,4 +1,7 @@
 import Link from 'next/link';
+import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { StatGrid, StatTile } from '@/components/ui/stat-tile';
+import { Badge } from '@/components/ui/badge';
 import type { SalesOverviewData } from '@/lib/sales/types';
 
 const money = (value: number) => `₦${Number(value || 0).toLocaleString('en-NG', { maximumFractionDigits: 0 })}`;
@@ -16,38 +19,35 @@ export function SalesOverview({ data }: { data: SalesOverviewData }) {
     <div className="mx-auto max-w-[1400px] space-y-5">
       <div>
         <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">Commercial performance</p>
-        <h1 className="mt-2 text-3xl font-black tracking-tight text-[#032489]">Sales Overview</h1>
+        <h1 className="mt-2 text-3xl font-black tracking-tight text-emmy-primary">Sales Overview</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">Sales Value, actual cash collected and outstanding balances remain separate so commercial performance is never confused with cash flow.</p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        {cards.map((card) => (
-          <section key={card.label} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="text-[11px] font-black uppercase tracking-[0.12em] text-slate-400">{card.label}</div>
-            <div className="mt-3 text-2xl font-black tracking-tight text-slate-900">{card.value}</div>
-            <div className="mt-2 text-xs leading-5 text-slate-500">{card.note}</div>
-          </section>
-        ))}
-      </div>
+      <StatGrid className="sm:grid-cols-2 xl:grid-cols-5">
+        {cards.map((card) => <StatTile key={card.label} label={card.label} value={card.value} description={card.note} tone="neutral" />)}
+      </StatGrid>
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">Direct Sales</div><div className="mt-2 text-2xl font-black">{data.directSales}</div></section>
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">Orders</div><div className="mt-2 text-2xl font-black">{data.orders}</div></section>
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">Published Quotes</div><div className="mt-2 text-2xl font-black">{data.quotationsPublished}</div></section>
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">Accepted Quotes</div><div className="mt-2 text-2xl font-black">{data.quotationsAccepted}</div></section>
-      </div>
+      <StatGrid className="md:grid-cols-4">
+        <StatTile label="Direct Sales" value={data.directSales} tone="neutral" />
+        <StatTile label="Orders" value={data.orders} tone="neutral" />
+        <StatTile label="Published Quotes" value={data.quotationsPublished} tone="neutral" />
+        <StatTile label="Accepted Quotes" value={data.quotationsAccepted} tone="neutral" />
+      </StatGrid>
 
-      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-100 p-5"><h2 className="font-black text-slate-900">Needs attention</h2><p className="mt-1 text-xs text-slate-400">Commercial items that need a staff decision.</p></div>
-        <div className="divide-y divide-slate-100">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Needs attention</CardTitle>
+          <CardDescription>Commercial items that need a staff decision.</CardDescription>
+        </CardHeader>
+        <div className="divide-y divide-slate-100 border-t border-slate-100">
           {data.attention.map((item) => (
             <Link href={item.href} key={item.key} className="flex items-center justify-between gap-4 p-4 transition hover:bg-slate-50">
               <span className="text-sm font-semibold text-slate-700">{item.label}</span>
-              <span className={`rounded-full px-3 py-1 text-xs font-black ${item.count > 0 ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-500'}`}>{item.count}</span>
+              <Badge variant={item.count > 0 ? 'warning' : 'outline'}>{item.count}</Badge>
             </Link>
           ))}
         </div>
-      </section>
+      </Card>
     </div>
   );
 }

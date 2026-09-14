@@ -9,6 +9,7 @@ import type {
   OperationsRepairPayment,
   OperationsRepairQuote,
   PaymentMethod,
+  RepairPartUsed,
   RepairPaymentRequirement,
   RepairStatus,
 } from './types';
@@ -36,16 +37,17 @@ export async function getAvailableRepairCards() {
 
 export async function getRepairAdminDetail(repairId: string) {
   const { supabase } = await requireRepairAccess();
-  const [repairResult, assignmentsResult, quotesResult, paymentsResult, consentsResult, eventsResult] = await Promise.all([
+  const [repairResult, assignmentsResult, quotesResult, paymentsResult, consentsResult, eventsResult, documentsResult] = await Promise.all([
     supabase.from('ops_repairs').select('*').eq('id', repairId).single(),
     supabase.from('ops_repair_card_assignments').select('*,card:ops_repair_cards(*)').eq('repair_id', repairId).order('assigned_at', { ascending: false }),
     supabase.from('ops_repair_quotes').select('*').eq('repair_id', repairId).order('version', { ascending: false }),
     supabase.from('ops_repair_payments').select('*').eq('repair_id', repairId).order('paid_at', { ascending: false }),
     supabase.from('ops_repair_consents').select('*').eq('repair_id', repairId).order('created_at', { ascending: false }),
     supabase.from('ops_repair_events').select('*').eq('repair_id', repairId).order('created_at', { ascending: false }),
+    supabase.from('sales_documents').select('id,document_number,document_type,render_status,storage_path,voided_at').eq('repair_id', repairId).is('voided_at', null).order('issued_at', { ascending: false }),
   ]);
 
-  const error = repairResult.error || assignmentsResult.error || quotesResult.error || paymentsResult.error || consentsResult.error || eventsResult.error;
+  const error = repairResult.error || assignmentsResult.error || quotesResult.error || paymentsResult.error || consentsResult.error || eventsResult.error || documentsResult.error;
   if (error) throw new Error(error.message);
 
   const repair = {
@@ -75,6 +77,7 @@ export async function getRepairAdminDetail(repairId: string) {
     payments,
     consents: (consentsResult.data || []) as OperationsRepairConsent[],
     events: (eventsResult.data || []) as OperationsRepairEvent[],
+    documents: documentsResult.data || [],
   };
 }
 
@@ -261,4 +264,50 @@ export async function completeRepairCollection(input: {
     p_missing_card_reason: input.missingCardReason?.trim() || null,
   });
   return error ? { success: false as const, message: error.message } : { success: true as const, message: 'Repair collection completed', data };
+}
+
+export async function getRepairPartsUsed(repairId: string): Promise<RepairPartUsed[]> {
+  const { supabase } = await requireRepairAccess();
+  const { data, error } = await supabase
+    .from('ops_repair_parts_used')
+    .select('*, inventory_item:ops_inventory_items(id,sku,name), inventory_unit:ops_inventory_units(id,serial_number,imei_1), location:ops_locations(id,name)')
+    .eq('repair_id', repairId)
+    .is('removed_at', null)
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  // Supabase's embed typing defaults each *-to-one join to an array without generated
+  // DB types wired in; these are all genuine to-one foreign keys (verified against the
+  // live schema), so the cast reflects the real shape, not a guess.
+  return (data || []) as unknown as RepairPartUsed[];
+}
+
+/**
+ * Consumes a real inventory item/unit against a repair — decrements stock (or marks a
+ * serialized unit 'repair') the same moment a technician records using it, rather than
+ * the free-text `parts_replaced` field which has no inventory effect at all.
+ */
+export async function addRepairPart(input: {
+  repairId: string;
+  inventoryItemId: string;
+  quantity?: number;
+  locationId?: string | null;
+  inventoryUnitId?: string | null;
+  note?: string | null;
+}) {
+  const { supabase } = await requireRepairAccess();
+  const { data, error } = await supabase.rpc('ops_add_repair_part', {
+    p_repair_id: input.repairId,
+    p_inventory_item_id: input.inventoryItemId,
+    p_quantity: Math.max(1, Number(input.quantity || 1)),
+    p_location_id: input.locationId || null,
+    p_inventory_unit_id: input.inventoryUnitId || null,
+    p_note: input.note?.trim() || null,
+  });
+  return error ? { success: false as const, message: error.message } : { success: true as const, message: 'Part added from inventory', data };
+}
+
+export async function removeRepairPart(partId: string) {
+  const { supabase } = await requireRepairAccess();
+  const { error } = await supabase.rpc('ops_remove_repair_part', { p_part_id: partId });
+  return error ? { success: false as const, message: error.message } : { success: true as const, message: 'Part removed and returned to inventory' };
 }

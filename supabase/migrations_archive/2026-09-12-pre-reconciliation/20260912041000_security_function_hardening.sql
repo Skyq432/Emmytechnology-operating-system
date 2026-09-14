@@ -1,0 +1,505 @@
+-- Security remediation: SECURITY DEFINER caller checks, EXECUTE grants, and
+-- mutable search_path findings. Committed before production application.
+
+-- ---------------------------------------------------------------------------
+-- 1. Harden legacy admin/marketing RPCs that trusted a caller-supplied UUID.
+-- ---------------------------------------------------------------------------
+
+create or replace function public.process_payout(
+  p_admin_id uuid,
+  p_ambassador_id uuid,
+  p_points_paid integer,
+  p_amount numeric,
+  p_notes text
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_payout_id uuid;
+  v_current_balance numeric;
+begin
+  if p_admin_id is distinct from auth.uid() or not public.is_admin() then
+    raise exception 'Only authenticated administrators can process payouts';
+  end if;
+  if p_amount is null or p_amount <= 0 then
+    raise exception 'Payout amount must be greater than zero';
+  end if;
+
+  select coalesce(available_balance, 0)
+  into v_current_balance
+  from public.ambassadors
+  where id = p_ambassador_id
+  for update;
+
+  if not found then raise exception 'Ambassador not found'; end if;
+  if v_current_balance < p_amount then raise exception 'Insufficient ambassador balance'; end if;
+
+  insert into public.payouts (
+    ambassador_id, amount, points_paid, status, notes, paid_by, paid_at, created_at
+  ) values (
+    p_ambassador_id, p_amount, coalesce(p_points_paid, 0), 'paid', p_notes,
+    auth.uid(), now(), now()
+  ) returning id into v_payout_id;
+
+  update public.ambassadors
+  set available_balance = coalesce(available_balance, 0) - p_amount,
+      total_cashed_out = coalesce(total_cashed_out, 0) + p_amount
+  where id = p_ambassador_id;
+
+  return v_payout_id;
+end;
+$$;
+
+create or replace function public.admin_add_ambassador_bonus(
+  p_admin_id uuid,
+  p_ambassador_id uuid,
+  p_amount numeric,
+  p_reason text
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_bonus_id uuid;
+begin
+  if p_admin_id is distinct from auth.uid() or not public.is_admin() then
+    raise exception 'Only authenticated administrators can add bonus';
+  end if;
+  if p_amount is null or p_amount <= 0 then
+    raise exception 'Bonus amount must be greater than zero';
+  end if;
+
+  insert into public.ambassador_bonuses (ambassador_id, amount, reason, added_by, created_at)
+  values (p_ambassador_id, p_amount, p_reason, auth.uid(), now())
+  returning id into v_bonus_id;
+
+  update public.ambassadors
+  set available_balance = coalesce(available_balance, 0) + p_amount
+  where id = p_ambassador_id;
+
+  return v_bonus_id;
+end;
+$$;
+
+create or replace function public.admin_create_lead(
+  p_admin_id uuid,
+  p_ambassador_id uuid,
+  p_customer_name text,
+  p_customer_phone text,
+  p_customer_email text,
+  p_source text,
+  p_notes text
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_lead_id uuid;
+begin
+  if p_admin_id is distinct from auth.uid() or not public.is_marketing_staff() then
+    raise exception 'Only authenticated Marketing staff can create leads';
+  end if;
+
+  insert into public.leads (
+    ambassador_id, source, customer_name, customer_phone, customer_email,
+    status, notes, click_count, last_clicked_at, created_at, updated_at
+  ) values (
+    p_ambassador_id, coalesce(p_source, 'direct'), p_customer_name,
+    p_customer_phone, p_customer_email, 'new', p_notes, 1, now(), now(), now()
+  ) returning id into v_lead_id;
+
+  update public.ambassadors
+  set total_leads = coalesce(total_leads, 0) + 1
+  where id = p_ambassador_id;
+
+  insert into public.lead_events (
+    lead_id, ambassador_id, event_type, event_title, event_description,
+    event_data, created_by
+  ) values (
+    v_lead_id, p_ambassador_id, 'lead_created', 'Lead created manually',
+    'Marketing staff manually added a lead for this ambassador.',
+    jsonb_build_object('customer_name', p_customer_name, 'customer_phone', p_customer_phone,
+      'source', coalesce(p_source, 'direct')),
+    auth.uid()
+  );
+  return v_lead_id;
+end;
+$$;
+
+create or replace function public.admin_create_conversion(
+  p_admin_id uuid,
+  p_lead_id uuid,
+  p_amount numeric,
+  p_commission_percentage numeric
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_ambassador_id uuid;
+  v_conversion_id uuid;
+  v_commission numeric := 0;
+  v_commission_rate numeric := 0;
+  v_sequence integer := 1;
+  v_is_repeat boolean := false;
+  v_is_commissionable boolean := true;
+begin
+  if p_admin_id is distinct from auth.uid() or not public.is_marketing_staff() then
+    raise exception 'Only authenticated Marketing staff can create conversions';
+  end if;
+  if p_amount is null or p_amount < 0 then raise exception 'Invalid conversion amount'; end if;
+
+  select ambassador_id into v_ambassador_id
+  from public.leads where id = p_lead_id for update;
+  if v_ambassador_id is null then raise exception 'Lead not found'; end if;
+
+  select count(*) + 1 into v_sequence from public.conversions where lead_id = p_lead_id;
+  v_is_repeat := v_sequence > 1;
+
+  if p_commission_percentage is null or p_commission_percentage <= 0 then
+    v_is_commissionable := false;
+    v_commission := 0;
+    v_commission_rate := 0;
+  else
+    v_commission_rate := p_commission_percentage / 100;
+    v_commission := p_amount * v_commission_rate;
+  end if;
+
+  insert into public.conversions (
+    lead_id, ambassador_id, amount, commission_amount, commission_rate,
+    commission_percentage, conversion_sequence, is_repeat_conversion,
+    is_commissionable, ambassador_notified, admin_attention_required,
+    approved_by, approved_at
+  ) values (
+    p_lead_id, v_ambassador_id, p_amount, v_commission, v_commission_rate,
+    p_commission_percentage, v_sequence, v_is_repeat, v_is_commissionable,
+    case when v_sequence = 1 then true else false end,
+    case when v_sequence > 1 and not v_is_commissionable then true else false end,
+    auth.uid(), now()
+  ) returning id into v_conversion_id;
+
+  update public.leads set status='converted', updated_at=now() where id=p_lead_id;
+  update public.ambassadors
+  set total_conversions = coalesce(total_conversions, 0) + 1,
+      available_balance = coalesce(available_balance, 0) + case when v_is_commissionable then v_commission else 0 end
+  where id = v_ambassador_id;
+
+  insert into public.lead_events (
+    lead_id, ambassador_id, event_type, event_title, event_description, event_data, created_by
+  ) values (
+    p_lead_id, v_ambassador_id,
+    case when v_is_repeat then 'repeat_conversion' else 'conversion_created' end,
+    case when v_is_repeat then 'Repeat conversion added' else 'Conversion added' end,
+    case when v_is_repeat and not v_is_commissionable then 'A repeat conversion was added without ambassador commission.'
+         when v_is_repeat then 'A repeat conversion was added with ambassador commission.'
+         else 'First conversion was added for this lead.' end,
+    jsonb_build_object('conversion_id',v_conversion_id,'amount',p_amount,
+      'commission_percentage',p_commission_percentage,'commission_amount',v_commission,
+      'sequence',v_sequence,'is_repeat_conversion',v_is_repeat,'is_commissionable',v_is_commissionable),
+    auth.uid()
+  );
+
+  if v_is_repeat and not v_is_commissionable then
+    insert into public.admin_notifications (
+      type,title,message,related_table,related_id,ambassador_id,lead_id
+    ) values (
+      'repeat_conversion_no_commission','Repeat conversion needs review',
+      'A repeat conversion was added without ambassador commission. Review whether this ambassador should receive commission.',
+      'conversions',v_conversion_id,v_ambassador_id,p_lead_id
+    );
+  end if;
+  return v_conversion_id;
+end;
+$$;
+
+-- Financial review actions remain administrator-only.
+create or replace function public.resolve_conversion_no_commission(p_admin_id uuid, p_conversion_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare v_conversion record;
+begin
+  if p_admin_id is distinct from auth.uid() or not public.is_admin() then
+    raise exception 'Only authenticated administrators can resolve conversion reviews';
+  end if;
+  select * into v_conversion from public.conversions where id=p_conversion_id for update;
+  if v_conversion.id is null then raise exception 'Conversion not found'; end if;
+  update public.conversions
+    set admin_attention_required=false,
+        internal_note=coalesce(internal_note,'') || ' | Reviewed: no commission approved.',
+        approved_by=auth.uid()
+  where id=p_conversion_id;
+  update public.admin_notifications set is_read=true
+  where related_table='conversions' and related_id=p_conversion_id;
+  insert into public.lead_events(lead_id,ambassador_id,event_type,event_title,event_description,event_data,created_by)
+  values(v_conversion.lead_id,v_conversion.ambassador_id,'conversion_review_resolved',
+    'Conversion review resolved','Admin approved this repeat conversion with no ambassador commission.',
+    jsonb_build_object('conversion_id',p_conversion_id),auth.uid());
+end;
+$$;
+
+create or replace function public.add_commission_to_conversion(
+  p_admin_id uuid, p_conversion_id uuid, p_commission_percentage numeric
+)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_conversion record;
+  v_new_commission numeric;
+  v_extra_commission numeric;
+begin
+  if p_admin_id is distinct from auth.uid() or not public.is_admin() then
+    raise exception 'Only authenticated administrators can add commission';
+  end if;
+  if p_commission_percentage is null or p_commission_percentage <= 0 then
+    raise exception 'Commission percentage must be greater than zero';
+  end if;
+  select * into v_conversion from public.conversions where id=p_conversion_id for update;
+  if v_conversion.id is null then raise exception 'Conversion not found'; end if;
+  v_new_commission := v_conversion.amount * (p_commission_percentage / 100);
+  v_extra_commission := v_new_commission - coalesce(v_conversion.commission_amount,0);
+  update public.conversions
+  set commission_amount=v_new_commission,
+      commission_rate=p_commission_percentage/100,
+      commission_percentage=p_commission_percentage,
+      is_commissionable=true,
+      admin_attention_required=false,
+      internal_note=coalesce(internal_note,'') || ' | Commission added after review.',
+      approved_by=auth.uid()
+  where id=p_conversion_id;
+  update public.ambassadors
+    set available_balance=coalesce(available_balance,0)+v_extra_commission
+  where id=v_conversion.ambassador_id;
+  update public.admin_notifications set is_read=true
+    where related_table='conversions' and related_id=p_conversion_id;
+  insert into public.lead_events(lead_id,ambassador_id,event_type,event_title,event_description,event_data,created_by)
+  values(v_conversion.lead_id,v_conversion.ambassador_id,'commission_added','Commission added to conversion',
+    'Admin added ambassador commission to a reviewed repeat conversion.',
+    jsonb_build_object('conversion_id',p_conversion_id,'commission_percentage',p_commission_percentage,
+      'commission_amount',v_new_commission),auth.uid());
+end;
+$$;
+
+create or replace function public.hard_delete_ambassador(p_ambassador_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'Only authenticated administrators can hard delete ambassadors';
+  end if;
+  delete from public.cart_events where ambassador_id=p_ambassador_id;
+  delete from public.product_views where ambassador_id=p_ambassador_id;
+  delete from public.visitor_sessions where ambassador_id=p_ambassador_id;
+  delete from public.referral_clicks where ambassador_id=p_ambassador_id;
+  delete from public.payouts where ambassador_id=p_ambassador_id;
+  delete from public.point_transactions where ambassador_id=p_ambassador_id;
+  delete from public.conversions where ambassador_id=p_ambassador_id;
+  delete from public.leads where ambassador_id=p_ambassador_id;
+  delete from public.activities where ambassador_id=p_ambassador_id;
+  delete from public.ambassadors where id=p_ambassador_id;
+end;
+$$;
+
+-- Lead approval/edit decisions are Marketing workflow actions. Bind actor IDs to
+-- the session instead of trusting arbitrary UUID parameters.
+create or replace function public.approve_lead_for_ambassador(p_admin_id uuid,p_lead_id uuid)
+returns void language plpgsql security definer set search_path=public,pg_temp as $$
+declare v_lead record;
+begin
+  if p_admin_id is distinct from auth.uid() or not public.is_marketing_staff() then raise exception 'Not authorized'; end if;
+  select * into v_lead from public.leads where id=p_lead_id for update;
+  if v_lead.id is null then raise exception 'Lead not found'; end if;
+  if v_lead.approved_as_lead=true then return; end if;
+  update public.leads set lead_approval_status='approved',approved_as_lead=true,approved_at=now(),approved_by=auth.uid(),updated_at=now() where id=p_lead_id;
+  update public.ambassadors set total_leads=coalesce(total_leads,0)+1 where id=v_lead.ambassador_id;
+  insert into public.lead_events(lead_id,ambassador_id,event_type,event_title,event_description,event_data,created_by)
+  values(p_lead_id,v_lead.ambassador_id,'lead_approved','Lead approved','This lead was approved and counted for the ambassador.',
+    jsonb_build_object('approved_at',now(),'approved_by',auth.uid()),auth.uid());
+end; $$;
+
+create or replace function public.reject_lead_for_ambassador(p_admin_id uuid,p_lead_id uuid,p_reason text default null)
+returns void language plpgsql security definer set search_path=public,pg_temp as $$
+declare v_lead record;
+begin
+  if p_admin_id is distinct from auth.uid() or not public.is_marketing_staff() then raise exception 'Not authorized'; end if;
+  select * into v_lead from public.leads where id=p_lead_id for update;
+  if v_lead.id is null then raise exception 'Lead not found'; end if;
+  if v_lead.approved_as_lead=true then raise exception 'Approved leads cannot be rejected. Reverse approval separately if needed.'; end if;
+  update public.leads set lead_approval_status='rejected',approved_as_lead=false,updated_at=now() where id=p_lead_id;
+  insert into public.lead_events(lead_id,ambassador_id,event_type,event_title,event_description,event_data,created_by)
+  values(p_lead_id,v_lead.ambassador_id,'lead_rejected','Lead rejected','This referral was reviewed and rejected as a valid ambassador lead.',
+    jsonb_build_object('reason',p_reason,'rejected_at',now(),'rejected_by',auth.uid()),auth.uid());
+  if v_lead.identity_id is not null then
+    insert into public.identity_events(identity_id,event_type,title,description,metadata)
+    values(v_lead.identity_id,'lead_rejected','Lead rejected','A linked referral lead was rejected and not counted for the ambassador.',
+      jsonb_build_object('lead_id',p_lead_id,'ambassador_id',v_lead.ambassador_id,'reason',p_reason,'rejected_by',auth.uid()));
+  end if;
+end; $$;
+
+create or replace function public.approve_lead_edit_request(p_admin_id uuid,p_lead_id uuid)
+returns void language plpgsql security definer set search_path=public,pg_temp as $$
+declare v_lead record;
+begin
+  if p_admin_id is distinct from auth.uid() or not public.is_marketing_staff() then raise exception 'Not authorized'; end if;
+  select * into v_lead from public.leads where id=p_lead_id for update;
+  if v_lead.id is null then raise exception 'Lead not found'; end if;
+  update public.leads set customer_name=coalesce(v_lead.pending_customer_name,customer_name),customer_phone=coalesce(v_lead.pending_customer_phone,customer_phone),pending_customer_name=null,pending_customer_phone=null,edit_status='approved',updated_at=now() where id=p_lead_id;
+  if v_lead.pending_customer_phone is not null then
+    insert into public.lead_signals(lead_id,ambassador_id,signal_type,signal_value,confidence_weight,verified)
+    values(p_lead_id,v_lead.ambassador_id,'phone',regexp_replace(v_lead.pending_customer_phone,'\s+','','g'),100,true)
+    on conflict(lead_id,signal_type,signal_value) do update set verified=true,last_seen_at=now(),seen_count=public.lead_signals.seen_count+1;
+  end if;
+  if v_lead.pending_customer_name is not null then
+    insert into public.lead_signals(lead_id,ambassador_id,signal_type,signal_value,confidence_weight,verified)
+    values(p_lead_id,v_lead.ambassador_id,'name',lower(trim(v_lead.pending_customer_name)),15,true)
+    on conflict(lead_id,signal_type,signal_value) do update set verified=true,last_seen_at=now(),seen_count=public.lead_signals.seen_count+1;
+  end if;
+  insert into public.lead_events(lead_id,ambassador_id,event_type,event_title,event_description,event_data,created_by)
+  values(p_lead_id,v_lead.ambassador_id,'edit_approved','Lead update approved','Marketing staff approved ambassador requested lead update.',
+    jsonb_build_object('approved_name',v_lead.pending_customer_name,'approved_phone',v_lead.pending_customer_phone),auth.uid());
+end; $$;
+
+create or replace function public.reject_lead_edit_request(p_admin_id uuid,p_lead_id uuid)
+returns void language plpgsql security definer set search_path=public,pg_temp as $$
+declare v_lead record;
+begin
+  if p_admin_id is distinct from auth.uid() or not public.is_marketing_staff() then raise exception 'Not authorized'; end if;
+  select * into v_lead from public.leads where id=p_lead_id for update;
+  if v_lead.id is null then raise exception 'Lead not found'; end if;
+  update public.leads set pending_customer_name=null,pending_customer_phone=null,edit_status='rejected',updated_at=now() where id=p_lead_id;
+  insert into public.lead_events(lead_id,ambassador_id,event_type,event_title,event_description,event_data,created_by)
+  values(p_lead_id,v_lead.ambassador_id,'edit_rejected','Lead update rejected','Marketing staff rejected ambassador requested lead update.',
+    jsonb_build_object('rejected_name',v_lead.pending_customer_name,'rejected_phone',v_lead.pending_customer_phone),auth.uid());
+end; $$;
+
+-- ---------------------------------------------------------------------------
+-- 2. Search-path hardening for the 13 advisor-listed functions.
+-- ---------------------------------------------------------------------------
+
+alter function public.generate_ambassador_assets(text) set search_path = public, pg_temp;
+alter function public.award_points(uuid,integer,text,uuid,text,text) set search_path = public, pg_temp;
+alter function public.approve_activity(uuid,uuid,integer) set search_path = public, pg_temp;
+alter function public.approve_conversion(uuid,uuid,numeric) set search_path = public, pg_temp;
+alter function public.update_ambassador_balance_on_payout() set search_path = public, pg_temp;
+alter function public.set_custom_referral_code(uuid,text) set search_path = public, pg_temp;
+alter function public.generate_lead_code() set search_path = public, pg_temp;
+alter function public.normalize_ng_phone(text) set search_path = public, pg_temp;
+alter function public.sms_set_updated_at() set search_path = public, pg_temp;
+alter function public.normalize_contact_phone(text) set search_path = public, pg_temp;
+alter function public.ops_touch_updated_at() set search_path = public, pg_temp;
+alter function public.ops_crm_stage_from_slug(text) set search_path = public, pg_temp;
+alter function public.is_internal_staff_role(text) set search_path = public, pg_temp;
+
+-- Trigger-only routines should never be directly callable by API roles.
+revoke execute on function public.remove_ambassador_on_admin() from public, anon, authenticated;
+revoke execute on function public.update_ambassador_balance_on_payout() from public, anon, authenticated;
+revoke execute on function public.sms_set_updated_at() from public, anon, authenticated;
+revoke execute on function public.ops_touch_updated_at() from public, anon, authenticated;
+
+-- merge_identities is retained as a trusted backend/service-role maintenance
+-- primitive; current UI uses the separately guarded explained-merge workflow.
+revoke execute on function public.merge_identities(uuid,uuid,uuid,text) from public, anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 3. Remove anonymous execution from internal SECURITY DEFINER RPCs.
+-- ---------------------------------------------------------------------------
+-- PostgreSQL grants EXECUTE to PUBLIC by default. Reset every SECURITY DEFINER
+-- routine, then explicitly re-open only the intentionally public guest surface
+-- and the current authenticated application surface.
+
+do $$
+declare
+  r record;
+  public_api text[] := array[
+    'bootstrap_canonical_wheel_visitor','complete_canonical_wheel_spin',
+    'get_canonical_wheel_state','get_cashoff_recommendations',
+    'create_website_wheel_handoff','consume_website_wheel_handoff',
+    'create_sms_product_handoff','consume_sms_product_handoff',
+    'record_sms_campaign_click','register_visitor_session','register_website_visitor',
+    'track_product_event','track_website_behavior','track_whatsapp_referral_click',
+    'track_whatsapp_referral_click_v2','sales_public_quotation_view',
+    'sales_public_quote_decide','get_invite_link','create_quote_lead'
+  ];
+  authenticated_api text[] := array[
+    -- policy/RBAC helpers
+    'is_admin','is_marketing_staff','ops_is_admin','staff_has_capability','staff_has_any_capability',
+    'work_is_admin','work_is_internal_user','work_can_read_task','work_can_read_goal',
+    -- Administration/Marketing
+    'generate_invite_link_for_role','set_staff_role','hard_delete_ambassador',
+    'admin_create_lead','admin_create_conversion','process_payout','admin_add_ambassador_bonus',
+    'approve_lead_edit_request','reject_lead_edit_request','approve_lead_for_ambassador',
+    'reject_lead_for_ambassador','resolve_conversion_no_commission','add_commission_to_conversion',
+    'get_recent_whatsapp_clicks_v3','get_whatsapp_match_suggestions_v3','resolve_whatsapp_intake_v3',
+    'get_unified_lead_timeline_v3','get_explained_merge_suggestions_v3','resolve_explained_merge_v3',
+    -- Operations
+    'ops_update_inventory_commercial_pricing','ops_record_order_payment','upsert_identity_from_signals',
+    'ops_current_crm_stage','ops_start_stock_transfer','ops_receive_stock_transfer','ops_cancel_stock_transfer',
+    'ops_update_repair_work_details','ops_create_repair_with_card','ops_publish_repair_quote',
+    'ops_record_repair_payment','ops_regenerate_repair_pin','ops_change_repair_status',
+    'ops_begin_repair_handover','ops_complete_repair_collection','ops_create_handover',
+    'ops_acknowledge_handover','ops_create_inventory_item','ops_add_inventory_stock',
+    'ops_create_draft_order','ops_confirm_order','ops_change_order_status',
+    -- Sales
+    'sales_create_quotation','sales_publish_quotation_version','sales_record_offline_quote_decision',
+    'sales_convert_accepted_quotation','sales_create_direct_sale_draft','sales_confirm_direct_sale',
+    'sales_approve_credit_release','sales_complete_direct_sale_handover','sales_create_order_draft',
+    'sales_ensure_quotation_document_metadata','sales_queue_quotation_send',
+    'sales_create_quotation_public_link','sales_create_return','sales_approve_return',
+    'sales_complete_return','sales_record_refund','sales_void_document',
+    -- Work management
+    'work_get_goal_progress','work_create_task','work_create_broadcast_task','work_accept_task',
+    'work_reject_task','work_request_extension','work_decide_extension','work_complete_task',
+    'work_reassign_returned_task','work_cancel_assignment','work_create_goal','work_update_goal',
+    'work_set_goal_contributors','work_update_numeric_goal_progress'
+  ];
+begin
+  for r in
+    select p.oid::regprocedure::text as signature, p.proname
+    from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+    where n.nspname='public' and p.prosecdef
+  loop
+    execute format('revoke execute on function %s from public, anon, authenticated', r.signature);
+    if r.proname = any(public_api) then
+      execute format('grant execute on function %s to anon, authenticated', r.signature);
+    elsif r.proname = any(authenticated_api) then
+      execute format('grant execute on function %s to authenticated', r.signature);
+    end if;
+  end loop;
+end
+$$;
+
+-- Trigger/helper/service-only routines explicitly stay closed after the grant
+-- reset above. Reassert the most sensitive examples for review clarity.
+revoke execute on function public.merge_identities(uuid,uuid,uuid,text) from public, anon, authenticated;
+revoke execute on function public.remove_ambassador_on_admin() from public, anon, authenticated;
+
+-- The specifically reviewed internal functions are authenticated-only. Their
+-- bodies enforce the caller checks documented above or in their existing code.
+grant execute on function public.process_payout(uuid,uuid,integer,numeric,text) to authenticated;
+grant execute on function public.admin_add_ambassador_bonus(uuid,uuid,numeric,text) to authenticated;
+grant execute on function public.hard_delete_ambassador(uuid) to authenticated;
+grant execute on function public.set_staff_role(uuid,text) to authenticated;
+grant execute on function public.admin_create_conversion(uuid,uuid,numeric,numeric) to authenticated;
+grant execute on function public.ops_record_order_payment(uuid,numeric,text,text,timestamptz,text) to authenticated;
+grant execute on function public.ops_record_repair_payment(uuid,numeric,text,text,timestamptz,text) to authenticated;
+grant execute on function public.sales_record_refund(uuid,numeric,text,text) to authenticated;
+grant execute on function public.sales_void_document(uuid,text) to authenticated;
+grant execute on function public.sales_approve_return(uuid) to authenticated;
+grant execute on function public.sales_approve_credit_release(uuid,numeric,timestamptz,text) to authenticated;

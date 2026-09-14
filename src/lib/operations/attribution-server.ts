@@ -1,27 +1,21 @@
-import { createClient } from '@/lib/supabase-server';
-
-async function requireAdmin() {
-  const supabase = await createClient();
-  const { data: { user }, error } = await supabase.auth.getUser();
-  if (error || !user) throw new Error('Not authenticated');
-  const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
-  if (profile?.role !== 'admin') throw new Error('Not authorized');
-  return { supabase, user };
-}
+import { requireStaffCapability } from '@/lib/auth/capability-server';
 
 export async function getOperationsAmbassadors() {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireStaffCapability('operations.order.manage');
   const { data, error } = await supabase
     .from('ambassadors')
     .select('id,display_name,ambassador_tag,user_id,users(name,email)')
     .eq('status', 'active')
     .order('display_name');
   if (error) throw new Error(error.message);
-  return (data || []).map((row: any) => ({
-    id: row.id as string,
-    name: row.display_name || row.users?.name || row.users?.email || row.ambassador_tag || 'Ambassador',
-    tag: row.ambassador_tag || null,
-  }));
+  return (data || []).map((row) => {
+    const user = Array.isArray(row.users) ? row.users[0] : row.users;
+    return {
+      id: row.id as string,
+      name: row.display_name || user?.name || user?.email || row.ambassador_tag || 'Ambassador',
+      tag: row.ambassador_tag || null,
+    };
+  });
 }
 
 export async function updateDraftOrderAttribution(input: {
@@ -30,7 +24,7 @@ export async function updateDraftOrderAttribution(input: {
   commissionRate: number;
   attributionSource: 'automatic' | 'manual_admin';
 }) {
-  const { supabase, user } = await requireAdmin();
+  const { supabase, user } = await requireStaffCapability('operations.order.manage');
   const { data: order, error: orderError } = await supabase
     .from('ops_orders')
     .select('id,commercial_state')
@@ -49,7 +43,7 @@ export async function updateDraftOrderAttribution(input: {
       commission_amount: 0,
       commission_status: 'none',
       attribution_note: ambassadorId
-        ? `${input.attributionSource === 'automatic' ? 'Automatically detected' : 'Manually assigned by Admin'} before confirmation`
+        ? `${input.attributionSource === 'automatic' ? 'Automatically detected' : 'Manually assigned by authorised staff'} before confirmation`
         : 'No Ambassador attribution',
     })
     .eq('id', input.orderId)
