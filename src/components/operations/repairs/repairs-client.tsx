@@ -1,10 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useActionState, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { Plus, Search, UserCheck, Wrench } from 'lucide-react';
 import { createRepairAction, type SalesActionState } from '@/app/(staff)/modules/operations/sales-actions';
+import { REPAIR_STATUS_SEQUENCE, type RepairStatus } from '@/lib/operations/repair-domain';
 import { HelpTip } from '@/components/ui/help-tip';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -32,6 +33,7 @@ type RepairDraft = {
   customerName: string;
   customerPhone: string;
   customerEmail: string;
+  issueCard: boolean;
   cardId: string;
   deviceType: string;
   purchasedFromUs: string;
@@ -56,15 +58,22 @@ function getServerDraftSnapshot() {
 
 export function RepairsClient({ repairs, availableCards }: { repairs: OperationsRepair[]; availableCards: RepairCardOption[] }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [state, action, pending] = useActionState(createRepairAction, initialState);
   const [showCreate, setShowCreate] = useState(false);
   const [step, setStep] = useState<Step>('customer');
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<RepairStatus | 'all' | 'uncollected'>(() => {
+    const fromUrl = searchParams.get('status');
+    if (fromUrl === 'uncollected') return 'uncollected';
+    return fromUrl && REPAIR_STATUS_SEQUENCE.includes(fromUrl as RepairStatus) ? (fromUrl as RepairStatus) : 'all';
+  });
   const [identityQuery, setIdentityQuery] = useState('');
   const [selectedIdentity, setSelectedIdentity] = useState<OperationsIdentitySummary | null>(null);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
+  const [issueCard, setIssueCard] = useState(true);
   const [cardId, setCardId] = useState('');
   const [deviceType, setDeviceType] = useState('Phone');
   const [purchasedFromUs, setPurchasedFromUs] = useState('not_sure');
@@ -99,6 +108,7 @@ export function RepairsClient({ repairs, availableCards }: { repairs: Operations
     if (savedDraft.customerName) setCustomerName(savedDraft.customerName);
     if (savedDraft.customerPhone) setCustomerPhone(savedDraft.customerPhone);
     if (savedDraft.customerEmail) setCustomerEmail(savedDraft.customerEmail);
+    if (savedDraft.issueCard !== undefined) setIssueCard(savedDraft.issueCard);
     if (savedDraft.cardId) setCardId(savedDraft.cardId);
     if (savedDraft.deviceType) setDeviceType(savedDraft.deviceType);
     if (savedDraft.purchasedFromUs) setPurchasedFromUs(savedDraft.purchasedFromUs);
@@ -124,7 +134,7 @@ export function RepairsClient({ repairs, availableCards }: { repairs: Operations
     if (!showCreate) return;
     const draft: RepairDraft = {
       step, identityQuery, selectedIdentity, customerName, customerPhone, customerEmail,
-      cardId, deviceType, purchasedFromUs, brand, model, serialOrImei, conditionReceived,
+      issueCard, cardId, deviceType, purchasedFromUs, brand, model, serialOrImei, conditionReceived,
       accessoriesReceived, faultReported,
     };
     try {
@@ -132,7 +142,7 @@ export function RepairsClient({ repairs, availableCards }: { repairs: Operations
     } catch {
       // Storage unavailable (private window, quota) — draft resilience is a nicety, not required.
     }
-  }, [showCreate, step, identityQuery, selectedIdentity, customerName, customerPhone, customerEmail, cardId, deviceType, purchasedFromUs, brand, model, serialOrImei, conditionReceived, accessoriesReceived, faultReported]);
+  }, [showCreate, step, identityQuery, selectedIdentity, customerName, customerPhone, customerEmail, issueCard, cardId, deviceType, purchasedFromUs, brand, model, serialOrImei, conditionReceived, accessoriesReceived, faultReported]);
 
   useEffect(() => {
     const repairId = (state.data as { repairId?: string } | undefined)?.repairId;
@@ -142,11 +152,21 @@ export function RepairsClient({ repairs, availableCards }: { repairs: Operations
     }
   }, [state, router]);
 
+  const statusCounts = useMemo(() => {
+    const counts = new Map<RepairStatus, number>();
+    for (const r of repairs) counts.set(r.status, (counts.get(r.status) || 0) + 1);
+    return counts;
+  }, [repairs]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return repairs;
-    return repairs.filter((r) => [r.repair_code,r.customer_name,r.customer_phone,r.brand,r.model,r.serial_or_imei,r.fault_reported].filter(Boolean).join(' ').toLowerCase().includes(q));
-  }, [repairs,search]);
+    return repairs.filter((r) => {
+      if (statusFilter === 'uncollected' && (r.status === 'collected' || r.status === 'cancelled')) return false;
+      else if (statusFilter !== 'all' && statusFilter !== 'uncollected' && r.status !== statusFilter) return false;
+      if (!q) return true;
+      return [r.repair_code,r.customer_name,r.customer_phone,r.brand,r.model,r.serial_or_imei,r.fault_reported].filter(Boolean).join(' ').toLowerCase().includes(q);
+    });
+  }, [repairs,search,statusFilter]);
 
   function chooseIdentity(identity: OperationsIdentitySummary | null) {
     if (!identity) {
@@ -172,6 +192,7 @@ export function RepairsClient({ repairs, availableCards }: { repairs: Operations
     setShowCreate(false);
     setStep('customer');
     clearIdentity();
+    setIssueCard(true);
     setCardId('');
     setDeviceType('Phone');
     setPurchasedFromUs('not_sure');
@@ -229,14 +250,20 @@ export function RepairsClient({ repairs, availableCards }: { repairs: Operations
         </div>
       </section>
 
-      <section hidden={step !== 'device'}><p className="mb-3 text-xs font-black uppercase tracking-wide text-slate-500">2. Device & Repair Card</p><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Field label="Repair Card"><Select name="card_id" value={cardId} onChange={(e) => setCardId(e.target.value)} required><option value="" disabled>Choose available card</option>{availableCards.map((card) => <option key={card.id} value={card.id}>{card.card_code}</option>)}</Select></Field><Field label="Device type"><Select name="device_type" value={deviceType} onChange={(e) => setDeviceType(e.target.value)}><option>Phone</option><option>Laptop</option><option>Accessory</option><option>Other</option></Select></Field><Field label="Purchased from us?"><Select name="purchased_from_us" value={purchasedFromUs} onChange={(e) => setPurchasedFromUs(e.target.value)}><option value="yes">Yes</option><option value="no">No</option><option value="not_sure">Not sure</option></Select></Field><Field label="Brand"><Input name="brand" value={brand} onChange={(e) => setBrand(e.target.value)} /></Field>
+      <section hidden={step !== 'device'}><p className="mb-3 text-xs font-black uppercase tracking-wide text-slate-500">2. Device & Repair Card</p>
+        <label className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-700">
+          <input type="checkbox" checked={issueCard} onChange={(e) => { setIssueCard(e.target.checked); if (!e.target.checked) setCardId(''); }} className="h-4 w-4" />
+          Issue a Repair Card for this job
+        </label>
+        {!issueCard && <p className="mb-3 text-xs text-slate-500">No card, PIN or handover steps — use this for family/trusted customers or same-day collection.</p>}
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {issueCard && <Field label="Repair Card"><Select name="card_id" value={cardId} onChange={(e) => setCardId(e.target.value)} required><option value="" disabled>Choose available card</option>{availableCards.map((card) => <option key={card.id} value={card.id}>{card.card_code}</option>)}</Select></Field>}<Field label="Device type"><Select name="device_type" value={deviceType} onChange={(e) => setDeviceType(e.target.value)}><option>Phone</option><option>Laptop</option><option>Accessory</option><option>Other</option></Select></Field><Field label="Purchased from us?"><Select name="purchased_from_us" value={purchasedFromUs} onChange={(e) => setPurchasedFromUs(e.target.value)}><option value="yes">Yes</option><option value="no">No</option><option value="not_sure">Not sure</option></Select></Field><Field label="Brand"><Input name="brand" value={brand} onChange={(e) => setBrand(e.target.value)} /></Field>
         <Field label="Model"><Input name="model" value={model} onChange={(e) => setModel(e.target.value)} /></Field><Field label="Serial / IMEI"><Input name="serial_or_imei" value={serialOrImei} onChange={(e) => setSerialOrImei(e.target.value)} /></Field><Field label="Condition received"><Input name="condition_received" value={conditionReceived} onChange={(e) => setConditionReceived(e.target.value)} placeholder="e.g. Cracked Screen" /></Field><Field label="Accessories received"><Input name="accessories_received" value={accessoriesReceived} onChange={(e) => setAccessoriesReceived(e.target.value)} placeholder="e.g. Charger, case" /></Field>
-      </div>{availableCards.length === 0 && <p className="mt-3 text-sm font-bold text-amber-700">No Repair Card is currently available. A repair cannot be checked in until a card is returned or restored.</p>}
+      </div>{issueCard && availableCards.length === 0 && <p className="mt-3 text-sm font-bold text-amber-700">No Repair Card is currently available. A repair cannot be checked in until a card is returned or restored, or issue this one without a card.</p>}
         <div className="mt-4 flex gap-2">
           <Button type="button" onClick={resetIntake} variant="ghost">Cancel</Button>
           <Button type="button" variant="outline" onClick={() => setStep('customer')}>Back</Button>
-          <Button type="button" disabled={!cardId} onClick={() => setStep('work')}>Continue</Button>
+          <Button type="button" disabled={issueCard && !cardId} onClick={() => setStep('work')}>Continue</Button>
         </div>
       </section>
 
@@ -247,10 +274,37 @@ export function RepairsClient({ repairs, availableCards }: { repairs: Operations
         <div className="mt-4 flex gap-2">
           <Button type="button" onClick={resetIntake} variant="ghost">Cancel</Button>
           <Button type="button" variant="outline" onClick={() => setStep('device')}>Back</Button>
-          <Button type="submit" disabled={pending || availableCards.length === 0 || !faultReported.trim()}>{pending ? 'Creating...' : 'Create repair & assign card'}</Button>
+          <Button type="submit" disabled={pending || (issueCard && availableCards.length === 0) || !faultReported.trim()}>{pending ? 'Creating...' : issueCard ? 'Create repair & assign card' : 'Create repair'}</Button>
         </div>
       </section>
     </form>}
+
+    <div className="mb-3 flex flex-wrap items-stretch gap-2">
+      <button type="button" onClick={() => setStatusFilter('all')} className={`rounded-xl border px-3 py-2 text-left shadow-sm transition-colors ${statusFilter === 'all' ? 'border-emmy-primary bg-blue-50' : 'border-slate-200 bg-white hover:border-slate-300'}`}>
+        <div className="text-lg font-black leading-none text-slate-900">{repairs.length}</div>
+        <div className="mt-1 text-[11px] font-bold uppercase tracking-wide text-slate-500">All</div>
+      </button>
+      <button type="button" onClick={() => setStatusFilter(statusFilter === 'uncollected' ? 'all' : 'uncollected')} className={`rounded-xl border px-3 py-2 text-left shadow-sm transition-colors ${statusFilter === 'uncollected' ? 'border-emmy-primary bg-blue-50' : 'border-slate-200 bg-white hover:border-slate-300'}`}>
+        <div className="text-lg font-black leading-none text-slate-900">{repairs.filter((r) => r.status !== 'collected' && r.status !== 'cancelled').length}</div>
+        <div className="mt-1 text-[11px] font-bold uppercase tracking-wide text-slate-500">Not collected yet</div>
+      </button>
+      <button type="button" onClick={() => setStatusFilter(statusFilter === 'collected' ? 'all' : 'collected')} className={`rounded-xl border px-3 py-2 text-left shadow-sm transition-colors ${statusFilter === 'collected' ? 'border-emmy-primary bg-blue-50' : 'border-slate-200 bg-white hover:border-slate-300'}`}>
+        <div className="text-lg font-black leading-none text-slate-900">{statusCounts.get('collected') || 0}</div>
+        <div className="mt-1 text-[11px] font-bold uppercase tracking-wide text-slate-500">Collected</div>
+      </button>
+      <Select
+        value={REPAIR_STATUS_SEQUENCE.includes(statusFilter as RepairStatus) && statusFilter !== 'collected' ? statusFilter : ''}
+        onChange={(e) => setStatusFilter((e.target.value || 'all') as RepairStatus | 'all' | 'uncollected')}
+        className="w-auto"
+      >
+        <option value="">More statuses…</option>
+        {REPAIR_STATUS_SEQUENCE.filter((status) => status !== 'collected').map((status) => (
+          <option key={status} value={status}>
+            {status.replaceAll('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())} ({statusCounts.get(status) || 0})
+          </option>
+        ))}
+      </Select>
+    </div>
 
     <div className="mb-3 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 shadow-sm"><Search className="h-4 w-4 text-slate-400" /><input value={search} onChange={(e)=>setSearch(e.target.value)} className="w-full bg-transparent text-sm outline-none" placeholder="Search repair, customer, device, serial or fault..." /></div>
 

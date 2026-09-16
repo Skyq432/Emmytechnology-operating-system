@@ -158,7 +158,7 @@ export async function publishQuotationAction(_prev: SalesActionState, formData: 
     inventoryItemId?: string | null; itemName: string; itemType?: string; category?: string | null;
     fulfilmentSource?: 'internal' | 'supplier' | 'dropship' | 'manual'; quantity: number;
     listPrice: number; finalUnitPrice: number; costBasis?: number | null; costBasisSource?: 'inventory_average' | 'product_default' | 'supplier_on_demand';
-    adminExceptionReason?: string | null; note?: string | null;
+    adminExceptionReason?: string | null; note?: string | null; specs?: Record<string, unknown> | null;
   }>>(formData.get('items_json'), []);
   if (!quotationId || !items.length) return fail('Quotation and at least one item are required.');
   const result = await publishSalesQuotationVersion({

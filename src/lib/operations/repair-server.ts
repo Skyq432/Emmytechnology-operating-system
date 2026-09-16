@@ -132,7 +132,7 @@ export async function startRepairDiagnosis(input: {
 }
 
 export async function createRepairWithCard(input: {
-  cardId: string;
+  cardId?: string | null;
   identityId?: string | null;
   originalOrderId?: string | null;
   inventoryUnitId?: string | null;
@@ -168,9 +168,9 @@ export async function createRepairWithCard(input: {
     email: input.customerEmail,
     source: 'operations_repair',
   });
-  const accessPin = generateRepairPin();
+  const accessPin = input.cardId ? generateRepairPin() : null;
   const { data, error } = await supabase.rpc('ops_create_repair_with_card', {
-    p_card_id: input.cardId,
+    p_card_id: input.cardId || null,
     p_identity_id: identityId,
     p_access_pin: accessPin,
     p_fault_reported: input.faultReported.trim(),

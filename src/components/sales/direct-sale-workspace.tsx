@@ -17,19 +17,11 @@ import { Select } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Alert, ActionResult } from '@/components/ui/alert';
 import { SegmentedControl } from '@/components/ui/segmented-control';
-import { getRelevantSpecFields, getOrderItemTypeLabel, ORDER_ITEM_TYPES, type OrderItemType } from '@/lib/operations/sales-model';
+import {
+  getRelevantSpecFields, getOrderItemTypeLabel, ORDER_ITEM_TYPES, type OrderItemType,
+  ORDER_ITEM_SPEC_LABELS as SPEC_LABELS, ORDER_ITEM_BOOLEAN_SPEC_KEYS as BOOLEAN_SPEC_KEYS,
+} from '@/lib/operations/sales-model';
 import { cn } from '@/lib/utils';
-
-const SPEC_LABELS: Record<string, string> = {
-  generation: 'Generation', processor_type: 'Processor type', processor_speed_ghz: 'Processor speed (GHz)',
-  ram: 'RAM', storage_size: 'Storage size', storage_type: 'Storage type', screen_size: 'Screen size',
-  touchscreen: 'Touchscreen?', colour: 'Colour', os_installed: 'OS installed', charger_included: 'Charger included?',
-  bag_included: 'Bag included?', storage_capacity: 'Storage capacity', network_type: 'Network type',
-  sim_type: 'SIM type', accessories_included: 'Accessories included', category: 'Sub-category',
-  subcategory: 'Sub-category', compatible_with: 'Compatible with', system_capacity: 'System capacity',
-  brand: 'Brand', model_spec: 'Model / spec',
-};
-const BOOLEAN_SPEC_KEYS = new Set(['touchscreen', 'charger_included', 'bag_included']);
 
 const initialState: SalesActionState = { success: false, message: '' };
 const money = (value: number) => `₦${Number(value || 0).toLocaleString('en-NG', { maximumFractionDigits: 0 })}`;
@@ -304,7 +296,6 @@ export function DirectSaleWorkspace({ inventory, availability, units, actor }: {
             <Input value={servicePrice} onChange={(e) => setServicePrice(e.target.value)} placeholder="Final price" />
             <Input type="number" min="1" value={qty} onChange={(e) => setQty(Number(e.target.value))} />
             <Input value={exceptionReason} onChange={(e) => setExceptionReason(e.target.value)} className="md:col-span-2" placeholder="Admin pricing exception reason (if needed)" />
-            <Button type="button" onClick={addServiceLine}>Add service</Button>
           </div>
           {serviceSpecFields.length > 0 && (
             <div className="mt-4 border-t border-slate-100 pt-4">
@@ -327,6 +318,7 @@ export function DirectSaleWorkspace({ inventory, availability, units, actor }: {
               </div>
             </div>
           )}
+          <Button type="button" className="mt-4" onClick={addServiceLine}>Add service</Button>
           </>}
 
           <div className="mt-5 space-y-2">{lines.length === 0 ? <div className="rounded-xl border border-dashed border-slate-300 p-5 text-center text-sm text-slate-400">No items added.</div> : lines.map((line) => <div key={line.key} className="flex items-center gap-3 rounded-xl border border-slate-200 p-3"><div className="min-w-0 flex-1"><div className="truncate text-sm font-bold text-slate-800">{line.itemName}</div><div className="text-xs text-slate-400">{line.quantity} × {money(Number(line.finalUnitPrice || 0))}</div></div><div className="text-sm font-black">{money(Number(line.finalUnitPrice || 0) * line.quantity)}</div><button type="button" onClick={() => setLines((current) => current.filter((row) => row.key !== line.key))} className="text-xs font-bold text-rose-600">Remove</button></div>)}</div>

@@ -20,7 +20,7 @@ async function requireOperationsAccess() {
 
 export async function getOperationsOverview(): Promise<OperationsOverview> {
   const { supabase } = await requireOperationsAccess();
-  const [openOrdersResult, urgentOrdersResult, awaitingDispatchResult, inventoryResult, websiteLinksResult, recentOrdersResult, recentEventsResult, availabilityResult] = await Promise.all([
+  const [openOrdersResult, urgentOrdersResult, awaitingDispatchResult, inventoryResult, websiteLinksResult, recentOrdersResult, recentEventsResult, availabilityResult, totalRepairsResult, collectedRepairsResult, uncollectedRepairsResult] = await Promise.all([
     supabase.from('ops_orders').select('id', { count: 'exact', head: true }).not('status', 'in', '(completed,cancelled)'),
     supabase.from('ops_orders').select('id', { count: 'exact', head: true }).eq('priority', 'urgent').not('status', 'in', '(completed,cancelled)'),
     supabase.from('ops_orders').select('id', { count: 'exact', head: true }).in('status', ['ready_dispatch', 'dispatched']),
@@ -29,9 +29,12 @@ export async function getOperationsOverview(): Promise<OperationsOverview> {
     supabase.from('ops_orders').select('*').order('updated_at', { ascending: false }).limit(6),
     supabase.from('ops_order_events').select('*').order('created_at', { ascending: false }).limit(8),
     supabase.from('ops_inventory_availability').select('inventory_item_id,reorder_level,on_hand,reserved,available'),
+    supabase.from('ops_repairs').select('id', { count: 'exact', head: true }).not('status', 'eq', 'cancelled'),
+    supabase.from('ops_repairs').select('id', { count: 'exact', head: true }).eq('status', 'collected'),
+    supabase.from('ops_repairs').select('id', { count: 'exact', head: true }).not('status', 'in', '(collected,cancelled)'),
   ]);
 
-  const errors = [openOrdersResult.error, urgentOrdersResult.error, awaitingDispatchResult.error, inventoryResult.error, websiteLinksResult.error, recentOrdersResult.error, recentEventsResult.error, availabilityResult.error].filter(Boolean);
+  const errors = [openOrdersResult.error, urgentOrdersResult.error, awaitingDispatchResult.error, inventoryResult.error, websiteLinksResult.error, recentOrdersResult.error, recentEventsResult.error, availabilityResult.error, totalRepairsResult.error, collectedRepairsResult.error, uncollectedRepairsResult.error].filter(Boolean);
   if (errors.length) throw new Error(errors[0]!.message);
 
   const totals = new Map<string, { available: number; reorderLevel: number }>();
@@ -49,6 +52,9 @@ export async function getOperationsOverview(): Promise<OperationsOverview> {
     inventoryItems: inventoryResult.count ?? 0,
     lowStockItems: Array.from(totals.values()).filter((row) => row.available <= row.reorderLevel).length,
     websiteLinks: websiteLinksResult.count ?? 0,
+    totalRepairs: totalRepairsResult.count ?? 0,
+    collectedRepairs: collectedRepairsResult.count ?? 0,
+    uncollectedRepairs: uncollectedRepairsResult.count ?? 0,
     recentOrders: (recentOrdersResult.data || []) as OperationsOrder[],
     recentEvents: (recentEventsResult.data || []) as OperationsOrderEvent[],
   };

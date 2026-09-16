@@ -66,6 +66,42 @@ export async function processDocumentQueueAction(_prev: DocumentActionState): Pr
   }
 }
 
+export async function sendReceiptAction(_prev: DocumentActionState, formData: FormData): Promise<DocumentActionState> {
+  const documentId = String(formData.get('document_id') || '');
+  const sourceType = String(formData.get('source_type') || '') as 'order' | 'repair' | '';
+  const sourcePaymentId = String(formData.get('source_payment_id') || '');
+  const email = String(formData.get('recipient_email') || '').trim().toLowerCase();
+  if (!email) return fail('Customer email is required.');
+  try {
+    const { supabase } = await requireSalesActor();
+    let docId = documentId;
+    if (!docId) {
+      if (!sourceType || !sourcePaymentId) return fail('Document is required.');
+      const { data: document, error: metadataError } = await supabase.rpc('sales_ensure_payment_receipt_metadata', {
+        p_source_type: sourceType,
+        p_source_payment_id: sourcePaymentId,
+      });
+      if (metadataError || !document?.id) throw new Error(metadataError?.message || 'Unable to prepare receipt PDF');
+      docId = String(document.id);
+    }
+
+    await renderAndStoreSalesDocument(docId);
+    const { error: queueError } = await supabase.rpc('sales_queue_document_send', { p_document_id: docId, p_recipient_email: email });
+    if (queueError) throw new Error(queueError.message);
+
+    const processed = await processSalesDocument(docId);
+    refresh();
+    const failed = processed.deliveries.filter((row) => !row.success).length;
+    return {
+      success: failed === 0,
+      message: failed ? `Receipt is ready, but ${failed} email delivery attempt(s) failed. Retry from Receipts & Documents.` : 'Receipt sent to the customer.',
+    };
+  } catch (error) {
+    refresh();
+    return fail(error instanceof Error ? error.message : 'Unable to send receipt.');
+  }
+}
+
 export async function sendQuotationPdfAction(_prev: DocumentActionState, formData: FormData): Promise<DocumentActionState> {
   const versionId = String(formData.get('quotation_version_id') || '');
   const email = String(formData.get('recipient_email') || '').trim().toLowerCase();
