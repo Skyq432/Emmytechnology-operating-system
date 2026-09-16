@@ -35,7 +35,6 @@ import {
 } from 'lucide-react';
 import { formatDate, formatCurrency } from '@/lib/utils';
 import { useReportingPeriod } from '@/components/reporting/reporting-period-context';
-import { ReportingPeriodPanel } from '@/components/reporting/reporting-period-panel';
 
 type LeadStatus = 'new' | 'pending' | 'contacted' | 'converted' | 'lost';
 type EditStatus = 'none' | 'pending' | 'approved' | 'rejected' | null;
@@ -657,7 +656,6 @@ export default function AdminLeadsPage() {
 
   return (
     <div className="space-y-6">
-      <ReportingPeriodPanel audience="admin" />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">

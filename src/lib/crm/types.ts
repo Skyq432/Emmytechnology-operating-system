@@ -39,6 +39,8 @@ export interface CrmNote {
 
 export interface Lead {
   id: string;
+  createdAtIso: string;
+  lastActivityAtIso: string;
   name: string;
   phone: string;
   source: string;

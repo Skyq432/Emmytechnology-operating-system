@@ -28,7 +28,7 @@ import type {
 } from '@/lib/operations/types';
 import type { TransferCarrierType } from '@/lib/operations/transfer';
 
-export type OperationsActionState = { success: boolean; message: string };
+export type OperationsActionState = { success: boolean; message: string; data?: unknown };
 
 export async function createOrderAction(
   _previousState: OperationsActionState,
@@ -78,7 +78,7 @@ export async function createOrderAction(
     revalidatePath('/modules/operations');
     revalidatePath('/modules/operations/orders');
   }
-  return { success: result.success, message: result.message };
+  return { success: result.success, message: result.message, data: result.success ? result.data : undefined };
 }
 
 export async function updateDraftAttributionAction(formData: FormData) {

@@ -302,7 +302,6 @@ export async function listAssignableStaff() {
 export async function getMyWorkDashboard() {
   const { supabase, user } = await requireInternalUser();
   const now = new Date();
-  const { start, end } = nigeriaDayBounds(now);
 
   const { data: assignments, error: assignmentError } = await supabase
     .from('work_task_assignments')
@@ -313,14 +312,12 @@ export async function getMyWorkDashboard() {
   throwIfError(assignmentError, 'Unable to load work summary');
   const assignmentRows = (assignments ?? []) as AssignmentRow[];
 
-  const { count: todayTodoCount, error: todoError } = await supabase
+  const { count: openTodoCount, error: todoError } = await supabase
     .from('work_todos')
     .select('id', { count: 'exact', head: true })
     .eq('owner_id', user.id)
-    .eq('status', 'open')
-    .gte('scheduled_for', start.toISOString())
-    .lt('scheduled_for', end.toISOString());
-  throwIfError(todoError, 'Unable to count today Todos');
+    .eq('status', 'open');
+  throwIfError(todoError, 'Unable to count open Todos');
 
   const { data: delegatedAssignments, error: delegatedError } = await supabase
     .from('work_task_assignments')
@@ -382,11 +379,12 @@ export async function getMyWorkDashboard() {
   }
 
   return {
+    activeCount: activeAssignments.length,
     pendingAcceptanceCount,
     extensionDecisionCount,
     dueTodayCount,
     overdueCount,
-    todayTodoCount: todayTodoCount ?? 0,
+    openTodoCount: openTodoCount ?? 0,
     nextTask: nextTask ? { task: nextTask, assignment: nextAssignment } : null,
     goalHighlight,
   };

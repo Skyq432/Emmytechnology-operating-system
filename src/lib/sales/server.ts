@@ -1,20 +1,14 @@
 import { createClient } from '@/lib/supabase-server';
+import { getCachedAuthContext } from '@/lib/auth/server';
 import { hasCapability } from '@/lib/auth/roles';
-import { resolveOrCreateOperationsIdentity, searchOperationsIdentities } from '@/lib/operations/identity-server';
+import { resolveOrCreateOperationsIdentity } from '@/lib/operations/identity-server';
 import { evaluateSalesPrice, resolveMinimumMargin, calculateGrossMargin } from './domain';
 import type { SalesActor, SalesOverviewData, SalesPricingContext } from './types';
 
 export async function requireSalesActor(): Promise<{ supabase: Awaited<ReturnType<typeof createClient>>; actor: SalesActor }> {
-  const supabase = await createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) throw new Error('Not authenticated');
-
-  const { data: profile, error: profileError } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-  if (profileError || !profile || !hasCapability(profile.role, 'sales.read')) throw new Error('Not authorized for Sales');
+  const { supabase, user, profile } = await getCachedAuthContext();
+  if (!user) throw new Error('Not authenticated');
+  if (!profile || !hasCapability(profile.role, 'sales.read')) throw new Error('Not authorized for Sales');
 
   if (profile.role === 'super_admin' || profile.role === 'admin') {
     return {
@@ -57,10 +51,6 @@ export async function resolveOrCreateSalesIdentity(input: {
     address: input.address,
     source: 'operations_order',
   });
-}
-
-export async function searchSalesIdentities(query: string) {
-  return searchOperationsIdentities(query);
 }
 
 export async function getSalesPricingContext(input: {

@@ -99,6 +99,7 @@ export async function createDirectSaleDraft(input: {
     itemName?: string | null;
     itemType?: string | null;
     category?: string | null;
+    specs?: Record<string, unknown> | null;
     quantity: number;
     finalUnitPrice?: number | null;
     listPrice?: number | null;
@@ -129,6 +130,7 @@ export async function createDirectSaleDraft(input: {
       item_name: item.itemName ?? '',
       item_type: item.itemType ?? 'other',
       category: item.category ?? '',
+      specs: item.specs && Object.keys(item.specs).length ? item.specs : null,
       quantity: item.quantity,
       final_unit_price: item.finalUnitPrice ?? '',
       list_price: item.listPrice ?? '',

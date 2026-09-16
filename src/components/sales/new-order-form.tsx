@@ -1,17 +1,47 @@
 'use client';
 
-import { useActionState, useState } from 'react';
-import { createSalesOrderAction } from '@/app/(staff)/modules/sales/actions';
+import { useActionState, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { createSalesOrderAction, type SalesActionState } from '@/app/(staff)/modules/sales/actions';
 import { IdentityPicker } from '@/components/shared/identity-picker';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { ActionResult } from '@/components/ui/alert';
 import { SegmentedControl } from '@/components/ui/segmented-control';
+import { getRelevantSpecFields, getOrderItemTypeLabel, ORDER_ITEM_TYPES, type OrderItemType } from '@/lib/operations/sales-model';
 
-const initial = { success: false, message: '' };
+const initial: SalesActionState = { success: false, message: '' };
 const money = (value: number) => `₦${Number(value || 0).toLocaleString('en-NG', { maximumFractionDigits: 0 })}`;
+
+const SPEC_LABELS: Record<string, string> = {
+  generation: 'Generation', processor_type: 'Processor type', processor_speed_ghz: 'Processor speed (GHz)',
+  ram: 'RAM', storage_size: 'Storage size', storage_type: 'Storage type', screen_size: 'Screen size',
+  touchscreen: 'Touchscreen?', colour: 'Colour', os_installed: 'OS installed', charger_included: 'Charger included?',
+  bag_included: 'Bag included?', storage_capacity: 'Storage capacity', network_type: 'Network type',
+  sim_type: 'SIM type', accessories_included: 'Accessories included', category: 'Sub-category',
+  subcategory: 'Sub-category', compatible_with: 'Compatible with', system_capacity: 'System capacity',
+  brand: 'Brand', model_spec: 'Model / spec',
+};
+const BOOLEAN_SPEC_KEYS = new Set(['touchscreen', 'charger_included', 'bag_included']);
+
+function computeMargin(price: number, cost: number) {
+  if (!(price > 0)) return null;
+  return ((price - cost) / price) * 100;
+}
+
+function MarginPreview({ price, cost, minMargin }: { price: number; cost: number; minMargin: number }) {
+  const margin = computeMargin(price, cost);
+  if (margin === null) return null;
+  const clears = margin >= minMargin;
+  return (
+    <Badge variant={clears ? 'success' : 'warning'} className="w-fit">
+      Margin {margin.toFixed(1)}% · min {minMargin.toFixed(1)}%
+    </Badge>
+  );
+}
 
 type InventoryItem = {
   id: string;
@@ -20,6 +50,13 @@ type InventoryItem = {
   category: string | null;
   item_type: string;
   default_selling_price: number | null;
+  default_unit_cost: number | null;
+  minimum_margin_percent: number;
+};
+
+type MarginContext = {
+  companyDefaultMarginPercent: number;
+  categoryMinimums: Record<string, number>;
 };
 
 type FulfilmentSource = 'internal' | 'supplier' | 'dropship' | 'manual';
@@ -29,6 +66,7 @@ type Line = {
   itemName: string;
   itemType?: string;
   category?: string | null;
+  specs?: Record<string, unknown> | null;
   fulfilmentSource: FulfilmentSource;
   quantity: number;
   listPrice: number;
@@ -39,8 +77,15 @@ type Line = {
   note?: string;
 };
 
-export function NewOrderForm({ inventory }: { inventory: InventoryItem[] }) {
+export function NewOrderForm({ inventory, marginContext }: { inventory: InventoryItem[]; marginContext: MarginContext }) {
+  const router = useRouter();
   const [state, action, pending] = useActionState(createSalesOrderAction, initial);
+
+  useEffect(() => {
+    if (state.success && typeof state.data === 'string') {
+      router.push(`/modules/operations/orders/${state.data}`);
+    }
+  }, [state, router]);
   const [mode, setMode] = useState<'product' | 'custom'>('product');
   const [lines, setLines] = useState<Line[]>([]);
   const [itemId, setItemId] = useState('');
@@ -51,11 +96,22 @@ export function NewOrderForm({ inventory }: { inventory: InventoryItem[] }) {
   const [lineNote, setLineNote] = useState('');
   const [exceptionReason, setExceptionReason] = useState('');
   const [customName, setCustomName] = useState('');
-  const [customType, setCustomType] = useState('other');
-  const [customCategory, setCustomCategory] = useState('');
+  const [customType, setCustomType] = useState<OrderItemType>('other');
+  const [customSpecs, setCustomSpecs] = useState<Record<string, unknown>>({});
   const [customList, setCustomList] = useState('');
   const selected = inventory.find((item) => item.id === itemId);
   const lineTotal = lines.reduce((sum, line) => sum + line.finalUnitPrice * line.quantity, 0);
+  const customSpecFields = useMemo(() => getRelevantSpecFields(customType), [customType]);
+
+  const productMinMargin = selected
+    ? selected.minimum_margin_percent || marginContext.categoryMinimums[(selected.category || '').toLowerCase().trim()] || marginContext.companyDefaultMarginPercent
+    : marginContext.companyDefaultMarginPercent;
+  const productPrice = Number(price || selected?.default_selling_price || 0);
+  const productCost = source === 'internal' ? Number(selected?.default_unit_cost || 0) : Number(cost || 0);
+
+  const customMinMargin = marginContext.categoryMinimums[customType] ?? marginContext.companyDefaultMarginPercent;
+  const customPrice = Number(price || customList || 0);
+  const customCost = Number(cost || 0);
 
   function addProduct() {
     if (!selected) return;
@@ -90,8 +146,9 @@ export function NewOrderForm({ inventory }: { inventory: InventoryItem[] }) {
     setLines((current) => [...current, {
       key: crypto.randomUUID(),
       itemName: customName.trim(),
-      itemType: customType.trim() || 'other',
-      category: customCategory.trim() || null,
+      itemType: customType,
+      category: customType,
+      specs: Object.keys(customSpecs).length ? customSpecs : null,
       fulfilmentSource: source === 'internal' ? 'manual' : source,
       quantity: Math.max(1, quantity),
       listPrice: list,
@@ -101,7 +158,7 @@ export function NewOrderForm({ inventory }: { inventory: InventoryItem[] }) {
       adminExceptionReason: exceptionReason.trim() || undefined,
       note: lineNote.trim() || undefined,
     }]);
-    setCustomName(''); setCustomType('other'); setCustomCategory(''); setCustomList(''); setQuantity(1); setPrice(''); setCost(''); setLineNote(''); setExceptionReason(''); setSource('manual');
+    setCustomName(''); setCustomType('other'); setCustomSpecs({}); setCustomList(''); setQuantity(1); setPrice(''); setCost(''); setLineNote(''); setExceptionReason(''); setSource('manual');
   }
 
   return (
@@ -129,29 +186,57 @@ export function NewOrderForm({ inventory }: { inventory: InventoryItem[] }) {
             size="sm"
             value={mode}
             onChange={(value) => { setMode(value); setSource(value === 'product' ? 'internal' : 'manual'); }}
-            options={[{ value: 'product', label: 'Catalog product' }, { value: 'custom', label: 'Service / on-demand' }]}
+            options={[{ value: 'product', label: 'Catalog product' }, { value: 'custom', label: 'Non-stock' }]}
           />
 
           <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             {mode === 'product' ? <Select value={itemId} onChange={(event) => { setItemId(event.target.value); setPrice(''); }}><option value="">Choose product</option>{inventory.map((item) => <option key={item.id} value={item.id}>{item.sku} · {item.name}</option>)}</Select> : <>
+              <Select value={customType} onChange={(event) => { setCustomType(event.target.value as OrderItemType); setCustomSpecs({}); }}>
+                {ORDER_ITEM_TYPES.map((type) => <option key={type} value={type}>{getOrderItemTypeLabel(type)}</option>)}
+              </Select>
               <Input value={customName} onChange={(event) => setCustomName(event.target.value)} placeholder="Item / service name" />
-              <Input value={customCategory} onChange={(event) => setCustomCategory(event.target.value)} placeholder="Category" />
             </>}
             <Select value={source} onChange={(event) => setSource(event.target.value as FulfilmentSource)}>
               {mode === 'product' ? <option value="internal">Internal stock</option> : null}
               <option value="supplier">Supplier sourced</option>
               <option value="dropship">Dropship</option>
-              <option value="manual">Service / manual</option>
+              <option value="manual">Manual</option>
             </Select>
             <Input type="number" min="1" value={quantity} onChange={(event) => setQuantity(Number(event.target.value))} placeholder="Qty" />
             {mode === 'custom' ? <Input value={customList} onChange={(event) => setCustomList(event.target.value)} placeholder="Normal price" /> : null}
-            <Input value={price} onChange={(event) => setPrice(event.target.value)} placeholder={selected ? `Final price · ${money(Number(selected.default_selling_price || 0))}` : 'Final price'} />
+            <div className="flex flex-col gap-1.5">
+              <Input value={price} onChange={(event) => setPrice(event.target.value)} placeholder={selected ? `Final price · ${money(Number(selected.default_selling_price || 0))}` : 'Final price'} />
+              {mode === 'product'
+                ? <MarginPreview price={productPrice} cost={productCost} minMargin={productMinMargin} />
+                : <MarginPreview price={customPrice} cost={customCost} minMargin={customMinMargin} />}
+            </div>
             {(mode === 'custom' || source !== 'internal') ? <Input value={cost} onChange={(event) => setCost(event.target.value)} placeholder="Supplier / service cost basis" /> : null}
-            {mode === 'custom' ? <Input value={customType} onChange={(event) => setCustomType(event.target.value)} placeholder="Item type" /> : null}
             <Input value={lineNote} onChange={(event) => setLineNote(event.target.value)} placeholder="Line note" />
             <Input value={exceptionReason} onChange={(event) => setExceptionReason(event.target.value)} placeholder="Admin pricing exception reason, if needed" className="xl:col-span-2" />
             <Button type="button" onClick={mode === 'product' ? addProduct : addCustom}>Add order line</Button>
           </div>
+
+          {mode === 'custom' && customSpecFields.length > 0 && (
+            <div className="mt-4 border-t border-slate-100 pt-4">
+              <p className="mb-3 text-xs font-black uppercase tracking-wide text-slate-500">{getOrderItemTypeLabel(customType)} details</p>
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                {customSpecFields.map((key) => (
+                  <label key={key}>
+                    <span className="mb-1.5 block text-xs font-bold capitalize text-slate-600">{SPEC_LABELS[key] || key.replaceAll('_', ' ')}</span>
+                    {BOOLEAN_SPEC_KEYS.has(key) ? (
+                      <Select value={String(customSpecs[key] ?? '')} onChange={(event) => setCustomSpecs((current) => ({ ...current, [key]: event.target.value === '' ? null : event.target.value === 'true' }))}>
+                        <option value="">Not set</option>
+                        <option value="true">Yes</option>
+                        <option value="false">No</option>
+                      </Select>
+                    ) : (
+                      <Input value={String(customSpecs[key] ?? '')} onChange={(event) => setCustomSpecs((current) => ({ ...current, [key]: event.target.value }))} />
+                    )}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="space-y-2">

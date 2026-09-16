@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { ArrowRight, BadgeDollarSign, Gift, Mail, Megaphone, MessageCircle, MousePointerClick, Share2, Smartphone, Trophy, UserCheck, Users } from 'lucide-react';
 import { createClient } from '@/lib/supabase-server';
-import { getReportingRange } from '@/lib/reporting-period';
+import { getReportingRange, type ReportingRange } from '@/lib/reporting-period';
+import { getServerReportingRange } from '@/lib/reporting-period-server';
 
 const solutions = [
   { name: 'Ambassador', slug: 'ambassador', description: 'Ambassadors, referrals, leads, conversions, payouts and performance.', icon: Users, active: true, tone: 'bg-blue-50 text-emmy-primary' },
@@ -14,27 +15,27 @@ const solutions = [
   { name: 'Marketing Finance', slug: 'marketing-finance', description: 'Marketing budgets, spend, approvals, ROI and financial reporting.', icon: BadgeDollarSign, active: false, tone: 'bg-teal-50 text-teal-600' },
 ];
 
-async function getMarketingSnapshot() {
+async function getMarketingSnapshot(range: ReportingRange) {
   const supabase = await createClient();
-  const month = getReportingRange('this_month');
   const today = getReportingRange('today');
   const [ambassadors, leads, conversions, players, spins, cashouts] = await Promise.all([
     supabase.from('ambassadors').select('id', { count: 'exact', head: true }).eq('status', 'active'),
-    supabase.from('leads').select('id', { count: 'exact', head: true }).eq('approved_as_lead', true).is('merged_into_lead_id', null).gte('approved_at', month.startIso).lt('approved_at', month.endExclusiveIso),
-    supabase.from('conversions').select('id', { count: 'exact', head: true }).gte('approved_at', month.startIso).lt('approved_at', month.endExclusiveIso),
+    supabase.from('leads').select('id', { count: 'exact', head: true }).eq('approved_as_lead', true).is('merged_into_lead_id', null).gte('approved_at', range.startIso).lt('approved_at', range.endExclusiveIso),
+    supabase.from('conversions').select('id', { count: 'exact', head: true }).gte('approved_at', range.startIso).lt('approved_at', range.endExclusiveIso),
     supabase.from('spin_players').select('id', { count: 'exact', head: true }),
     supabase.from('spin_logs').select('id', { count: 'exact', head: true }).gte('created_at', today.startIso).lt('created_at', today.endExclusiveIso),
     supabase.from('spin_cashout_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
   ]);
-  return { activeAmbassadors: ambassadors.count ?? 0, monthlyLeads: leads.count ?? 0, monthlyConversions: conversions.count ?? 0, totalPlayers: players.count ?? 0, spinsToday: spins.count ?? 0, pendingCashouts: cashouts.count ?? 0 };
+  return { activeAmbassadors: ambassadors.count ?? 0, periodLeads: leads.count ?? 0, periodConversions: conversions.count ?? 0, totalPlayers: players.count ?? 0, spinsToday: spins.count ?? 0, pendingCashouts: cashouts.count ?? 0 };
 }
 
 export default async function MarketingHubPage() {
-  const snapshot = await getMarketingSnapshot();
+  const range = await getServerReportingRange();
+  const snapshot = await getMarketingSnapshot(range);
   const stats = [
     { label: 'Active ambassadors', value: snapshot.activeAmbassadors, context: 'Ambassador programme', href: '/modules/marketing/ambassadors', icon: UserCheck, tone: 'bg-blue-50 text-emmy-primary' },
-    { label: 'Approved leads', value: snapshot.monthlyLeads, context: 'This month', href: '/modules/marketing/leads', icon: Users, tone: 'bg-indigo-50 text-indigo-600' },
-    { label: 'Conversions', value: snapshot.monthlyConversions, context: 'This month', href: '/modules/marketing/conversions', icon: Trophy, tone: 'bg-emerald-50 text-emerald-600' },
+    { label: 'Approved leads', value: snapshot.periodLeads, context: range.shortLabel, href: '/modules/marketing/leads', icon: Users, tone: 'bg-indigo-50 text-indigo-600' },
+    { label: 'Conversions', value: snapshot.periodConversions, context: range.shortLabel, href: '/modules/marketing/conversions', icon: Trophy, tone: 'bg-emerald-50 text-emerald-600' },
     { label: 'Spin Wheel players', value: snapshot.totalPlayers, context: 'All registered players', href: '/modules/marketing/spin-wheel', icon: Gift, tone: 'bg-amber-50 text-amber-600' },
     { label: 'Spins today', value: snapshot.spinsToday, context: 'Nigeria time', href: '/modules/marketing/spin-wheel', icon: MousePointerClick, tone: 'bg-orange-50 text-orange-600' },
     { label: 'Pending cash-outs', value: snapshot.pendingCashouts, context: 'Awaiting review', href: '/modules/marketing/spin-wheel', icon: BadgeDollarSign, tone: 'bg-rose-50 text-rose-600' },
@@ -51,7 +52,7 @@ export default async function MarketingHubPage() {
       </section>
 
       <section>
-        <div className="mb-3 flex items-end justify-between gap-3"><div><h3 className="text-lg font-bold text-slate-950">Performance snapshot</h3><p className="mt-1 text-xs text-slate-500">Live data from Ambassador and Spin Wheel</p></div><span className="text-xs font-semibold text-slate-400">Monthly where indicated</span></div>
+        <div className="mb-3 flex items-end justify-between gap-3"><div><h3 className="text-lg font-bold text-slate-950">Performance snapshot</h3><p className="mt-1 text-xs text-slate-500">Live data from Ambassador and Spin Wheel</p></div><span className="text-xs font-semibold text-slate-400">{range.shortLabel} where indicated</span></div>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {stats.map((stat) => { const Icon = stat.icon; return (
             <Link key={stat.label} href={stat.href} className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">

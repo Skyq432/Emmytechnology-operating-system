@@ -6,6 +6,7 @@ export type SalesOrderDraftInputLine = {
   itemName: string;
   itemType?: string | null;
   category?: string | null;
+  specs?: Record<string, unknown> | null;
   fulfilmentSource?: SalesOrderDraftFulfilmentSource;
   quantity: number;
   listPrice: number;
@@ -21,6 +22,7 @@ export type SalesOrderDraftRpcLine = {
   item_name: string;
   item_type: string;
   category: string | null;
+  specs: Record<string, unknown> | null;
   fulfilment_source: SalesOrderDraftFulfilmentSource;
   quantity: number;
   list_price: number;
@@ -72,6 +74,7 @@ export function buildSalesOrderDraftItems(lines: SalesOrderDraftInputLine[]): Sa
       item_name: name,
       item_type: String(line.itemType || 'other').trim() || 'other',
       category: line.category?.trim() || null,
+      specs: line.specs && Object.keys(line.specs).length ? line.specs : null,
       fulfilment_source: fulfilmentSource,
       quantity,
       list_price: listPrice,

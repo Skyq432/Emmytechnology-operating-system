@@ -69,7 +69,10 @@ export type RepairWorkflowAction = {
   key:
     | 'start_diagnosis'
     | 'publish_quote'
-    | 'await_payment'
+    | 'approve_quote'
+    | 'record_payment'
+    | 'confirm_collection'
+    | 'release_override'
     | 'await_parts'
     | 'start_repair'
     | 'quality_check'
@@ -85,6 +88,7 @@ export function getRepairWorkflowActions(input: {
   quoteStatus: RepairQuoteStatus | null;
   amountPaid: number;
   requiredBeforeStart: number;
+  balanceDue?: number;
 }): RepairWorkflowAction[] {
   const cancel: RepairWorkflowAction = {
     key: 'cancel',
@@ -106,10 +110,16 @@ export function getRepairWorkflowActions(input: {
     case 'diagnosing':
       return [{ key: 'publish_quote', label: 'Publish Repair Quote' }, cancel];
     case 'awaiting_customer_approval':
+      if (input.quoteStatus === 'published') {
+        return [
+          { key: 'approve_quote', label: 'Approve Quote (customer confirmed)' },
+          cancel,
+        ];
+      }
       if (input.quoteStatus !== 'approved') return [cancel];
       if (!gateMet) {
         return [
-          { key: 'await_payment', label: 'Awaiting Payment', status: 'awaiting_payment' },
+          { key: 'record_payment', label: 'Record Payment' },
           cancel,
         ];
       }
@@ -119,7 +129,7 @@ export function getRepairWorkflowActions(input: {
         cancel,
       ];
     case 'awaiting_payment':
-      if (!gateMet) return [cancel];
+      if (!gateMet) return [{ key: 'record_payment', label: 'Record Payment' }, cancel];
       return [
         { key: 'await_parts', label: 'Waiting for Parts', status: 'awaiting_parts' },
         { key: 'start_repair', label: 'Start Repair', status: 'in_progress' },
@@ -128,7 +138,7 @@ export function getRepairWorkflowActions(input: {
     case 'awaiting_parts':
       return gateMet
         ? [{ key: 'start_repair', label: 'Start Repair', status: 'in_progress' }, cancel]
-        : [cancel];
+        : [{ key: 'record_payment', label: 'Record Payment' }, cancel];
     case 'in_progress':
       return [
         { key: 'quality_check', label: 'Send to Quality Check', status: 'quality_check' },
@@ -141,7 +151,19 @@ export function getRepairWorkflowActions(input: {
         cancel,
       ];
     case 'ready_collection':
-      return [{ key: 'resume_rework', label: 'Return to Rework', status: 'rework' }, cancel];
+      if ((input.balanceDue || 0) > 0) {
+        return [
+          { key: 'record_payment', label: 'Record Payment' },
+          { key: 'release_override', label: 'Release Without Full Payment (admin approval)' },
+          { key: 'resume_rework', label: 'Return to Rework', status: 'rework' },
+          cancel,
+        ];
+      }
+      return [
+        { key: 'confirm_collection', label: 'Confirm Collected (customer picked up)' },
+        { key: 'resume_rework', label: 'Return to Rework', status: 'rework' },
+        cancel,
+      ];
     case 'rework':
       return [
         { key: 'start_repair', label: 'Resume Repair', status: 'in_progress' },

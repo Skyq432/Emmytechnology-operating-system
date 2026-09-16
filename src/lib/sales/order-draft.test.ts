@@ -19,6 +19,7 @@ test('inventory order line keeps shared inventory identity and defaults to inter
     item_name: 'ThinkPad T14',
     item_type: 'laptop',
     category: 'Laptop',
+    specs: null,
     fulfilment_source: 'internal',
     quantity: 2,
     list_price: 500000,
@@ -28,6 +29,38 @@ test('inventory order line keeps shared inventory identity and defaults to inter
     admin_exception_reason: null,
     note: null,
   });
+});
+
+test('non-stock line carries category-driven specs through to the RPC payload', () => {
+  const [line] = buildSalesOrderDraftItems([{
+    itemName: 'Screen replacement',
+    itemType: 'phone',
+    category: 'phone',
+    specs: { storage_capacity: '128GB', colour: 'Black' },
+    fulfilmentSource: 'manual',
+    quantity: 1,
+    listPrice: 45000,
+    finalUnitPrice: 40000,
+    costBasis: 20000,
+  }]);
+
+  assert.deepEqual(line.specs, { storage_capacity: '128GB', colour: 'Black' });
+});
+
+test('a line with an empty specs object is normalized to null', () => {
+  const [line] = buildSalesOrderDraftItems([{
+    itemName: 'Cable',
+    itemType: 'accessory',
+    category: 'accessory',
+    specs: {},
+    fulfilmentSource: 'manual',
+    quantity: 1,
+    listPrice: 5000,
+    finalUnitPrice: 5000,
+    costBasis: 2000,
+  }]);
+
+  assert.equal(line.specs, null);
 });
 
 test('supplier or service line preserves explicit cost evidence and fulfilment source', () => {

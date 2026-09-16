@@ -24,7 +24,6 @@ import {
 import Link from 'next/link';
 import { formatDate, formatNumber, formatCurrency } from '@/lib/utils';
 import { useReportingPeriod } from '@/components/reporting/reporting-period-context';
-import { ReportingPeriodPanel } from '@/components/reporting/reporting-period-panel';
 
 interface AdminStats {
   totalAmbassadors: number;
@@ -309,7 +308,6 @@ export default function AdminOverview() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <ReportingPeriodPanel audience="admin" />
         <div className="h-8 w-64 animate-pulse rounded bg-slate-200/50" />
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
           {[1, 2, 3, 4].map((item) => (
@@ -406,8 +404,6 @@ export default function AdminOverview() {
           Administrator
         </Badge>
       </div>
-
-      <ReportingPeriodPanel audience="admin" />
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">

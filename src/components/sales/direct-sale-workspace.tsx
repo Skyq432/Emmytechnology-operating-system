@@ -17,7 +17,19 @@ import { Select } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Alert, ActionResult } from '@/components/ui/alert';
 import { SegmentedControl } from '@/components/ui/segmented-control';
+import { getRelevantSpecFields, getOrderItemTypeLabel, ORDER_ITEM_TYPES, type OrderItemType } from '@/lib/operations/sales-model';
 import { cn } from '@/lib/utils';
+
+const SPEC_LABELS: Record<string, string> = {
+  generation: 'Generation', processor_type: 'Processor type', processor_speed_ghz: 'Processor speed (GHz)',
+  ram: 'RAM', storage_size: 'Storage size', storage_type: 'Storage type', screen_size: 'Screen size',
+  touchscreen: 'Touchscreen?', colour: 'Colour', os_installed: 'OS installed', charger_included: 'Charger included?',
+  bag_included: 'Bag included?', storage_capacity: 'Storage capacity', network_type: 'Network type',
+  sim_type: 'SIM type', accessories_included: 'Accessories included', category: 'Sub-category',
+  subcategory: 'Sub-category', compatible_with: 'Compatible with', system_capacity: 'System capacity',
+  brand: 'Brand', model_spec: 'Model / spec',
+};
+const BOOLEAN_SPEC_KEYS = new Set(['touchscreen', 'charger_included', 'bag_included']);
 
 const initialState: SalesActionState = { success: false, message: '' };
 const money = (value: number) => `₦${Number(value || 0).toLocaleString('en-NG', { maximumFractionDigits: 0 })}`;
@@ -30,7 +42,7 @@ type Availability = { inventory_item_id: string; location_id: string; location_n
 type Unit = { id: string; inventory_item_id: string; serial_number: string | null; imei_1: string | null; imei_2: string | null; unit_cost: number | null; current_location_id: string | null; status: string };
 type CartLine = {
   key: string; inventoryItemId?: string; inventoryUnitId?: string; sourceLocationId?: string;
-  itemName?: string; itemType?: string; category?: string; quantity: number; listPrice?: number;
+  itemName?: string; itemType?: string; category?: string; specs?: Record<string, unknown> | null; quantity: number; listPrice?: number;
   finalUnitPrice?: number; costBasis?: number; costBasisSource?: string; adminExceptionReason?: string;
 };
 
@@ -159,6 +171,8 @@ export function DirectSaleWorkspace({ inventory, availability, units, actor }: {
   const [price, setPrice] = useState('');
   const [exceptionReason, setExceptionReason] = useState('');
   const [serviceName, setServiceName] = useState('');
+  const [serviceType, setServiceType] = useState<OrderItemType>('other');
+  const [serviceSpecs, setServiceSpecs] = useState<Record<string, unknown>>({});
   const [serviceCost, setServiceCost] = useState('');
   const [serviceList, setServiceList] = useState('');
   const [servicePrice, setServicePrice] = useState('');
@@ -170,6 +184,7 @@ export function DirectSaleWorkspace({ inventory, availability, units, actor }: {
   const [cashOffAmount, setCashOffAmount] = useState(0);
 
   const selectedItem = inventory.find((item) => item.id === selectedItemId);
+  const serviceSpecFields = useMemo(() => getRelevantSpecFields(serviceType), [serviceType]);
   const itemUnits = useMemo(() => units.filter((unit) => unit.inventory_item_id === selectedItemId), [units, selectedItemId]);
   const itemAvailability = useMemo(() => availability.filter((row) => row.inventory_item_id === selectedItemId && Number(row.available) > 0), [availability, selectedItemId]);
   const total = lines.reduce((sum, line) => sum + Number(line.finalUnitPrice || 0) * line.quantity, 0);
@@ -225,10 +240,11 @@ export function DirectSaleWorkspace({ inventory, availability, units, actor }: {
     const list = Number(serviceList || 0); const finalPrice = Number(servicePrice || serviceList || 0); const cost = Number(serviceCost || 0);
     if (!serviceName.trim() || list <= 0 || finalPrice <= 0 || cost < 0) return;
     setLines((current) => [...current, {
-      key: crypto.randomUUID(), itemName: serviceName.trim(), itemType: 'other', category: 'Service', quantity: Math.max(1, qty),
+      key: crypto.randomUUID(), itemName: serviceName.trim(), itemType: serviceType, category: serviceType,
+      specs: Object.keys(serviceSpecs).length ? serviceSpecs : null, quantity: Math.max(1, qty),
       listPrice: list, finalUnitPrice: finalPrice, costBasis: cost, costBasisSource: 'supplier_on_demand', adminExceptionReason: exceptionReason || undefined,
     }]);
-    setServiceName(''); setServiceCost(''); setServiceList(''); setServicePrice(''); setQty(1); setExceptionReason('');
+    setServiceName(''); setServiceType('other'); setServiceSpecs({}); setServiceCost(''); setServiceList(''); setServicePrice(''); setQty(1); setExceptionReason('');
   }
 
   const createdCheckout = state.success && state.data ? state.data as DirectSaleCheckoutSnapshot : null;
@@ -277,7 +293,11 @@ export function DirectSaleWorkspace({ inventory, availability, units, actor }: {
             {selectedItem ? <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs md:col-span-2 xl:col-span-3"><div className="flex flex-wrap gap-x-6 gap-y-1"><span>Standard price <strong className="text-slate-900">{standardPrice > 0 ? money(standardPrice) : 'Not configured'}</strong></span><span>Your lowest price <strong className="text-emmy-primary">{standardPrice > 0 ? money(authorityFloor) : 'Pending price setup'}</strong></span><span>Salesperson discount <strong>{productDiscount.toFixed(0)}%</strong><span>Minimum gross margin <strong>{minMargin.toFixed(0)}%</strong></span></span></div>{selectedItem.website_price_mismatch ? <div className="mt-2 font-bold text-amber-700">Website price {money(Number(selectedItem.website_selling_price || 0))} differs from inventory standard {money(standardPrice)}.</div> : null}{needsApproval ? <div className="mt-2 font-bold text-amber-700">This price is below your normal authority. Admin approval is required.</div> : null}</div> : null}
             <Input value={exceptionReason} onChange={(e) => setExceptionReason(e.target.value)} className="md:col-span-2 xl:col-span-3" placeholder={needsApproval ? "Admin approval reason" : "Pricing note (optional)"} />
             <Button type="button" onClick={addStockLine}>Add item</Button>
-          </div> : <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          </div> : <>
+          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <Select value={serviceType} onChange={(e) => { setServiceType(e.target.value as OrderItemType); setServiceSpecs({}); }}>
+              {ORDER_ITEM_TYPES.map((type) => <option key={type} value={type}>{getOrderItemTypeLabel(type)}</option>)}
+            </Select>
             <Input value={serviceName} onChange={(e) => setServiceName(e.target.value)} placeholder="Service / charge name" />
             <Input value={serviceCost} onChange={(e) => setServiceCost(e.target.value)} placeholder="Cost basis" />
             <Input value={serviceList} onChange={(e) => setServiceList(e.target.value)} placeholder="Normal price" />
@@ -285,7 +305,29 @@ export function DirectSaleWorkspace({ inventory, availability, units, actor }: {
             <Input type="number" min="1" value={qty} onChange={(e) => setQty(Number(e.target.value))} />
             <Input value={exceptionReason} onChange={(e) => setExceptionReason(e.target.value)} className="md:col-span-2" placeholder="Admin pricing exception reason (if needed)" />
             <Button type="button" onClick={addServiceLine}>Add service</Button>
-          </div>}
+          </div>
+          {serviceSpecFields.length > 0 && (
+            <div className="mt-4 border-t border-slate-100 pt-4">
+              <p className="mb-3 text-xs font-black uppercase tracking-wide text-slate-500">{getOrderItemTypeLabel(serviceType)} details</p>
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                {serviceSpecFields.map((key) => (
+                  <label key={key}>
+                    <span className="mb-1.5 block text-xs font-bold capitalize text-slate-600">{SPEC_LABELS[key] || key.replaceAll('_', ' ')}</span>
+                    {BOOLEAN_SPEC_KEYS.has(key) ? (
+                      <Select value={String(serviceSpecs[key] ?? '')} onChange={(event) => setServiceSpecs((current) => ({ ...current, [key]: event.target.value === '' ? null : event.target.value === 'true' }))}>
+                        <option value="">Not set</option>
+                        <option value="true">Yes</option>
+                        <option value="false">No</option>
+                      </Select>
+                    ) : (
+                      <Input value={String(serviceSpecs[key] ?? '')} onChange={(event) => setServiceSpecs((current) => ({ ...current, [key]: event.target.value }))} />
+                    )}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+          </>}
 
           <div className="mt-5 space-y-2">{lines.length === 0 ? <div className="rounded-xl border border-dashed border-slate-300 p-5 text-center text-sm text-slate-400">No items added.</div> : lines.map((line) => <div key={line.key} className="flex items-center gap-3 rounded-xl border border-slate-200 p-3"><div className="min-w-0 flex-1"><div className="truncate text-sm font-bold text-slate-800">{line.itemName}</div><div className="text-xs text-slate-400">{line.quantity} × {money(Number(line.finalUnitPrice || 0))}</div></div><div className="text-sm font-black">{money(Number(line.finalUnitPrice || 0) * line.quantity)}</div><button type="button" onClick={() => setLines((current) => current.filter((row) => row.key !== line.key))} className="text-xs font-bold text-rose-600">Remove</button></div>)}</div>
 

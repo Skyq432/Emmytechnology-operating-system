@@ -9,10 +9,11 @@ import { HelpTip } from '@/components/ui/help-tip';
 import { Select } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 
-export function OperationsPeriodBar() {
+export function OperationsPeriodBar({ moduleLabel = 'Operations', helpText }: { moduleLabel?: string; helpText?: string }) {
   const router = useRouter();
   const { range, setPreset, setCustomRange, setSelectedMonth } = useReportingPeriod();
   const first = useRef(true);
+  const title = `${moduleLabel} time frame`;
 
   useEffect(() => {
     if (first.current) {
@@ -28,7 +29,7 @@ export function OperationsPeriodBar() {
       <div className="flex items-center gap-3">
         <div className="grid h-9 w-9 place-items-center rounded-lg bg-blue-50 text-emmy-primary"><CalendarRange className="h-4 w-4" /></div>
         <div>
-          <div className="flex items-center gap-1.5"><p className="text-xs font-black text-slate-800">Operations time frame</p><HelpTip text="This controls the month or dates shown across Operations. Old Inventory periods show stock as it stood at the end of that period." label="About Operations time frame" /></div>
+          <div className="flex items-center gap-1.5"><p className="text-xs font-black text-slate-800">{title}</p><HelpTip text={helpText ?? `This controls the month or dates shown across ${moduleLabel}.`} label={`About ${title}`} /></div>
           <p className="mt-0.5 text-xs text-slate-500">Showing {range.shortLabel}</p>
         </div>
       </div>

@@ -1039,6 +1039,8 @@ export async function GET() {
         id,
         identityCode: identity.identity_code || id.slice(0, 8).toUpperCase(),
         mergeConfidence: `Identity confidence ${identity.confidence_score ?? "—"}%`,
+        createdAtIso: identity.created_at,
+        lastActivityAtIso: lastActivityAt || identity.created_at,
         name: identity.primary_name || player?.full_name || lead?.customer_name || smsRows[0]?.full_name || "Unknown identity",
         phone: identity.primary_phone || player?.phone_number || lead?.customer_phone || smsRows[0]?.phone_normalized || "—",
         email: identity.primary_email || player?.email || lead?.customer_email || "—",

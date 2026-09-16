@@ -111,6 +111,26 @@ export async function updateRepairWorkDetails(input: {
   return error ? { success: false as const, message: error.message } : { success: true as const, message: 'Repair work details saved' };
 }
 
+// Combines saving the diagnosis-relevant fields with advancing the repair to
+// 'diagnosing' in one step, backing the "Start Diagnosis" popup — staff shouldn't
+// have to fill a form and then separately remember to click a different status
+// button. Only advances the status once the save has actually succeeded.
+export async function startRepairDiagnosis(input: {
+  repairId: string;
+  technicianName?: string | null;
+  repairType?: string | null;
+  diagnosis?: string | null;
+}) {
+  const saveResult = await updateRepairWorkDetails({
+    repairId: input.repairId,
+    technicianName: input.technicianName,
+    repairType: input.repairType,
+    diagnosis: input.diagnosis,
+  });
+  if (!saveResult.success) return saveResult;
+  return advanceRepairWorkflow(input.repairId, 'diagnosing');
+}
+
 export async function createRepairWithCard(input: {
   cardId: string;
   identityId?: string | null;
@@ -206,6 +226,15 @@ export async function publishRepairQuote(input: {
   return error ? { success: false as const, message: error.message } : { success: true as const, message: 'Repair quote published', data };
 }
 
+export async function approveRepairQuote(input: { repairId: string; confirmationNote: string }) {
+  const { supabase } = await requireRepairAccess();
+  const { data, error } = await supabase.rpc('ops_approve_repair_quote', {
+    p_repair_id: input.repairId,
+    p_confirmation_note: input.confirmationNote,
+  });
+  return error ? { success: false as const, message: error.message } : { success: true as const, message: 'Quote approved', data };
+}
+
 export async function recordRepairPayment(input: {
   repairId: string;
   amount: number;
@@ -264,6 +293,38 @@ export async function completeRepairCollection(input: {
     p_missing_card_reason: input.missingCardReason?.trim() || null,
   });
   return error ? { success: false as const, message: error.message } : { success: true as const, message: 'Repair collection completed', data };
+}
+
+export async function confirmRepairCollection(input: {
+  repairId: string;
+  cardReturned: boolean;
+  confirmationNote: string;
+  missingCardReason?: string | null;
+}) {
+  const { supabase } = await requireRepairAccess();
+  const { data, error } = await supabase.rpc('ops_confirm_repair_collection', {
+    p_repair_id: input.repairId,
+    p_card_returned: input.cardReturned,
+    p_confirmation_note: input.confirmationNote,
+    p_missing_card_reason: input.missingCardReason?.trim() || null,
+  });
+  return error ? { success: false as const, message: error.message } : { success: true as const, message: 'Repair marked collected', data };
+}
+
+export async function releaseRepairWithoutPayment(input: {
+  repairId: string;
+  cardReturned: boolean;
+  confirmationNote: string;
+  missingCardReason?: string | null;
+}) {
+  const { supabase } = await requireRepairAccess();
+  const { data, error } = await supabase.rpc('ops_release_repair_without_payment', {
+    p_repair_id: input.repairId,
+    p_card_returned: input.cardReturned,
+    p_confirmation_note: input.confirmationNote,
+    p_missing_card_reason: input.missingCardReason?.trim() || null,
+  });
+  return error ? { success: false as const, message: error.message } : { success: true as const, message: 'Repair released without full payment', data };
 }
 
 export async function getRepairPartsUsed(repairId: string): Promise<RepairPartUsed[]> {
