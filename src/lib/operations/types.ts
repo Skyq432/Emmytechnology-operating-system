@@ -26,6 +26,7 @@ export interface OperationsLocation { id: string; code: string; name: string; lo
 
 export interface OperationsOverview {
   openOrders: number; urgentOrders: number; awaitingDispatch: number; inventoryItems: number; lowStockItems: number; websiteLinks: number;
+  totalRepairs: number; collectedRepairs: number; uncollectedRepairs: number;
   recentOrders: OperationsOrder[]; recentEvents: OperationsOrderEvent[];
 }
 

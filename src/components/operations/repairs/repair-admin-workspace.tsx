@@ -34,6 +34,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ActionResult } from '@/components/ui/alert';
+import { SendReceiptButton } from '@/components/sales/send-receipt-button';
 
 const initialState: SalesActionState = { success: false, message: '' };
 const money = (value: number) => `₦${Number(value || 0).toLocaleString('en-NG', { maximumFractionDigits: 0 })}`;
@@ -131,7 +132,7 @@ export function RepairAdminWorkspace({
           </div>
           <form action={pinAction}><input type="hidden" name="repair_id" value={repair.id} /><Button type="submit" variant="outline" size="sm" disabled={pinPending}>{pinPending ? 'Regenerating...' : 'Regenerate PIN'}</Button></form>
           <ActionResult state={pinState} />
-        </div> : <p className="text-sm text-slate-500">No active Repair Card assignment.</p>}
+        </div> : <p className="text-sm text-slate-500">No Repair Card was issued for this job — collection doesn&apos;t need a card or PIN.</p>}
       </Panel>
 
       <Panel title="Payment gate" subtitle="The database will not allow repair work to start until approval and the required payment are satisfied.">
@@ -223,7 +224,7 @@ export function RepairAdminWorkspace({
         </div>
         <Button type="button" size="sm" className="mt-4" onClick={() => setDialogOpen('record_payment')} disabled={!currentQuote}>Record payment</Button>
         {!currentQuote && <span className="ml-3 text-xs font-bold text-amber-700">Publish a quote first.</span>}
-        {payments.length > 0 && <div className="mt-5 space-y-2">{payments.map((payment) => <div key={payment.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2"><div><p className="text-sm font-black text-slate-800">{money(payment.amount)} · {payment.payment_method.replaceAll('_',' ')}</p><p className="mt-0.5 text-xs text-slate-500">{dateTime(payment.paid_at)}{payment.reference ? ` · ${payment.reference}` : ''}</p></div>{payment.is_void && <Badge variant="danger" className="uppercase">Void</Badge>}</div>)}</div>}
+        {payments.length > 0 && <div className="mt-5 space-y-2">{payments.map((payment) => <div key={payment.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2"><div><p className="text-sm font-black text-slate-800">{money(payment.amount)} · {payment.payment_method.replaceAll('_',' ')}</p><p className="mt-0.5 text-xs text-slate-500">{dateTime(payment.paid_at)}{payment.reference ? ` · ${payment.reference}` : ''}</p></div>{payment.is_void ? <Badge variant="danger" className="uppercase">Void</Badge> : <SendReceiptButton sourceType="repair" sourcePaymentId={payment.id} defaultEmail={repair.customer_email} />}</div>)}</div>}
       </Panel>
 
       <Panel title="Repair timeline" subtitle="Important internal and customer-visible milestones for this job.">
@@ -299,9 +300,12 @@ export function RepairAdminWorkspace({
     <Dialog open={dialogOpen === 'confirm_collection'} onClose={() => setDialogOpen(null)} title="Confirm Collected" description="For when the customer picks up in person or you've confirmed by phone that a rider/agent handed the device over. Record how it was confirmed — this becomes part of the repair's record.">
       <form action={collectionAction} className="space-y-4">
         <input type="hidden" name="repair_id" value={repair.id} />
+        <input type="hidden" name="has_card" value={activeAssignment ? 'true' : 'false'} />
         <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700">Balance due: <span className="font-bold">{money(repair.balance_due)}</span>{repair.balance_due > 0 && <span className="ml-2 text-rose-600">Balance must be cleared before this can be confirmed.</span>}</div>
-        <label className="flex items-center gap-2 text-sm font-bold text-slate-700"><input type="checkbox" name="card_returned" defaultChecked className="h-4 w-4" /> Physical Repair Card returned</label>
-        <Field label="If not returned, reason"><Input name="missing_card_reason" placeholder="Only needed if the card above is unchecked" /></Field>
+        {activeAssignment && <>
+          <label className="flex items-center gap-2 text-sm font-bold text-slate-700"><input type="checkbox" name="card_returned" defaultChecked className="h-4 w-4" /> Physical Repair Card returned</label>
+          <Field label="If not returned, reason"><Input name="missing_card_reason" placeholder="Only needed if the card above is unchecked" /></Field>
+        </>}
         <Field label="Confirmation note"><Textarea name="confirmation_note" required placeholder="e.g. Customer collected in person on 15 Sep, ID verified at front desk." className="min-h-20" /></Field>
         <div className="flex items-center gap-3">
           <Button type="submit" variant="success" disabled={collectionPending}>{collectionPending ? 'Confirming...' : 'Confirm Collected'}</Button>
@@ -313,9 +317,12 @@ export function RepairAdminWorkspace({
     <Dialog open={dialogOpen === 'release_override'} onClose={() => setDialogOpen(null)} title="Release Without Full Payment" description="Only an authorised administrator can do this. Use it when release was approved despite an outstanding balance — e.g. confirmed by phone that the customer will settle later.">
       <form action={releaseAction} className="space-y-4">
         <input type="hidden" name="repair_id" value={repair.id} />
+        <input type="hidden" name="has_card" value={activeAssignment ? 'true' : 'false'} />
         <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">Outstanding balance at release: <span className="font-bold">{money(repair.balance_due)}</span></div>
-        <label className="flex items-center gap-2 text-sm font-bold text-slate-700"><input type="checkbox" name="card_returned" defaultChecked className="h-4 w-4" /> Physical Repair Card returned</label>
-        <Field label="If not returned, reason"><Input name="missing_card_reason" placeholder="Only needed if the card above is unchecked" /></Field>
+        {activeAssignment && <>
+          <label className="flex items-center gap-2 text-sm font-bold text-slate-700"><input type="checkbox" name="card_returned" defaultChecked className="h-4 w-4" /> Physical Repair Card returned</label>
+          <Field label="If not returned, reason"><Input name="missing_card_reason" placeholder="Only needed if the card above is unchecked" /></Field>
+        </>}
         <Field label="Approval note"><Textarea name="confirmation_note" required placeholder="e.g. Approved by [administrator name] via phone at 3pm — customer will settle the balance on their next visit." className="min-h-20" /></Field>
         <div className="flex items-center gap-3">
           <Button type="submit" variant="outline" className="border-amber-300 text-amber-800" disabled={releasePending}>{releasePending ? 'Releasing...' : 'Release Without Full Payment'}</Button>

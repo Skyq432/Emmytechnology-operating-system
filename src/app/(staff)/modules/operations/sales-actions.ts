@@ -119,10 +119,9 @@ export async function createRepairAction(_prev: SalesActionState, formData: Form
   const fault = String(formData.get('fault_reported') || '').trim();
   const cardId = String(formData.get('card_id') || '');
   if (!fault) return initialFail('Fault reported is required.');
-  if (!cardId) return initialFail('Choose an available Repair Card.');
 
   const result = await createRepairWithCard({
-    cardId,
+    cardId: cardId || null,
     identityId: String(formData.get('identity_id') || '') || null,
     originalOrderId: String(formData.get('original_order_id') || '') || null,
     inventoryUnitId: String(formData.get('inventory_unit_id') || '') || null,
@@ -251,11 +250,12 @@ export async function approveRepairQuoteAction(_prev: SalesActionState, formData
 export async function confirmRepairCollectionAction(_prev: SalesActionState, formData: FormData): Promise<SalesActionState> {
   const repairId = String(formData.get('repair_id') || '');
   const confirmationNote = String(formData.get('confirmation_note') || '');
-  const cardReturned = formData.get('card_returned') === 'on';
+  const hasCard = formData.get('has_card') === 'true';
+  const cardReturned = !hasCard || formData.get('card_returned') === 'on';
   const missingCardReason = String(formData.get('missing_card_reason') || '');
   if (!repairId) return initialFail('Repair is required.');
   if (!confirmationNote.trim()) return initialFail('Describe how the customer confirmed collection.');
-  if (!cardReturned && !missingCardReason.trim()) return initialFail('Explain why the physical Repair Card was not returned.');
+  if (hasCard && !cardReturned && !missingCardReason.trim()) return initialFail('Explain why the physical Repair Card was not returned.');
   const result = await confirmRepairCollection({ repairId, cardReturned, confirmationNote, missingCardReason });
   if (result.success) revalidateRepair(repairId);
   return { success: result.success, message: result.message };
@@ -264,11 +264,12 @@ export async function confirmRepairCollectionAction(_prev: SalesActionState, for
 export async function releaseRepairWithoutPaymentAction(_prev: SalesActionState, formData: FormData): Promise<SalesActionState> {
   const repairId = String(formData.get('repair_id') || '');
   const confirmationNote = String(formData.get('confirmation_note') || '');
-  const cardReturned = formData.get('card_returned') === 'on';
+  const hasCard = formData.get('has_card') === 'true';
+  const cardReturned = !hasCard || formData.get('card_returned') === 'on';
   const missingCardReason = String(formData.get('missing_card_reason') || '');
   if (!repairId) return initialFail('Repair is required.');
   if (!confirmationNote.trim()) return initialFail('Record how this release was approved.');
-  if (!cardReturned && !missingCardReason.trim()) return initialFail('Explain why the physical Repair Card was not returned.');
+  if (hasCard && !cardReturned && !missingCardReason.trim()) return initialFail('Explain why the physical Repair Card was not returned.');
   const result = await releaseRepairWithoutPayment({ repairId, cardReturned, confirmationNote, missingCardReason });
   if (result.success) revalidateRepair(repairId);
   return { success: result.success, message: result.message };

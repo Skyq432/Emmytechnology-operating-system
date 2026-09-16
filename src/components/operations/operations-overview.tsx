@@ -3,10 +3,13 @@ import {
   AlertTriangle,
   ArrowRight,
   Boxes,
+  CheckCircle2,
   ClipboardList,
+  Clock,
   Link2,
   PackageCheck,
   Truck,
+  Wrench,
 } from 'lucide-react';
 import { HelpTip } from '@/components/ui/help-tip';
 import { buttonVariants } from '@/components/ui/button';
@@ -22,30 +25,38 @@ function MetricCard({
   helper,
   help,
   icon: Icon,
+  href,
 }: {
   label: string;
   value: number;
   helper: string;
   help: string;
   icon: React.ComponentType<{ className?: string }>;
+  href?: string;
 }) {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5">
-            <p className="text-xs font-bold text-slate-500">{label}</p>
-            <HelpTip text={help} label={`About ${label}`} />
-          </div>
-          <p className="mt-2 text-2xl font-black tracking-tight text-slate-950">{value}</p>
-          <p className="mt-1 text-xs leading-5 text-slate-500">{helper}</p>
+  const body = (
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <div className="flex items-center gap-1.5">
+          <p className="text-xs font-bold text-slate-500">{label}</p>
+          <HelpTip text={help} label={`About ${label}`} />
         </div>
-        <div className="rounded-lg bg-blue-50 p-2.5 text-emmy-primary">
-          <Icon className="h-4 w-4" />
-        </div>
+        <p className="mt-2 text-2xl font-black tracking-tight text-slate-950">{value}</p>
+        <p className="mt-1 text-xs leading-5 text-slate-500">{helper}</p>
+      </div>
+      <div className="rounded-lg bg-blue-50 p-2.5 text-emmy-primary">
+        <Icon className="h-4 w-4" />
       </div>
     </div>
   );
+  if (href) {
+    return (
+      <Link href={href} className="block rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-colors hover:border-emmy-primary hover:bg-blue-50/40">
+        {body}
+      </Link>
+    );
+  }
+  return <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">{body}</div>;
 }
 
 export function OperationsOverview({ data }: { data: OperationsOverviewData }) {
@@ -71,6 +82,13 @@ export function OperationsOverview({ data }: { data: OperationsOverviewData }) {
         <MetricCard label="Inventory items" value={data.inventoryItems} helper="Internal items being tracked" help={OPERATIONS_HELP.inventoryItems} icon={Boxes} />
         <MetricCard label="Low stock" value={data.lowStockItems} helper="May need restocking" help={OPERATIONS_HELP.lowStock} icon={PackageCheck} />
         <MetricCard label="Website links" value={data.websiteLinks} helper="Optional product links" help={OPERATIONS_HELP.websiteLinks} icon={Link2} />
+      </div>
+
+      <p className="mb-2 mt-5 text-xs font-black uppercase tracking-[0.14em] text-slate-400">Repairs</p>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <MetricCard label="Total repairs" value={data.totalRepairs} helper="Received in this period" help={OPERATIONS_HELP.totalRepairs} icon={Wrench} href="/modules/operations/repairs" />
+        <MetricCard label="Collected" value={data.collectedRepairs} helper="Already picked up" help={OPERATIONS_HELP.collectedRepairs} icon={CheckCircle2} href="/modules/operations/repairs?status=collected" />
+        <MetricCard label="Not collected yet" value={data.uncollectedRepairs} helper="Still in the pipeline" help={OPERATIONS_HELP.uncollectedRepairs} icon={Clock} href="/modules/operations/repairs?status=uncollected" />
       </div>
 
       <div className="mt-5 grid gap-5 xl:grid-cols-[1.35fr_1fr]">

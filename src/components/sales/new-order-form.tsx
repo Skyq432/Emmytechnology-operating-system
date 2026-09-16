@@ -11,21 +11,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ActionResult } from '@/components/ui/alert';
 import { SegmentedControl } from '@/components/ui/segmented-control';
-import { getRelevantSpecFields, getOrderItemTypeLabel, ORDER_ITEM_TYPES, type OrderItemType } from '@/lib/operations/sales-model';
+import {
+  getRelevantSpecFields, getOrderItemTypeLabel, ORDER_ITEM_TYPES, type OrderItemType,
+  ORDER_ITEM_SPEC_LABELS as SPEC_LABELS, ORDER_ITEM_BOOLEAN_SPEC_KEYS as BOOLEAN_SPEC_KEYS,
+} from '@/lib/operations/sales-model';
 
 const initial: SalesActionState = { success: false, message: '' };
 const money = (value: number) => `₦${Number(value || 0).toLocaleString('en-NG', { maximumFractionDigits: 0 })}`;
-
-const SPEC_LABELS: Record<string, string> = {
-  generation: 'Generation', processor_type: 'Processor type', processor_speed_ghz: 'Processor speed (GHz)',
-  ram: 'RAM', storage_size: 'Storage size', storage_type: 'Storage type', screen_size: 'Screen size',
-  touchscreen: 'Touchscreen?', colour: 'Colour', os_installed: 'OS installed', charger_included: 'Charger included?',
-  bag_included: 'Bag included?', storage_capacity: 'Storage capacity', network_type: 'Network type',
-  sim_type: 'SIM type', accessories_included: 'Accessories included', category: 'Sub-category',
-  subcategory: 'Sub-category', compatible_with: 'Compatible with', system_capacity: 'System capacity',
-  brand: 'Brand', model_spec: 'Model / spec',
-};
-const BOOLEAN_SPEC_KEYS = new Set(['touchscreen', 'charger_included', 'bag_included']);
 
 function computeMargin(price: number, cost: number) {
   if (!(price > 0)) return null;
@@ -213,7 +205,7 @@ export function NewOrderForm({ inventory, marginContext }: { inventory: Inventor
             {(mode === 'custom' || source !== 'internal') ? <Input value={cost} onChange={(event) => setCost(event.target.value)} placeholder="Supplier / service cost basis" /> : null}
             <Input value={lineNote} onChange={(event) => setLineNote(event.target.value)} placeholder="Line note" />
             <Input value={exceptionReason} onChange={(event) => setExceptionReason(event.target.value)} placeholder="Admin pricing exception reason, if needed" className="xl:col-span-2" />
-            <Button type="button" onClick={mode === 'product' ? addProduct : addCustom}>Add order line</Button>
+            {mode === 'product' ? <Button type="button" onClick={addProduct}>Add order line</Button> : null}
           </div>
 
           {mode === 'custom' && customSpecFields.length > 0 && (
@@ -237,6 +229,7 @@ export function NewOrderForm({ inventory, marginContext }: { inventory: Inventor
               </div>
             </div>
           )}
+          {mode === 'custom' ? <Button type="button" className="mt-4" onClick={addCustom}>Add order line</Button> : null}
         </div>
 
         <div className="space-y-2">

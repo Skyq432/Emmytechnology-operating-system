@@ -46,6 +46,7 @@ export async function publishSalesQuotationVersion(input: {
     costBasisSource?: 'inventory_average' | 'product_default' | 'supplier_on_demand';
     adminExceptionReason?: string | null;
     note?: string | null;
+    specs?: Record<string, unknown> | null;
   }>;
   customerNote?: string | null;
   terms?: string | null;
@@ -67,6 +68,7 @@ export async function publishSalesQuotationVersion(input: {
       cost_basis_source: item.costBasisSource ?? '',
       admin_exception_reason: item.adminExceptionReason ?? '',
       note: item.note ?? '',
+      specs: item.specs ?? null,
     })),
     p_customer_note: input.customerNote ?? null,
     p_terms: input.terms ?? null,

@@ -5,6 +5,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { renderFallbackSalesPdf } from './fallback-pdf.ts';
 import { renderReceiptPdf } from './pdf/receipt.ts';
+import { renderQuotationPdf } from './pdf/quotation.ts';
 import {
   buildQuotationTemplateData,
   buildReceiptTemplateData,
@@ -90,10 +91,18 @@ export async function renderDocumentPdf(input: {
 }): Promise<Buffer> {
   const isReceipt = input.documentType === 'payment_receipt' || input.documentType === 'final_sales_receipt';
 
-  // Receipts are production PDFs generated natively inside EmmyTech OS.
-  // The approved receipt.tex remains a design/reference file only.
+  // Receipts and quotations are production PDFs generated natively inside EmmyTech
+  // OS, sharing one design system (see pdf/shared.ts). The .tex templates remain
+  // design/reference files only.
   if (isReceipt) {
     return renderReceiptPdf({
+      documentNumber: input.documentNumber,
+      issuedAt: input.issuedAt,
+      snapshot: input.snapshot,
+    });
+  }
+  if (input.documentType === 'quotation_pdf') {
+    return renderQuotationPdf({
       documentNumber: input.documentNumber,
       issuedAt: input.issuedAt,
       snapshot: input.snapshot,
@@ -109,10 +118,7 @@ export async function renderDocumentPdf(input: {
     return await renderLocal(source, logo);
   } catch (error) {
     const typed = error as NodeJS.ErrnoException;
-    if (
-      typed.code === 'ENOENT' &&
-      (input.documentType === 'quotation_pdf' || input.documentType === 'refund_document')
-    ) {
+    if (typed.code === 'ENOENT' && input.documentType === 'refund_document') {
       return renderFallbackSalesPdf({
         documentNumber: input.documentNumber,
         documentType: input.documentType,
