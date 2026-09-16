@@ -58,23 +58,35 @@ export function IdentityPicker({
   placeholder = 'Start typing any customer detail...',
   selected: controlledSelected,
 }: IdentityPickerProps) {
+  type FieldKey = 'code' | 'phone' | 'email' | 'name' | 'address';
+
   const [internalSelected, setInternalSelected] = useState<OperationsIdentitySummary | null>(null);
   const [name, setName] = useState(defaultName);
   const [phone, setPhone] = useState(defaultPhone);
   const [email, setEmail] = useState(defaultEmail);
   const [address, setAddress] = useState(defaultAddress);
   const [code, setCode] = useState('');
+  const [activeField, setActiveField] = useState<FieldKey | null>(null);
 
   const [results, setResults] = useState<OperationsIdentitySummary[]>([]);
   const [loading, setLoading] = useState(false);
-  const latestQuery = useRef('');
+  const [searchError, setSearchError] = useState<string | null>(null);
+  // Scoped to this picker instance — cleared when it unmounts, never persisted, so a
+  // stale cache entry can't outlive the create-flow session it was built during.
+  const resultCache = useRef(new Map<string, OperationsIdentitySummary[]>());
 
   const selected = renderHiddenFields ? internalSelected : controlledSelected ?? null;
 
   const multiFieldQuery = useMemo(() => {
+    // Search on whichever field the user is actively typing in, not a fixed
+    // precedence order — otherwise once an earlier field (e.g. name) reaches 3
+    // characters, editing a later one (e.g. address) never triggers a fresh search.
+    const fieldValues: Record<FieldKey, string> = { code, phone, email, name, address };
+    const activeValue = activeField ? fieldValues[activeField].trim() : '';
+    if (activeValue.length >= 3) return activeValue;
     const values = [code, phone, email, name, address].map((v) => v.trim()).filter((v) => v.length >= 3);
     return values[0] || '';
-  }, [code, phone, email, name, address]);
+  }, [activeField, code, phone, email, name, address]);
 
   const query = renderHiddenFields ? multiFieldQuery : controlledQuery ?? '';
 
@@ -84,20 +96,43 @@ export function IdentityPicker({
 
   useEffect(() => {
     if (selected || query.length < 3) return;
-    latestQuery.current = query;
+    const cached = resultCache.current.get(query);
+    if (cached) {
+      setResults(cached);
+      setSearchError(null);
+      return;
+    }
+    let cancelled = false;
+    const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       setLoading(true);
       try {
-        const response = await fetch(`/api/operations/identities?q=${encodeURIComponent(query)}`);
+        const response = await fetch(`/api/operations/identities?q=${encodeURIComponent(query)}`, { signal: controller.signal });
         const payload = await response.json();
-        if (latestQuery.current === query) setResults(Array.isArray(payload.results) ? payload.results : []);
-      } catch {
-        if (latestQuery.current === query) setResults([]);
+        if (!response.ok) throw new Error(payload?.detail || payload?.error || 'Search failed');
+        const nextResults = Array.isArray(payload.results) ? payload.results : [];
+        // Only cache genuine successes — a transient failure shouldn't poison this
+        // query string for the rest of the session.
+        resultCache.current.set(query, nextResults);
+        if (!cancelled) {
+          setResults(nextResults);
+          setSearchError(null);
+        }
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        if (!cancelled) {
+          setResults([]);
+          setSearchError(error instanceof Error ? error.message : 'Search failed');
+        }
       } finally {
-        if (latestQuery.current === query) setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }, 250);
-    return () => window.clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      controller.abort();
+    };
   }, [query, selected]);
 
   function choose(identity: OperationsIdentitySummary) {
@@ -120,12 +155,14 @@ export function IdentityPicker({
       setPhone('');
       setEmail('');
       setAddress('');
+      setActiveField(null);
     }
     onSelect?.(null);
   }
 
-  function edit(setter: (value: string) => void, value: string) {
+  function edit(field: FieldKey, setter: (value: string) => void, value: string) {
     setInternalSelected(null);
+    setActiveField(field);
     setter(value);
     if (!renderHiddenFields) onSelect?.(null);
   }
@@ -140,6 +177,10 @@ export function IdentityPicker({
           className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emmy-primary focus:ring-2 focus:ring-emmy-primary/10"
         />
         {loading && <p className="mt-2 text-xs text-slate-400">Checking EmmyTech identities...</p>}
+        {!loading && searchError && <p className="mt-2 text-xs font-bold text-rose-600">Search failed: {searchError}. Try again.</p>}
+        {!loading && !searchError && query.length >= 3 && effectiveResults.length === 0 && (
+          <p className="mt-2 text-xs text-slate-400">No CRM match yet. A new Identity will be resolved when you save.</p>
+        )}
         {effectiveResults.length > 0 && (
           <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-72 overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg">
             {effectiveResults.map((identity) => (
@@ -190,16 +231,17 @@ export function IdentityPicker({
       ) : null}
 
       <div className="relative mt-4 grid gap-3 md:grid-cols-2">
-        <input value={code} onChange={(e) => edit(setCode, e.target.value)} placeholder="CRM identity code" className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
-        <input name="customer_name" value={name} onChange={(e) => edit(setName, e.target.value)} placeholder="Customer name" className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
-        <input name="customer_phone" value={phone} onChange={(e) => edit(setPhone, e.target.value)} placeholder="Phone" className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
-        <input name="customer_email" value={email} onChange={(e) => edit(setEmail, e.target.value)} type="email" placeholder="Email" className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
-        <input name="customer_address" value={address} onChange={(e) => edit(setAddress, e.target.value)} placeholder="Address (supporting CRM signal)" className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm md:col-span-2" />
+        <input value={code} onChange={(e) => edit('code', setCode, e.target.value)} placeholder="CRM identity code" className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+        <input name="customer_name" value={name} onChange={(e) => edit('name', setName, e.target.value)} placeholder="Customer name" className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+        <input name="customer_phone" value={phone} onChange={(e) => edit('phone', setPhone, e.target.value)} placeholder="Phone" className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+        <input name="customer_email" value={email} onChange={(e) => edit('email', setEmail, e.target.value)} type="email" placeholder="Email" className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+        <input name="customer_address" value={address} onChange={(e) => edit('address', setAddress, e.target.value)} placeholder="Address (supporting CRM signal)" className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm md:col-span-2" />
         <input type="hidden" name="identity_id" value={selected?.id || ''} />
 
-        {!selected && (loading || effectiveResults.length > 0) ? (
+        {!selected && (loading || searchError || effectiveResults.length > 0) ? (
           <div className="absolute left-0 right-0 top-full z-30 mt-2 max-h-72 overflow-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl">
             {loading ? <div className="px-3 py-2 text-xs text-slate-400">Checking CRM identities…</div> : null}
+            {!loading && searchError ? <div className="px-3 py-2 text-xs font-bold text-rose-600">Search failed: {searchError}. Try again.</div> : null}
             {effectiveResults.map((identity) => (
               <button key={identity.id} type="button" onClick={() => choose(identity)} className="block w-full rounded-lg px-3 py-2.5 text-left hover:bg-slate-50">
                 <div className="text-sm font-bold text-slate-900">{identity.primary_name || 'Unnamed customer'}</div>
@@ -208,7 +250,7 @@ export function IdentityPicker({
                 </div>
               </button>
             ))}
-            {!loading && !effectiveResults.length ? <div className="px-3 py-2 text-xs text-slate-400">No CRM match yet. A new Identity will be resolved when you save.</div> : null}
+            {!loading && !searchError && !effectiveResults.length ? <div className="px-3 py-2 text-xs text-slate-400">No CRM match yet. A new Identity will be resolved when you save.</div> : null}
           </div>
         ) : null}
       </div>

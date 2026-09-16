@@ -8,6 +8,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/modules/marketing': 'Marketing Solutions',
   '/modules/marketing/ambassador': 'Ambassador Command Centre',
   '/modules/marketing/ambassadors': 'Ambassadors',
+  '/modules/marketing/leaderboard': 'Ambassador Leaderboard',
   '/modules/marketing/activities': 'Activity Reviews',
   '/modules/marketing/leads': 'Lead Management',
   '/modules/marketing/whatsapp-intake': 'WhatsApp Intake',

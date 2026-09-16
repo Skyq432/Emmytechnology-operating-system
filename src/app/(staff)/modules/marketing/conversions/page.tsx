@@ -13,7 +13,6 @@ import {
 import Link from 'next/link';
 import { formatDate, formatCurrency } from '@/lib/utils';
 import { useReportingPeriod } from '@/components/reporting/reporting-period-context';
-import { ReportingPeriodPanel } from '@/components/reporting/reporting-period-panel';
 
 interface Conversion {
   id: string;
@@ -114,7 +113,6 @@ export default function ConversionsPage() {
 
   return (
     <div className="space-y-8">
-      <ReportingPeriodPanel audience="admin" />
       {/* Header with back button */}
       <div className="flex items-center gap-4">
         <Link href="/modules/marketing">

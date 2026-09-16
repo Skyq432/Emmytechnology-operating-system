@@ -265,11 +265,12 @@ export default function MyWorkWorkspace({ currentUser, summary, todos, tasks, go
 
       {tab === 'Today' && (
         <>
-          <StatGrid className="sm:grid-cols-4">
+          <StatGrid className="sm:grid-cols-2 lg:grid-cols-5">
+            <StatTile label="Active Tasks" value={summary.activeCount} icon={<Inbox className="h-[15px] w-[15px]" />} tone="purple" description="In progress, any due date" />
             <StatTile label="Needs response" value={summary.pendingAcceptanceCount} icon={<Inbox className="h-[15px] w-[15px]" />} tone="primary" />
             <StatTile label="Due today" value={summary.dueTodayCount} icon={<Clock3 className="h-[15px] w-[15px]" />} tone="secondary" />
             <StatTile label="Overdue" value={summary.overdueCount} icon={<AlertTriangle className="h-[15px] w-[15px]" />} tone="danger" />
-            <StatTile label="My Todos today" value={summary.todayTodoCount} icon={<CheckCircle2 className="h-[15px] w-[15px]" />} tone="success" />
+            <StatTile label="My Todos" value={summary.openTodoCount} icon={<CheckCircle2 className="h-[15px] w-[15px]" />} tone="success" />
           </StatGrid>
 
           <div className="grid gap-4 lg:grid-cols-2">

@@ -13,15 +13,19 @@ import {
 import {
   addRepairPart,
   advanceRepairWorkflow,
+  approveRepairQuote,
+  confirmRepairCollection,
   createRepairWithCard,
   publishRepairQuote,
   recordRepairPayment,
   regenerateRepairPin,
+  releaseRepairWithoutPayment,
   removeRepairPart,
+  startRepairDiagnosis,
   updateRepairWorkDetails,
 } from '@/lib/operations/repair-server';
 
-export type SalesActionState = { success: boolean; message: string };
+export type SalesActionState = { success: boolean; message: string; data?: unknown };
 const initialFail = (message: string): SalesActionState => ({ success: false, message });
 
 function revalidateRepair(repairId: string) {
@@ -149,9 +153,9 @@ export async function createRepairAction(_prev: SalesActionState, formData: Form
 
   if (result.success) {
     revalidatePath('/modules/operations/repairs');
-    const data = result.data as { repair_code?: string; card_code?: string; access_pin?: string } | null;
+    const data = result.data as { repair_id?: string; repair_code?: string; card_code?: string; access_pin?: string } | null;
     const details = [data?.repair_code, data?.card_code, data?.access_pin ? `PIN ${data.access_pin}` : ''].filter(Boolean).join(' · ');
-    return { success: true, message: details ? `Repair created · ${details}` : result.message };
+    return { success: true, message: details ? `Repair created · ${details}` : result.message, data: { repairId: data?.repair_id } };
   }
   return { success: false, message: result.message };
 }
@@ -171,6 +175,19 @@ export async function saveRepairWorkAction(_prev: SalesActionState, formData: Fo
     warrantyPeriod: String(formData.get('warranty_period') || ''),
     warrantyExpiresAt: String(formData.get('warranty_expires_at') || '') || null,
     notes: String(formData.get('notes') || ''),
+  });
+  if (result.success) revalidateRepair(repairId);
+  return { success: result.success, message: result.message };
+}
+
+export async function startDiagnosisAction(_prev: SalesActionState, formData: FormData): Promise<SalesActionState> {
+  const repairId = String(formData.get('repair_id') || '');
+  if (!repairId) return initialFail('Repair is required.');
+  const result = await startRepairDiagnosis({
+    repairId,
+    technicianName: String(formData.get('technician_name') || ''),
+    repairType: String(formData.get('repair_type') || ''),
+    diagnosis: String(formData.get('diagnosis') || ''),
   });
   if (result.success) revalidateRepair(repairId);
   return { success: result.success, message: result.message };
@@ -217,6 +234,42 @@ export async function publishRepairQuoteAction(_prev: SalesActionState, formData
     paymentRequirement,
     requiredBeforeStart: Number(formData.get('required_before_start') || 0),
   });
+  if (result.success) revalidateRepair(repairId);
+  return { success: result.success, message: result.message };
+}
+
+export async function approveRepairQuoteAction(_prev: SalesActionState, formData: FormData): Promise<SalesActionState> {
+  const repairId = String(formData.get('repair_id') || '');
+  const confirmationNote = String(formData.get('confirmation_note') || '');
+  if (!repairId) return initialFail('Repair is required.');
+  if (!confirmationNote.trim()) return initialFail('Describe how the customer confirmed.');
+  const result = await approveRepairQuote({ repairId, confirmationNote });
+  if (result.success) revalidateRepair(repairId);
+  return { success: result.success, message: result.message };
+}
+
+export async function confirmRepairCollectionAction(_prev: SalesActionState, formData: FormData): Promise<SalesActionState> {
+  const repairId = String(formData.get('repair_id') || '');
+  const confirmationNote = String(formData.get('confirmation_note') || '');
+  const cardReturned = formData.get('card_returned') === 'on';
+  const missingCardReason = String(formData.get('missing_card_reason') || '');
+  if (!repairId) return initialFail('Repair is required.');
+  if (!confirmationNote.trim()) return initialFail('Describe how the customer confirmed collection.');
+  if (!cardReturned && !missingCardReason.trim()) return initialFail('Explain why the physical Repair Card was not returned.');
+  const result = await confirmRepairCollection({ repairId, cardReturned, confirmationNote, missingCardReason });
+  if (result.success) revalidateRepair(repairId);
+  return { success: result.success, message: result.message };
+}
+
+export async function releaseRepairWithoutPaymentAction(_prev: SalesActionState, formData: FormData): Promise<SalesActionState> {
+  const repairId = String(formData.get('repair_id') || '');
+  const confirmationNote = String(formData.get('confirmation_note') || '');
+  const cardReturned = formData.get('card_returned') === 'on';
+  const missingCardReason = String(formData.get('missing_card_reason') || '');
+  if (!repairId) return initialFail('Repair is required.');
+  if (!confirmationNote.trim()) return initialFail('Record how this release was approved.');
+  if (!cardReturned && !missingCardReason.trim()) return initialFail('Explain why the physical Repair Card was not returned.');
+  const result = await releaseRepairWithoutPayment({ repairId, cardReturned, confirmationNote, missingCardReason });
   if (result.success) revalidateRepair(repairId);
   return { success: result.success, message: result.message };
 }

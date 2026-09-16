@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useActionState, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useActionState, useEffect, useMemo, useState } from 'react';
 import { ClipboardList, Plus, Search, UserCheck } from 'lucide-react';
 import { HelpTip } from '@/components/ui/help-tip';
 import { Input } from '@/components/ui/input';
@@ -29,8 +30,15 @@ export function OrdersClient({ orders, inventory, locations, websiteProducts, am
   websiteProducts: Array<{ id: string; name: string; slug: string; status: string | null; price: number | null; sale_price: number | null }>;
   ambassadors: AmbassadorOption[];
 }) {
+  const router = useRouter();
   const [state, formAction, pending] = useActionState(createOrderAction, initialState);
   const [showCreate, setShowCreate] = useState(false);
+
+  useEffect(() => {
+    if (state.success && typeof state.data === 'string') {
+      router.push(`/modules/operations/orders/${state.data}`);
+    }
+  }, [state, router]);
   const [search, setSearch] = useState('');
   // Commercial (draft/confirmed/cancelled) and fulfilment (new...completed) are two
   // separate fields on the same order — 'confirmed' is a valid value in both, so they

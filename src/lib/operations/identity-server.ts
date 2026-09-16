@@ -153,12 +153,17 @@ export async function searchOperationsIdentities(query: string): Promise<Operati
   const addressByIdentity = new Map<string, string>();
   for (const row of addressSignals || []) if (!addressByIdentity.has(row.identity_id)) addressByIdentity.set(row.identity_id, row.signal_value);
 
-  return Promise.all(matchedIdentities.map(async (identity) => {
+  const { data: stageRows, error: stageError } = await supabase.rpc('ops_current_crm_stage_bulk', { p_identity_ids: ids });
+  if (stageError) throw new Error(stageError.message);
+  const stageByIdentity = new Map(
+    ((stageRows || []) as Array<{ identity_id: string; stage: number }>).map((row) => [row.identity_id, Number(row.stage || 0)])
+  );
+
+  return matchedIdentities.map((identity) => {
     const lead = leadByIdentity.get(identity.id);
     const ownership = ownershipByIdentity.get(identity.id);
     const ambassadorId = ownership?.original_ambassador_id || lead?.ambassador_id || null;
-    const { data: stage } = await supabase.rpc('ops_current_crm_stage', { p_identity_id: identity.id });
-    const crmStage = Number(stage || 0);
+    const crmStage = stageByIdentity.get(identity.id) || 0;
 
     return {
       id: identity.id,
@@ -175,5 +180,5 @@ export async function searchOperationsIdentities(query: string): Promise<Operati
       acquisition_source: lead?.source || null,
       cash_off_balance: cashOffByIdentity.get(identity.id) || 0,
     } satisfies OperationsIdentitySummary;
-  }));
+  });
 }

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { AlertTriangle, ArrowRight, CheckCircle2, Clock3, Inbox } from 'lucide-react';
+import { AlertTriangle, ArrowRight, CheckCircle2, Clock3, Inbox, ListChecks } from 'lucide-react';
 import { StatGrid, StatTile } from '@/components/ui/stat-tile';
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -38,11 +38,12 @@ export default function CommandCentreWorkSummary({ summary }: { summary: Summary
         </Link>
       </div>
 
-      <StatGrid className="mt-4 sm:grid-cols-4">
+      <StatGrid className="mt-4 sm:grid-cols-2 lg:grid-cols-5">
+        <StatTile label="Active Tasks" value={summary.activeCount} icon={<ListChecks className="h-[15px] w-[15px]" />} tone="purple" description="In progress, any due date" />
         <StatTile label="Need response" value={summary.pendingAcceptanceCount} icon={<Inbox className="h-[15px] w-[15px]" />} tone="primary" />
         <StatTile label="Due today" value={summary.dueTodayCount} icon={<Clock3 className="h-[15px] w-[15px]" />} tone="secondary" />
         <StatTile label="Overdue" value={summary.overdueCount} icon={<AlertTriangle className="h-[15px] w-[15px]" />} tone="danger" />
-        <StatTile label="Private Todos" value={summary.todayTodoCount} icon={<CheckCircle2 className="h-[15px] w-[15px]" />} tone="success" />
+        <StatTile label="Private Todos" value={summary.openTodoCount} icon={<CheckCircle2 className="h-[15px] w-[15px]" />} tone="success" />
       </StatGrid>
 
       {summary.extensionDecisionCount > 0 && (

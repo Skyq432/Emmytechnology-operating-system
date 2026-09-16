@@ -26,7 +26,6 @@ import {
   Gift,
 } from 'lucide-react';
 import { formatDate, formatCurrency } from '@/lib/utils';
-import { ReportingPeriodPanel } from '@/components/reporting/reporting-period-panel';
 import { useReportingPeriod } from '@/components/reporting/reporting-period-context';
 
 interface AmbassadorDetail {
@@ -585,7 +584,6 @@ export default function AmbassadorDetailPage() {
 
   return (
     <div className="space-y-8">
-      <ReportingPeriodPanel audience="admin" />
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-950 via-emmy-primary to-blue-700 p-8 text-white shadow-xl">
         <div className="absolute right-0 top-0 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
         <div className="absolute bottom-0 left-1/2 h-40 w-40 rounded-full bg-yellow-400/20 blur-2xl" />

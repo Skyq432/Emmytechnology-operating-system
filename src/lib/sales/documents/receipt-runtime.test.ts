@@ -38,7 +38,11 @@ test('receipt embeds the complete EmmyTech symbol and wordmark asset', async () 
   assert.match(pdf.toString('binary'), /\/Width 1126 \/Height 323/);
 });
 
-test('receipt places the full logo lockup in the white header area', async () => {
+test('receipt places the full logo lockup on a white plate inside the navy header band', async () => {
+  // Premium redesign (approved design review): the header band now carries the
+  // title itself, so the logo moved from the open white area below the band onto
+  // a small white plate set inside the band — same "logo always sits on white"
+  // rule, new position. See `chipX`/`chipY` in pdf/receipt.ts.
   const { renderDocumentPdf } = await import('./runtime.ts');
   const pdf = await renderDocumentPdf({
     documentNumber: 'RCT-P-TEST-LOGO-POSITION',
@@ -47,7 +51,7 @@ test('receipt places the full logo lockup in the white header area', async () =>
     snapshot: { customer_name: 'Test Customer', transaction_total: 1000, cumulative_paid: 1000 },
   });
 
-  assert.match(pdf.toString('binary'), /q [\d.]+ 0 0 [\d.]+ [\d.]+ 710 cm \/Logo Do Q/);
+  assert.match(pdf.toString('binary'), /q [\d.]+ 0 0 30 [\d.]+ 773\.89 cm \/Logo Do Q/);
 });
 
 test('receipt logo uses navy lettering that remains visible on white', async () => {

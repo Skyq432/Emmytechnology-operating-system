@@ -3,10 +3,12 @@
 import * as React from 'react';
 import { friendlyActionError } from '@/lib/crm/domain';
 import type { CrmTask, Lead } from '@/lib/crm/types';
+import { useReportingPeriod } from '@/components/reporting/reporting-period-context';
 
 interface CrmDataValue {
+  /** All fetched identities narrowed to the selected reporting period (by last activity). */
   leads: Lead[];
-  /** `leads` narrowed by `query` — what Leads, Funnel and Contacts render. */
+  /** `leads` narrowed further by `query` — what Leads, Funnel and Contacts render. */
   filteredLeads: Lead[];
   query: string;
   setQuery: (query: string) => void;
@@ -30,7 +32,8 @@ const CrmDataContext = React.createContext<CrmDataValue | null>(null);
  * CrmWorkspace component's local state now that each view is its own page.
  */
 export function CrmDataProvider({ children }: { children: React.ReactNode }) {
-  const [leads, setLeads] = React.useState<Lead[]>([]);
+  const { range } = useReportingPeriod();
+  const [allLeads, setAllLeads] = React.useState<Lead[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [dbError, setDbError] = React.useState<string | null>(null);
   const [reloadToken, setReloadToken] = React.useState(0);
@@ -48,7 +51,7 @@ export function CrmDataProvider({ children }: { children: React.ReactNode }) {
         if (!response.ok) throw new Error(payload.detail || payload.error || 'CRM database request failed');
         if (active) {
           const nextLeads: Lead[] = payload.leads ?? [];
-          setLeads(nextLeads);
+          setAllLeads(nextLeads);
           setSelectedLead((current) => (current ? (nextLeads.find((lead) => lead.id === current.id) ?? current) : null));
           setDbError(null);
         }
@@ -63,6 +66,13 @@ export function CrmDataProvider({ children }: { children: React.ReactNode }) {
       active = false;
     };
   }, [reloadToken]);
+
+  // "In period" means the person had some activity (a spin, click, note, stage move —
+  // whatever last touched lastActivityAtIso) inside the selected window.
+  const leads = React.useMemo(
+    () => allLeads.filter((lead) => lead.lastActivityAtIso >= range.startIso && lead.lastActivityAtIso < range.endExclusiveIso),
+    [allLeads, range.startIso, range.endExclusiveIso]
+  );
 
   const performAction = React.useCallback(async (payload: Record<string, unknown>) => {
     const response = await fetch('/api/crm/action', {

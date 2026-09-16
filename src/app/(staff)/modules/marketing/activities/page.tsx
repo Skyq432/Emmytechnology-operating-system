@@ -27,7 +27,6 @@ import {
 import Link from 'next/link';
 import { formatDate, formatCurrency } from '@/lib/utils';
 import { useReportingPeriod } from '@/components/reporting/reporting-period-context';
-import { ReportingPeriodPanel } from '@/components/reporting/reporting-period-panel';
 
 type ActivityItemType =
   | 'post'
@@ -446,7 +445,6 @@ export default function AdminActivitiesPage() {
 
   return (
     <div className="space-y-6">
-      <ReportingPeriodPanel audience="admin" />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">

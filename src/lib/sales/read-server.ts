@@ -49,6 +49,26 @@ export async function getSalesInventoryCatalog() {
   };
 }
 
+export async function getSalesMarginContext() {
+  const supabase = await createClient();
+  const [settingsResult, categoryPoliciesResult] = await Promise.all([
+    supabase.from('sales_settings').select('company_default_margin_percent').eq('settings_key', 'default').single(),
+    supabase.from('sales_margin_policies').select('category,minimum_margin_percent').eq('policy_scope', 'category').eq('is_active', true),
+  ]);
+  if (settingsResult.error) throw new Error(settingsResult.error.message);
+  if (categoryPoliciesResult.error) throw new Error(categoryPoliciesResult.error.message);
+
+  const categoryMinimums: Record<string, number> = {};
+  for (const row of categoryPoliciesResult.data || []) {
+    if (row.category) categoryMinimums[row.category.toLowerCase().trim()] = Number(row.minimum_margin_percent || 0);
+  }
+
+  return {
+    companyDefaultMarginPercent: Number(settingsResult.data?.company_default_margin_percent || 0),
+    categoryMinimums,
+  };
+}
+
 export async function getSalesQuotations() {
   const supabase = await createClient();
   const { data, error } = await supabase

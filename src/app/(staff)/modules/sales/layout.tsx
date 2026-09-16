@@ -7,7 +7,7 @@ export default async function SalesLayout({ children }: { children: React.ReactN
 
   return (
     <ReportingPeriodProvider>
-      <OperationsPeriodBar />
+      <OperationsPeriodBar moduleLabel="Sales" />
       {children}
     </ReportingPeriodProvider>
   );

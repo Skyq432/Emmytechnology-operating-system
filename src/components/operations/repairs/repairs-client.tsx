@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useActionState, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useActionState, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { Plus, Search, UserCheck, Wrench } from 'lucide-react';
 import { createRepairAction, type SalesActionState } from '@/app/(staff)/modules/operations/sales-actions';
 import { HelpTip } from '@/components/ui/help-tip';
@@ -11,24 +12,135 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ActionResult } from '@/components/ui/alert';
+import { StepProgress } from '@/components/ui/step-progress';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { IdentityPicker } from '@/components/shared/identity-picker';
 import type { OperationsIdentitySummary, OperationsRepair } from '@/lib/operations/types';
 
 const initialState: SalesActionState = { success: false, message: '' };
 const money = (value: number) => `₦${Number(value || 0).toLocaleString('en-NG',{maximumFractionDigits:0})}`;
+const STEPS = ['Customer', 'Device & Repair Card', 'Repair work'];
+const STEP_ORDER: Step[] = ['customer', 'device', 'work'];
+const DRAFT_KEY = 'emmytech-repair-intake-draft';
 
 type RepairCardOption = { id: string; card_code: string; status: string };
+type Step = 'customer' | 'device' | 'work';
+type RepairDraft = {
+  step: Step;
+  identityQuery: string;
+  selectedIdentity: OperationsIdentitySummary | null;
+  customerName: string;
+  customerPhone: string;
+  customerEmail: string;
+  cardId: string;
+  deviceType: string;
+  purchasedFromUs: string;
+  brand: string;
+  model: string;
+  serialOrImei: string;
+  conditionReceived: string;
+  accessoriesReceived: string;
+  faultReported: string;
+};
+
+function subscribeToDraft(callback: () => void) {
+  window.addEventListener('storage', callback);
+  return () => window.removeEventListener('storage', callback);
+}
+function getDraftSnapshot() {
+  return window.localStorage.getItem(DRAFT_KEY);
+}
+function getServerDraftSnapshot() {
+  return null;
+}
 
 export function RepairsClient({ repairs, availableCards }: { repairs: OperationsRepair[]; availableCards: RepairCardOption[] }) {
+  const router = useRouter();
   const [state, action, pending] = useActionState(createRepairAction, initialState);
   const [showCreate, setShowCreate] = useState(false);
+  const [step, setStep] = useState<Step>('customer');
   const [search, setSearch] = useState('');
   const [identityQuery, setIdentityQuery] = useState('');
   const [selectedIdentity, setSelectedIdentity] = useState<OperationsIdentitySummary | null>(null);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
+  const [cardId, setCardId] = useState('');
+  const [deviceType, setDeviceType] = useState('Phone');
+  const [purchasedFromUs, setPurchasedFromUs] = useState('not_sure');
+  const [brand, setBrand] = useState('');
+  const [model, setModel] = useState('');
+  const [serialOrImei, setSerialOrImei] = useState('');
+  const [conditionReceived, setConditionReceived] = useState('');
+  const [accessoriesReceived, setAccessoriesReceived] = useState('');
+  const [faultReported, setFaultReported] = useState('');
+  const [draftRestored, setDraftRestored] = useState(false);
+
+  // Whether an in-progress intake is sitting in localStorage — read via
+  // useSyncExternalStore (not an effect) so the server-rendered pass and the
+  // client's first render agree (server always sees no draft) with no flash.
+  const savedDraftRaw = useSyncExternalStore(subscribeToDraft, getDraftSnapshot, getServerDraftSnapshot);
+  const savedDraft = useMemo<Partial<RepairDraft> | null>(() => {
+    if (!savedDraftRaw) return null;
+    try {
+      return JSON.parse(savedDraftRaw) as Partial<RepairDraft>;
+    } catch {
+      return null;
+    }
+  }, [savedDraftRaw]);
+
+  // Resuming is a real user action (a button click), not something that should
+  // happen silently on mount — that keeps every setState call here inside an
+  // event handler, never an effect.
+  function resumeDraft() {
+    if (!savedDraft) return;
+    if (savedDraft.selectedIdentity) setSelectedIdentity(savedDraft.selectedIdentity);
+    if (savedDraft.identityQuery) setIdentityQuery(savedDraft.identityQuery);
+    if (savedDraft.customerName) setCustomerName(savedDraft.customerName);
+    if (savedDraft.customerPhone) setCustomerPhone(savedDraft.customerPhone);
+    if (savedDraft.customerEmail) setCustomerEmail(savedDraft.customerEmail);
+    if (savedDraft.cardId) setCardId(savedDraft.cardId);
+    if (savedDraft.deviceType) setDeviceType(savedDraft.deviceType);
+    if (savedDraft.purchasedFromUs) setPurchasedFromUs(savedDraft.purchasedFromUs);
+    if (savedDraft.brand) setBrand(savedDraft.brand);
+    if (savedDraft.model) setModel(savedDraft.model);
+    if (savedDraft.serialOrImei) setSerialOrImei(savedDraft.serialOrImei);
+    if (savedDraft.conditionReceived) setConditionReceived(savedDraft.conditionReceived);
+    if (savedDraft.accessoriesReceived) setAccessoriesReceived(savedDraft.accessoriesReceived);
+    if (savedDraft.faultReported) setFaultReported(savedDraft.faultReported);
+    if (savedDraft.step) setStep(savedDraft.step);
+    setShowCreate(true);
+    setDraftRestored(true);
+  }
+
+  function discardDraft() {
+    window.localStorage.removeItem(DRAFT_KEY);
+    window.dispatchEvent(new StorageEvent('storage'));
+  }
+
+  // Persist on every change while the form is open — cleared on successful create
+  // or an explicit Cancel, so it never outlives the intake it belongs to.
+  useEffect(() => {
+    if (!showCreate) return;
+    const draft: RepairDraft = {
+      step, identityQuery, selectedIdentity, customerName, customerPhone, customerEmail,
+      cardId, deviceType, purchasedFromUs, brand, model, serialOrImei, conditionReceived,
+      accessoriesReceived, faultReported,
+    };
+    try {
+      window.localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    } catch {
+      // Storage unavailable (private window, quota) — draft resilience is a nicety, not required.
+    }
+  }, [showCreate, step, identityQuery, selectedIdentity, customerName, customerPhone, customerEmail, cardId, deviceType, purchasedFromUs, brand, model, serialOrImei, conditionReceived, accessoriesReceived, faultReported]);
+
+  useEffect(() => {
+    const repairId = (state.data as { repairId?: string } | undefined)?.repairId;
+    if (state.success && repairId) {
+      window.localStorage.removeItem(DRAFT_KEY);
+      router.push(`/modules/operations/repairs/${repairId}`);
+    }
+  }, [state, router]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -56,14 +168,47 @@ export function RepairsClient({ repairs, availableCards }: { repairs: Operations
     setCustomerEmail('');
   }
 
+  function resetIntake() {
+    setShowCreate(false);
+    setStep('customer');
+    clearIdentity();
+    setCardId('');
+    setDeviceType('Phone');
+    setPurchasedFromUs('not_sure');
+    setBrand('');
+    setModel('');
+    setSerialOrImei('');
+    setConditionReceived('');
+    setAccessoriesReceived('');
+    setFaultReported('');
+    setDraftRestored(false);
+    window.localStorage.removeItem(DRAFT_KEY);
+    window.dispatchEvent(new StorageEvent('storage'));
+  }
+
+  const stepIndex = STEP_ORDER.indexOf(step);
+
   return <div className="mx-auto max-w-[1500px]">
     <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-end">
       <div><div className="flex items-center gap-2"><p className="text-xs font-black uppercase tracking-[0.16em] text-emmy-primary">After-sales</p><HelpTip text="Repairs are separate from normal sales Orders. They can still link back to the customer, original Order or exact device." label="About Repairs" /></div><h1 className="mt-1.5 text-3xl font-black tracking-[-0.035em]">Repairs</h1><p className="mt-2 text-sm text-slate-500">Track faults, diagnosis, parts, labour, technician, warranty and collection.</p></div>
-      <Button onClick={() => setShowCreate((v) => !v)} className="self-start"><Plus className="h-4 w-4" /> {showCreate ? 'Close form' : 'New repair'}</Button>
+      <Button onClick={() => (showCreate ? resetIntake() : setShowCreate(true))} className="self-start"><Plus className="h-4 w-4" /> {showCreate ? 'Close form' : 'New repair'}</Button>
     </div>
 
+    {!showCreate && savedDraft && (
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+        <p className="text-sm font-bold text-emmy-primary">You have an unfinished repair intake{savedDraft.customerName ? ` for ${savedDraft.customerName}` : ''}.</p>
+        <div className="flex gap-2">
+          <Button size="sm" variant="ghost" onClick={discardDraft}>Discard</Button>
+          <Button size="sm" onClick={resumeDraft}>Resume</Button>
+        </div>
+      </div>
+    )}
+
     {showCreate && <form action={action} className="mb-5 space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <section className="rounded-xl bg-slate-50 p-4">
+      <StepProgress steps={STEPS} current={stepIndex} />
+      {draftRestored && <p className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-emmy-primary">Restored your in-progress intake — pick up where you left off.</p>}
+
+      <section hidden={step !== 'customer'} className="rounded-xl bg-slate-50 p-4">
         <div className="mb-3 flex items-center gap-2"><p className="text-xs font-black uppercase tracking-wide text-slate-500">1. Customer</p><HelpTip text="Search EmmyTech CRM first. If there is no match, enter the customer details and the system will create the CRM Identity automatically when the repair is created." label="About repair customer identity" /></div>
         <div className="max-w-2xl">
           <IdentityPicker
@@ -78,20 +223,33 @@ export function RepairsClient({ repairs, availableCards }: { repairs: Operations
         {selectedIdentity && <div className="mt-3 flex flex-col justify-between gap-3 rounded-lg border border-blue-100 bg-white p-3 sm:flex-row sm:items-center"><div className="flex items-start gap-3"><UserCheck className="mt-0.5 h-4 w-4 text-emmy-primary" /><div><p className="text-sm font-black text-slate-800">Using existing Identity: {selectedIdentity.identity_code}</p><p className="mt-1 text-xs text-slate-500">CRM: Stage {selectedIdentity.crm_stage} {selectedIdentity.crm_stage_name}</p></div></div><button type="button" onClick={clearIdentity} className="text-xs font-bold text-slate-500 hover:text-emmy-primary">Use someone else</button></div>}
         <input type="hidden" name="identity_id" value={selectedIdentity?.id || ''} />
         <div className="mt-4 grid gap-4 md:grid-cols-3"><Field label="Customer name"><Input name="customer_name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} required /></Field><Field label="Phone"><Input name="customer_phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} /></Field><Field label="Email"><Input name="customer_email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} /></Field></div>
+        <div className="mt-4 flex gap-2">
+          <Button type="button" onClick={resetIntake} variant="ghost">Cancel</Button>
+          <Button type="button" disabled={!customerName.trim()} onClick={() => setStep('device')}>Continue</Button>
+        </div>
       </section>
 
-      <section><p className="mb-3 text-xs font-black uppercase tracking-wide text-slate-500">2. Device & Repair Card</p><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Field label="Repair Card"><Select name="card_id" defaultValue="" required><option value="" disabled>Choose available card</option>{availableCards.map((card) => <option key={card.id} value={card.id}>{card.card_code}</option>)}</Select></Field><Field label="Device type"><Select name="device_type"><option>Phone</option><option>Laptop</option><option>Accessory</option><option>Other</option></Select></Field><Field label="Purchased from us?"><Select name="purchased_from_us" defaultValue="not_sure"><option value="yes">Yes</option><option value="no">No</option><option value="not_sure">Not sure</option></Select></Field><Field label="Brand"><Input name="brand" /></Field>
-        <Field label="Model"><Input name="model" /></Field><Field label="Serial / IMEI"><Input name="serial_or_imei" /></Field><Field label="Condition received"><Input name="condition_received" placeholder="e.g. Cracked Screen" /></Field><Field label="Accessories received"><Input name="accessories_received" placeholder="e.g. Charger, case" /></Field>
-      </div>{availableCards.length === 0 && <p className="mt-3 text-sm font-bold text-amber-700">No Repair Card is currently available. A repair cannot be checked in until a card is returned or restored.</p>}</section>
+      <section hidden={step !== 'device'}><p className="mb-3 text-xs font-black uppercase tracking-wide text-slate-500">2. Device & Repair Card</p><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <Field label="Repair Card"><Select name="card_id" value={cardId} onChange={(e) => setCardId(e.target.value)} required><option value="" disabled>Choose available card</option>{availableCards.map((card) => <option key={card.id} value={card.id}>{card.card_code}</option>)}</Select></Field><Field label="Device type"><Select name="device_type" value={deviceType} onChange={(e) => setDeviceType(e.target.value)}><option>Phone</option><option>Laptop</option><option>Accessory</option><option>Other</option></Select></Field><Field label="Purchased from us?"><Select name="purchased_from_us" value={purchasedFromUs} onChange={(e) => setPurchasedFromUs(e.target.value)}><option value="yes">Yes</option><option value="no">No</option><option value="not_sure">Not sure</option></Select></Field><Field label="Brand"><Input name="brand" value={brand} onChange={(e) => setBrand(e.target.value)} /></Field>
+        <Field label="Model"><Input name="model" value={model} onChange={(e) => setModel(e.target.value)} /></Field><Field label="Serial / IMEI"><Input name="serial_or_imei" value={serialOrImei} onChange={(e) => setSerialOrImei(e.target.value)} /></Field><Field label="Condition received"><Input name="condition_received" value={conditionReceived} onChange={(e) => setConditionReceived(e.target.value)} placeholder="e.g. Cracked Screen" /></Field><Field label="Accessories received"><Input name="accessories_received" value={accessoriesReceived} onChange={(e) => setAccessoriesReceived(e.target.value)} placeholder="e.g. Charger, case" /></Field>
+      </div>{availableCards.length === 0 && <p className="mt-3 text-sm font-bold text-amber-700">No Repair Card is currently available. A repair cannot be checked in until a card is returned or restored.</p>}
+        <div className="mt-4 flex gap-2">
+          <Button type="button" onClick={resetIntake} variant="ghost">Cancel</Button>
+          <Button type="button" variant="outline" onClick={() => setStep('customer')}>Back</Button>
+          <Button type="button" disabled={!cardId} onClick={() => setStep('work')}>Continue</Button>
+        </div>
+      </section>
 
-      <section><p className="mb-3 text-xs font-black uppercase tracking-wide text-slate-500">3. Repair work</p><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <div className="md:col-span-2"><Field label="Fault reported"><Textarea name="fault_reported" required className="min-h-20" /></Field></div><div className="md:col-span-2"><Field label="Technician diagnosis"><Textarea name="diagnosis" className="min-h-20" /></Field></div>
-        <Field label="Repair type"><Input name="repair_type" placeholder="Screen Replacement" /></Field><Field label="Parts replaced"><Input name="parts_replaced" /></Field><Field label="Technician"><Input name="technician_name" /></Field><Field label="Condition returned"><Input name="condition_returned" /></Field>
-      </div></section>
-      <section><p className="mb-3 text-xs font-black uppercase tracking-wide text-slate-500">4. Money & warranty</p><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"><Field label="Parts cost"><Input name="parts_cost" type="number" min="0" defaultValue="0" /></Field><Field label="Labour cost"><Input name="labour_cost" type="number" min="0" defaultValue="0" /></Field><Field label="Initial amount"><Input name="amount_charged" type="number" min="0" defaultValue="0" /></Field><Field label="Repair warranty"><Input name="warranty_period" placeholder="1 Month" /></Field><Field label="Warranty expiry"><Input name="warranty_expires_at" type="date" /></Field><div className="md:col-span-2 xl:col-span-3"><Field label="Notes"><Input name="notes" /></Field></div></div></section>
-      <ActionResult state={state} />
-      <Button type="submit" disabled={pending || availableCards.length === 0}>{pending ? 'Creating...' : 'Create repair & assign card'}</Button>
+      <section hidden={step !== 'work'}><p className="mb-3 text-xs font-black uppercase tracking-wide text-slate-500">3. Repair work</p>
+        <Field label="Fault reported"><Textarea name="fault_reported" value={faultReported} onChange={(e) => setFaultReported(e.target.value)} required className="min-h-20" /></Field>
+        <p className="mt-4 text-xs text-slate-500">Diagnosis, technician, parts, cost and warranty are collected afterward, one step at a time, from the repair&apos;s own page — no need to work those out now.</p>
+        <ActionResult state={state} />
+        <div className="mt-4 flex gap-2">
+          <Button type="button" onClick={resetIntake} variant="ghost">Cancel</Button>
+          <Button type="button" variant="outline" onClick={() => setStep('device')}>Back</Button>
+          <Button type="submit" disabled={pending || availableCards.length === 0 || !faultReported.trim()}>{pending ? 'Creating...' : 'Create repair & assign card'}</Button>
+        </div>
+      </section>
     </form>}
 
     <div className="mb-3 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 shadow-sm"><Search className="h-4 w-4 text-slate-400" /><input value={search} onChange={(e)=>setSearch(e.target.value)} className="w-full bg-transparent text-sm outline-none" placeholder="Search repair, customer, device, serial or fault..." /></div>

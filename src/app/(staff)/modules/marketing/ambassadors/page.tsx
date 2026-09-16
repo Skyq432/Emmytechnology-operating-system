@@ -19,7 +19,6 @@ import {
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import Link from 'next/link';
-import { ReportingPeriodPanel } from '@/components/reporting/reporting-period-panel';
 import { useReportingPeriod } from '@/components/reporting/reporting-period-context';
 
 interface Ambassador {
@@ -181,8 +180,6 @@ export default function AdminAmbassadorsPage() {
           </Link>
         </div>
       </div>
-
-      <ReportingPeriodPanel audience="admin" />
 
       <div className="space-y-3">
         <div className="relative w-full sm:max-w-md">

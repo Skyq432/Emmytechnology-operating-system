@@ -40,11 +40,12 @@ test('dashboard summary contains the required attention counters', () => {
   assert.notEqual(start, -1);
   const fragment = server.slice(start, start + 6500);
   for (const key of [
+    'activeCount',
     'pendingAcceptanceCount',
     'extensionDecisionCount',
     'dueTodayCount',
     'overdueCount',
-    'todayTodoCount',
+    'openTodoCount',
     'nextTask',
     'goalHighlight',
   ]) {
