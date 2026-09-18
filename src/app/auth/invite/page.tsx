@@ -76,7 +76,13 @@ export default function InviteRegisterPage() {
       const { error: authError } = await supabase.auth.signUp({
         email: cleanEmail,
         password,
-        options: { data: { full_name: cleanName, role: inviteData.role || 'ambassador', invite_code: code } },
+        options: {
+          data: { full_name: cleanName, role: inviteData.role || 'ambassador', invite_code: code },
+          // Without this, Supabase falls back to the project's default Site URL for
+          // the confirmation email link — which points at the ambassador site, not
+          // this app, since this Supabase project was originally built for it.
+          emailRedirectTo: `${window.location.origin}/auth/login`,
+        },
       });
       if (authError) throw authError;
       setSuccess(true);
