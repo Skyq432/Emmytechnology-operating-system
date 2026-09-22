@@ -112,10 +112,26 @@ export function TransfersClient({ transfers, availability, locations, users, res
       <div className="mb-3 flex justify-end"><Select value={status} onChange={(e) => setStatus(e.target.value)} className="w-auto font-bold"><option value="all">All statuses</option><option value="in_transit">In Transit</option><option value="received">Received</option><option value="cancelled">Cancelled</option></Select></div>
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        {filtered.length === 0 ? <div className="py-14 text-center"><Repeat2 className="mx-auto h-8 w-8 text-slate-300" /><p className="mt-3 text-sm font-bold text-slate-700">No transfers in this period</p></div> : <div className="divide-y divide-slate-100">{filtered.map((transfer) => <div key={transfer.id} className="p-5"><div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center"><div><div className="flex flex-wrap items-center gap-2"><p className="font-black text-emmy-primary">{transfer.transfer_code}</p><Badge variant={transfer.status === 'received' ? 'default' : transfer.status === 'cancelled' ? 'outline' : 'warning'} className="uppercase">{transfer.status.replace('_', ' ')}</Badge>{transfer.order?.order_code && <Badge variant="outline">{transfer.order.order_code}</Badge>}</div><p className="mt-2 text-sm font-bold text-slate-800">{transfer.inventory_item?.sku} · {transfer.inventory_item?.name} × {transfer.quantity}</p><p className="mt-1 flex items-center gap-1 text-xs text-slate-500">{transfer.from_location?.name} <ArrowRight className="h-3 w-3" /> {transfer.to_location?.name}</p><p className="mt-1 text-xs text-slate-400">{transfer.reason || 'Stock movement'} · {new Date(transfer.created_at).toLocaleString('en-NG', { dateStyle: 'medium', timeStyle: 'short' })}</p></div>{transfer.status === 'in_transit' && <div className="flex gap-2"><form action={receiveTransferAction}><input type="hidden" name="transfer_id" value={transfer.id} /><Button size="sm"><PackageCheck className="h-3.5 w-3.5" /> Receive</Button></form><form action={cancelTransferAction}><input type="hidden" name="transfer_id" value={transfer.id} /><Button type="submit" variant="outline" size="sm">Cancel</Button></form></div>}</div></div>)}</div>}
+        {filtered.length === 0 ? <div className="py-14 text-center"><Repeat2 className="mx-auto h-8 w-8 text-slate-300" /><p className="mt-3 text-sm font-bold text-slate-700">No transfers in this period</p></div> : <div className="divide-y divide-slate-100">{filtered.map((transfer) => <div key={transfer.id} className="p-5"><div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center"><div><div className="flex flex-wrap items-center gap-2"><p className="font-black text-emmy-primary">{transfer.transfer_code}</p><Badge variant={transfer.status === 'received' ? 'default' : transfer.status === 'cancelled' ? 'outline' : 'warning'} className="uppercase">{transfer.status.replace('_', ' ')}</Badge>{transfer.order?.order_code && <Badge variant="outline">{transfer.order.order_code}</Badge>}</div><p className="mt-2 text-sm font-bold text-slate-800">{transfer.inventory_item?.sku} · {transfer.inventory_item?.name} × {transfer.quantity}</p><p className="mt-1 flex items-center gap-1 text-xs text-slate-500">{transfer.from_location?.name} <ArrowRight className="h-3 w-3" /> {transfer.to_location?.name}</p><p className="mt-1 text-xs text-slate-400">{transfer.reason || 'Stock movement'} · {new Date(transfer.created_at).toLocaleString('en-NG', { dateStyle: 'medium', timeStyle: 'short' })}</p></div>{transfer.status === 'in_transit' && <TransferRowActions transferId={transfer.id} />}</div></div>)}</div>}
       </div>
     </div>
   );
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-600">{label}</span>{children}</label>; }
+
+function TransferRowActions({ transferId }: { transferId: string }) {
+  const [receiveState, receiveAction, receivePending] = useActionState(receiveTransferAction, initialState);
+  const [cancelState, cancelAction, cancelPending] = useActionState(cancelTransferAction, initialState);
+  const message = receiveState.message || cancelState.message;
+  const failed = message ? !receiveState.success && !cancelState.success : false;
+  return (
+    <div className="flex flex-col items-end gap-2">
+      <div className="flex gap-2">
+        <form action={receiveAction}><input type="hidden" name="transfer_id" value={transferId} /><Button size="sm" disabled={receivePending || cancelPending}><PackageCheck className="h-3.5 w-3.5" /> {receivePending ? 'Receiving…' : 'Receive'}</Button></form>
+        <form action={cancelAction}><input type="hidden" name="transfer_id" value={transferId} /><Button type="submit" variant="outline" size="sm" disabled={receivePending || cancelPending}>{cancelPending ? 'Cancelling…' : 'Cancel'}</Button></form>
+      </div>
+      {message && <p className={`max-w-xs text-right text-xs font-bold ${failed ? 'text-rose-600' : 'text-emerald-700'}`}>{message}</p>}
+    </div>
+  );
+}

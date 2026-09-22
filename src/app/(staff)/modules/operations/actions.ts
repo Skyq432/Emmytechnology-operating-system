@@ -81,78 +81,108 @@ export async function createOrderAction(
   return { success: result.success, message: result.message, data: result.success ? result.data : undefined };
 }
 
-export async function updateDraftAttributionAction(formData: FormData) {
+export async function updateDraftAttributionAction(
+  _previousState: OperationsActionState,
+  formData: FormData
+): Promise<OperationsActionState> {
   const orderId = String(formData.get('order_id') || '');
-  if (!orderId) return;
+  if (!orderId) return { success: false, message: 'Order is required.' };
   const result = await updateDraftOrderAttribution({
     orderId,
     ambassadorId: String(formData.get('ambassador_id') || '') || null,
     commissionRate: Number(formData.get('commission_rate') || 0),
     attributionSource: String(formData.get('attribution_source') || 'manual_admin') === 'automatic' ? 'automatic' : 'manual_admin',
   });
-  if (!result.success) throw new Error(result.message);
-  revalidatePath('/modules/operations/orders');
-  revalidatePath(`/modules/operations/orders/${orderId}`);
+  if (result.success) {
+    revalidatePath('/modules/operations/orders');
+    revalidatePath(`/modules/operations/orders/${orderId}`);
+  }
+  return { success: result.success, message: result.message };
 }
 
-export async function confirmOrderAction(formData: FormData) {
+export async function confirmOrderAction(
+  _previousState: OperationsActionState,
+  formData: FormData
+): Promise<OperationsActionState> {
   const orderId = String(formData.get('order_id') || '');
-  if (!orderId) return;
+  if (!orderId) return { success: false, message: 'Order is required.' };
   const result = await confirmOperationsOrder(orderId);
-  if (!result.success) throw new Error(result.message);
-  revalidatePath('/modules/operations');
-  revalidatePath('/modules/operations/orders');
-  revalidatePath('/modules/operations/inventory');
-  revalidatePath(`/modules/operations/orders/${orderId}`);
+  if (result.success) {
+    revalidatePath('/modules/operations');
+    revalidatePath('/modules/operations/orders');
+    revalidatePath('/modules/operations/inventory');
+    revalidatePath(`/modules/operations/orders/${orderId}`);
+  }
+  return { success: result.success, message: result.message };
 }
 
-export async function changeOrderStatusAction(formData: FormData) {
+export async function changeOrderStatusAction(
+  _previousState: OperationsActionState,
+  formData: FormData
+): Promise<OperationsActionState> {
   const orderId = String(formData.get('order_id') || '');
   const status = String(formData.get('status') || '') as OrderStatus;
   const note = String(formData.get('note') || '');
-  if (!orderId || !status) return;
+  if (!orderId || !status) return { success: false, message: 'Order and status are required.' };
   const result = await changeOperationsOrderStatus(orderId, status, note);
-  if (!result.success) throw new Error(result.message);
-  revalidatePath('/modules/operations');
-  revalidatePath('/modules/operations/orders');
-  revalidatePath(`/modules/operations/orders/${orderId}`);
+  if (result.success) {
+    revalidatePath('/modules/operations');
+    revalidatePath('/modules/operations/orders');
+    revalidatePath(`/modules/operations/orders/${orderId}`);
+  }
+  return { success: result.success, message: result.message };
 }
 
-export async function completeOrderHandoverAction(formData: FormData) {
+export async function completeOrderHandoverAction(
+  _previousState: OperationsActionState,
+  formData: FormData
+): Promise<OperationsActionState> {
   const orderId = String(formData.get('order_id') || '');
   const note = String(formData.get('note') || '');
-  if (!orderId) return;
+  if (!orderId) return { success: false, message: 'Order is required.' };
   const result = await completeOperationsOrderHandover(orderId, note);
-  if (!result.success) throw new Error(result.message);
-  revalidatePath('/modules/operations');
-  revalidatePath('/modules/operations/orders');
-  revalidatePath('/modules/operations/inventory');
-  revalidatePath(`/modules/operations/orders/${orderId}`);
+  if (result.success) {
+    revalidatePath('/modules/operations');
+    revalidatePath('/modules/operations/orders');
+    revalidatePath('/modules/operations/inventory');
+    revalidatePath(`/modules/operations/orders/${orderId}`);
+  }
+  return { success: result.success, message: result.message };
 }
 
-export async function createHandoverAction(formData: FormData) {
+export async function createHandoverAction(
+  _previousState: OperationsActionState,
+  formData: FormData
+): Promise<OperationsActionState> {
   const orderId = String(formData.get('order_id') || '');
   const toTeam = String(formData.get('to_team') || '').trim();
   const toUserId = String(formData.get('to_user_id') || '') || null;
   const note = String(formData.get('note') || '');
-  if (!orderId || !toTeam) return;
+  if (!orderId || !toTeam) return { success: false, message: 'Destination team is required.' };
   const result = await createOperationsHandover({ orderId, toTeam, toUserId, note });
-  if (!result.success) throw new Error(result.message);
-  revalidatePath('/modules/operations');
-  revalidatePath('/modules/operations/orders');
-  revalidatePath(`/modules/operations/orders/${orderId}`);
+  if (result.success) {
+    revalidatePath('/modules/operations');
+    revalidatePath('/modules/operations/orders');
+    revalidatePath(`/modules/operations/orders/${orderId}`);
+  }
+  return { success: result.success, message: result.message };
 }
 
-export async function acknowledgeHandoverAction(formData: FormData) {
+export async function acknowledgeHandoverAction(
+  _previousState: OperationsActionState,
+  formData: FormData
+): Promise<OperationsActionState> {
   const handoverId = String(formData.get('handover_id') || '');
   const orderId = String(formData.get('order_id') || '');
   const note = String(formData.get('note') || '');
-  if (!handoverId || !orderId) return;
+  if (!handoverId || !orderId) return { success: false, message: 'Handover is required.' };
   const result = await acknowledgeOperationsHandover(handoverId, note);
-  if (!result.success) throw new Error(result.message);
-  revalidatePath('/modules/operations');
-  revalidatePath('/modules/operations/orders');
-  revalidatePath(`/modules/operations/orders/${orderId}`);
+  if (result.success) {
+    revalidatePath('/modules/operations');
+    revalidatePath('/modules/operations/orders');
+    revalidatePath(`/modules/operations/orders/${orderId}`);
+  }
+  return { success: result.success, message: result.message };
 }
 
 export async function createInventoryItemAction(
@@ -205,24 +235,34 @@ export async function startTransferAction(
   return { success: result.success, message: result.message };
 }
 
-export async function receiveTransferAction(formData: FormData) {
+export async function receiveTransferAction(
+  _previousState: OperationsActionState,
+  formData: FormData
+): Promise<OperationsActionState> {
   const transferId = String(formData.get('transfer_id') || '');
-  if (!transferId) return;
+  if (!transferId) return { success: false, message: 'Transfer is required.' };
   const result = await receiveOperationsTransfer(transferId, String(formData.get('note') || ''));
-  if (!result.success) throw new Error(result.message);
-  revalidatePath('/modules/operations');
-  revalidatePath('/modules/operations/inventory');
-  revalidatePath('/modules/operations/transfers');
+  if (result.success) {
+    revalidatePath('/modules/operations');
+    revalidatePath('/modules/operations/inventory');
+    revalidatePath('/modules/operations/transfers');
+  }
+  return { success: result.success, message: result.message };
 }
 
-export async function cancelTransferAction(formData: FormData) {
+export async function cancelTransferAction(
+  _previousState: OperationsActionState,
+  formData: FormData
+): Promise<OperationsActionState> {
   const transferId = String(formData.get('transfer_id') || '');
-  if (!transferId) return;
+  if (!transferId) return { success: false, message: 'Transfer is required.' };
   const result = await cancelOperationsTransfer(transferId, String(formData.get('note') || ''));
-  if (!result.success) throw new Error(result.message);
-  revalidatePath('/modules/operations');
-  revalidatePath('/modules/operations/inventory');
-  revalidatePath('/modules/operations/transfers');
+  if (result.success) {
+    revalidatePath('/modules/operations');
+    revalidatePath('/modules/operations/inventory');
+    revalidatePath('/modules/operations/transfers');
+  }
+  return { success: result.success, message: result.message };
 }
 
 export async function createWebsiteLinkAction(
