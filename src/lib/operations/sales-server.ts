@@ -164,27 +164,27 @@ export async function updateDraftSalesDetails(input: {
   warrantyExpiresAt?: string | null;
   specs?: Record<string, unknown>;
 }) {
-  const { supabase } = await requireOperationsAccess();
-  const { data: order, error: orderError } = await supabase.from('ops_orders').select('commercial_state').eq('id', input.orderId).single();
-  if (orderError) return { success: false as const, message: orderError.message };
-  if (order.commercial_state !== 'draft') return { success: false as const, message: 'Sales details can only be edited while the order is Draft.' };
-  const { error: orderUpdateError } = await supabase.from('ops_orders').update({
-    order_type: input.orderType,
-    sales_staff_user_id: input.salesStaffUserId || null,
-    sales_staff_name: input.salesStaffName?.trim() || null,
-  }).eq('id', input.orderId);
-  if (orderUpdateError) return { success: false as const, message: orderUpdateError.message };
-  const { error: itemError } = await supabase.from('ops_order_items').update({
-    item_type: input.itemType,
-    brand: input.brand?.trim() || null,
-    model: input.model?.trim() || null,
-    condition: input.condition?.trim() || null,
-    unit_cost_snapshot: input.unitCostSnapshot == null ? null : Math.max(0, Number(input.unitCostSnapshot)),
-    warranty_period: input.warrantyPeriod?.trim() || null,
-    warranty_expires_at: input.warrantyExpiresAt || null,
-    specs: input.specs || {},
-  }).eq('id', input.itemId).eq('order_id', input.orderId);
-  return itemError ? { success: false as const, message: itemError.message } : { success: true as const, message: 'Sales details saved' };
+  // A SECURITY DEFINER RPC, not raw client-side UPDATEs: ops_orders and ops_order_items
+  // each only have one write RLS policy, requiring 'admin'/'super_admin' specifically —
+  // a plain .update() here silently no-ops (0 rows, no error) for front_desk and anyone
+  // else with just operations.order.manage.
+  const { supabase } = await requireStaffCapability('operations.order.manage');
+  const { error } = await supabase.rpc('ops_update_draft_sales_details', {
+    p_order_id: input.orderId,
+    p_item_id: input.itemId,
+    p_order_type: input.orderType,
+    p_item_type: input.itemType,
+    p_sales_staff_user_id: input.salesStaffUserId || null,
+    p_sales_staff_name: input.salesStaffName?.trim() || null,
+    p_brand: input.brand?.trim() || null,
+    p_model: input.model?.trim() || null,
+    p_condition: input.condition?.trim() || null,
+    p_unit_cost_snapshot: input.unitCostSnapshot == null ? null : Math.max(0, Number(input.unitCostSnapshot)),
+    p_warranty_period: input.warrantyPeriod?.trim() || null,
+    p_warranty_expires_at: input.warrantyExpiresAt || null,
+    p_specs: input.specs || {},
+  });
+  return error ? { success: false as const, message: error.message } : { success: true as const, message: 'Sales details saved' };
 }
 
 export async function getOperationsRepairs(): Promise<OperationsRepair[]> {
