@@ -1,19 +1,10 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { createClient } from '@/lib/supabase-server';
+import { requireStaffCapability } from '@/lib/auth/capability-server';
 
 export type DraftFulfilmentActionState = { success: boolean; message: string };
 const fail = (message: string): DraftFulfilmentActionState => ({ success: false, message });
-
-async function requireAdmin() {
-  const supabase = await createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) throw new Error('Not authenticated');
-  const { data: profile, error: profileError } = await supabase.from('users').select('role').eq('id', user.id).single();
-  if (profileError || profile?.role !== 'admin') throw new Error('Not authorized');
-  return supabase;
-}
 
 export async function saveDraftFulfilmentSourceAction(
   _prev: DraftFulfilmentActionState,
@@ -29,7 +20,7 @@ export async function saveDraftFulfilmentSourceAction(
   if (source === 'internal' && !locationId) return fail('Choose the internal stock location.');
 
   try {
-    const supabase = await requireAdmin();
+    const { supabase } = await requireStaffCapability('operations.order.manage');
     const { data: order, error: orderError } = await supabase
       .from('ops_orders')
       .select('commercial_state')
