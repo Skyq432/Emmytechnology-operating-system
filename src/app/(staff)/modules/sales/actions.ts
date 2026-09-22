@@ -47,18 +47,22 @@ export async function createDirectSaleAction(_prev: SalesActionState, formData: 
     costBasisSource?: string | null; adminExceptionReason?: string | null; note?: string | null;
   }>>(formData.get('items_json'), []);
   if (!items.length) return fail('Add at least one item to the Direct Sale.');
-  const result = await createDirectSaleDraft({
-    existingIdentityId: String(formData.get('identity_id') || '') || null,
-    customerName: String(formData.get('customer_name') || ''),
-    customerPhone: String(formData.get('customer_phone') || ''),
-    customerEmail: String(formData.get('customer_email') || ''),
-    customerAddress: String(formData.get('customer_address') || ''),
-    salesStaffName: String(formData.get('sales_staff_name') || ''),
-    cashOffAmount: Number(formData.get('cash_off_amount') || 0),
-    items,
-  });
-  if (result.success) revalidateSales();
-  return { success: result.success, message: result.message, data: result.success ? result.data : undefined };
+  try {
+    const result = await createDirectSaleDraft({
+      existingIdentityId: String(formData.get('identity_id') || '') || null,
+      customerName: String(formData.get('customer_name') || ''),
+      customerPhone: String(formData.get('customer_phone') || ''),
+      customerEmail: String(formData.get('customer_email') || ''),
+      customerAddress: String(formData.get('customer_address') || ''),
+      salesStaffName: String(formData.get('sales_staff_name') || ''),
+      cashOffAmount: Number(formData.get('cash_off_amount') || 0),
+      items,
+    });
+    if (result.success) revalidateSales();
+    return { success: result.success, message: result.message, data: result.success ? result.data : undefined };
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : 'Unable to create Direct Sale draft.');
+  }
 }
 
 export async function createSalesOrderAction(_prev: SalesActionState, formData: FormData): Promise<SalesActionState> {
@@ -99,25 +103,33 @@ export async function createSalesOrderAction(_prev: SalesActionState, formData: 
 export async function confirmDirectSaleAction(_prev: SalesActionState, formData: FormData): Promise<SalesActionState> {
   const orderId = String(formData.get('order_id') || '');
   if (!orderId) return fail('Direct Sale is required.');
-  const result = await confirmDirectSale(orderId);
-  if (result.success) revalidateSales();
-  return { success: result.success, message: result.message, data: result.success ? result.data : undefined };
+  try {
+    const result = await confirmDirectSale(orderId);
+    if (result.success) revalidateSales();
+    return { success: result.success, message: result.message, data: result.success ? result.data : undefined };
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : 'Unable to confirm Direct Sale.');
+  }
 }
 
 export async function recordSalesPaymentAction(_prev: SalesActionState, formData: FormData): Promise<SalesActionState> {
   const orderId = String(formData.get('order_id') || '');
   const amount = Number(formData.get('amount') || 0);
   if (!orderId || amount <= 0) return fail('Enter a valid payment amount.');
-  const result = await recordDirectSalePayment({
-    orderId,
-    amount,
-    paymentMethod: String(formData.get('payment_method') || 'other') as 'bank_transfer' | 'pos' | 'cash' | 'split' | 'other',
-    reference: String(formData.get('reference') || ''),
-    paidAt: String(formData.get('paid_at') || '') || null,
-    note: String(formData.get('note') || ''),
-  });
-  if (result.success) revalidateSales();
-  return { success: result.success, message: result.message, data: result.success ? result.data : undefined };
+  try {
+    const result = await recordDirectSalePayment({
+      orderId,
+      amount,
+      paymentMethod: String(formData.get('payment_method') || 'other') as 'bank_transfer' | 'pos' | 'cash' | 'split' | 'other',
+      reference: String(formData.get('reference') || ''),
+      paidAt: String(formData.get('paid_at') || '') || null,
+      note: String(formData.get('note') || ''),
+    });
+    if (result.success) revalidateSales();
+    return { success: result.success, message: result.message, data: result.success ? result.data : undefined };
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : 'Unable to record payment.');
+  }
 }
 
 export async function approveCreditAction(_prev: SalesActionState, formData: FormData): Promise<SalesActionState> {
@@ -126,30 +138,42 @@ export async function approveCreditAction(_prev: SalesActionState, formData: For
   const dueAt = String(formData.get('due_at') || '');
   const reason = String(formData.get('reason') || '').trim();
   if (!orderId || amount <= 0 || !dueAt || !reason) return fail('Order, approved amount, due date and reason are required.');
-  const result = await approveDirectSaleCredit({ orderId, approvedOutstandingAmount: amount, dueAt, reason });
-  if (result.success) revalidateSales();
-  return { success: result.success, message: result.message, data: result.success ? result.data : undefined };
+  try {
+    const result = await approveDirectSaleCredit({ orderId, approvedOutstandingAmount: amount, dueAt, reason });
+    if (result.success) revalidateSales();
+    return { success: result.success, message: result.message, data: result.success ? result.data : undefined };
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : 'Unable to approve credit.');
+  }
 }
 
 export async function completeHandoverAction(_prev: SalesActionState, formData: FormData): Promise<SalesActionState> {
   const orderId = String(formData.get('order_id') || '');
   if (!orderId) return fail('Direct Sale is required.');
-  const result = await completeDirectSaleHandover(orderId);
-  if (result.success) revalidateSales();
-  return { success: result.success, message: result.message, data: result.success ? result.data : undefined };
+  try {
+    const result = await completeDirectSaleHandover(orderId);
+    if (result.success) revalidateSales();
+    return { success: result.success, message: result.message, data: result.success ? result.data : undefined };
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : 'Unable to complete handover.');
+  }
 }
 
 export async function createQuotationAction(_prev: SalesActionState, formData: FormData): Promise<SalesActionState> {
-  const result = await createSalesQuotation({
-    existingIdentityId: String(formData.get('identity_id') || '') || null,
-    customerName: String(formData.get('customer_name') || ''),
-    customerPhone: String(formData.get('customer_phone') || ''),
-    customerEmail: String(formData.get('customer_email') || ''),
-    customerAddress: String(formData.get('customer_address') || ''),
-    salesStaffName: String(formData.get('sales_staff_name') || ''),
-  });
-  if (result.success) revalidateSales();
-  return { success: result.success, message: result.message, data: result.success ? result.data : undefined };
+  try {
+    const result = await createSalesQuotation({
+      existingIdentityId: String(formData.get('identity_id') || '') || null,
+      customerName: String(formData.get('customer_name') || ''),
+      customerPhone: String(formData.get('customer_phone') || ''),
+      customerEmail: String(formData.get('customer_email') || ''),
+      customerAddress: String(formData.get('customer_address') || ''),
+      salesStaffName: String(formData.get('sales_staff_name') || ''),
+    });
+    if (result.success) revalidateSales();
+    return { success: result.success, message: result.message, data: result.success ? result.data : undefined };
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : 'Unable to create quotation.');
+  }
 }
 
 export async function publishQuotationAction(_prev: SalesActionState, formData: FormData): Promise<SalesActionState> {
@@ -161,44 +185,56 @@ export async function publishQuotationAction(_prev: SalesActionState, formData: 
     adminExceptionReason?: string | null; note?: string | null; specs?: Record<string, unknown> | null;
   }>>(formData.get('items_json'), []);
   if (!quotationId || !items.length) return fail('Quotation and at least one item are required.');
-  const result = await publishSalesQuotationVersion({
-    quotationId,
-    items,
-    customerNote: String(formData.get('customer_note') || ''),
-    terms: String(formData.get('terms') || ''),
-    validityExpiresAt: String(formData.get('validity_expires_at') || '') || null,
-  });
-  if (!result.success) return { success: false, message: result.message };
+  try {
+    const result = await publishSalesQuotationVersion({
+      quotationId,
+      items,
+      customerNote: String(formData.get('customer_note') || ''),
+      terms: String(formData.get('terms') || ''),
+      validityExpiresAt: String(formData.get('validity_expires_at') || '') || null,
+    });
+    if (!result.success) return { success: false, message: result.message };
 
-  const version = result.data as { id?: string } | null;
-  if (version?.id) {
-    const { supabase } = await requireSalesActor();
-    const { error } = await supabase.rpc('sales_ensure_quotation_document_metadata', { p_quotation_version_id: version.id });
-    if (error) return { success: false, message: `Quotation published, but document queue failed: ${error.message}`, data: result.data };
+    const version = result.data as { id?: string } | null;
+    if (version?.id) {
+      const { supabase } = await requireSalesActor();
+      const { error } = await supabase.rpc('sales_ensure_quotation_document_metadata', { p_quotation_version_id: version.id });
+      if (error) return { success: false, message: `Quotation published, but document queue failed: ${error.message}`, data: result.data };
+    }
+    revalidateSales();
+    return { success: true, message: 'Quotation published and PDF queued', data: result.data };
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : 'Unable to publish quotation.');
   }
-  revalidateSales();
-  return { success: true, message: 'Quotation published and PDF queued', data: result.data };
 }
 
 export async function offlineQuotationDecisionAction(_prev: SalesActionState, formData: FormData): Promise<SalesActionState> {
-  const result = await recordOfflineQuotationDecision({
-    quotationId: String(formData.get('quotation_id') || ''),
-    decision: String(formData.get('decision') || 'accepted') as 'accepted' | 'declined',
-    channel: String(formData.get('channel') || 'whatsapp') as 'whatsapp' | 'phone' | 'email' | 'in_person' | 'other',
-    note: String(formData.get('note') || ''),
-    evidenceReference: String(formData.get('evidence_reference') || ''),
-  });
-  if (result.success) revalidateSales();
-  return { success: result.success, message: result.message, data: result.success ? result.data : undefined };
+  try {
+    const result = await recordOfflineQuotationDecision({
+      quotationId: String(formData.get('quotation_id') || ''),
+      decision: String(formData.get('decision') || 'accepted') as 'accepted' | 'declined',
+      channel: String(formData.get('channel') || 'whatsapp') as 'whatsapp' | 'phone' | 'email' | 'in_person' | 'other',
+      note: String(formData.get('note') || ''),
+      evidenceReference: String(formData.get('evidence_reference') || ''),
+    });
+    if (result.success) revalidateSales();
+    return { success: result.success, message: result.message, data: result.success ? result.data : undefined };
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : 'Unable to record offline decision.');
+  }
 }
 
 export async function convertQuotationAction(_prev: SalesActionState, formData: FormData): Promise<SalesActionState> {
-  const result = await convertAcceptedQuotation({
-    quotationId: String(formData.get('quotation_id') || ''),
-    conversionType: String(formData.get('conversion_type') || 'order') as 'direct_sale' | 'order',
-  });
-  if (result.success) revalidateSales();
-  return { success: result.success, message: result.message, data: result.success ? result.data : undefined };
+  try {
+    const result = await convertAcceptedQuotation({
+      quotationId: String(formData.get('quotation_id') || ''),
+      conversionType: String(formData.get('conversion_type') || 'order') as 'direct_sale' | 'order',
+    });
+    if (result.success) revalidateSales();
+    return { success: result.success, message: result.message, data: result.success ? result.data : undefined };
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : 'Unable to convert quotation.');
+  }
 }
 
 export async function createQuotationPublicLinkAction(_prev: SalesActionState, formData: FormData): Promise<SalesActionState> {
