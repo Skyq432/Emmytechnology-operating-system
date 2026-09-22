@@ -20,23 +20,17 @@ export async function saveDraftFulfilmentSourceAction(
   if (source === 'internal' && !locationId) return fail('Choose the internal stock location.');
 
   try {
+    // A SECURITY DEFINER RPC, not a raw client-side UPDATE: ops_order_items' only
+    // write RLS policy requires the 'admin'/'super_admin' role specifically, which
+    // would silently no-op this save (0 rows affected, no error) for front_desk and
+    // anyone else with just operations.order.manage.
     const { supabase } = await requireStaffCapability('operations.order.manage');
-    const { data: order, error: orderError } = await supabase
-      .from('ops_orders')
-      .select('commercial_state')
-      .eq('id', orderId)
-      .single();
-    if (orderError) return fail(orderError.message);
-    if (order.commercial_state !== 'draft') return fail('Fulfilment source can only change while the Order is Draft.');
-
-    const { error } = await supabase
-      .from('ops_order_items')
-      .update({
-        fulfilment_source: source,
-        source_location_id: source === 'internal' ? locationId : null,
-      })
-      .eq('id', itemId)
-      .eq('order_id', orderId);
+    const { error } = await supabase.rpc('ops_set_order_item_fulfilment_source', {
+      p_order_id: orderId,
+      p_item_id: itemId,
+      p_fulfilment_source: source,
+      p_source_location_id: source === 'internal' ? locationId : null,
+    });
 
     if (error) return fail(error.message);
     revalidatePath(`/modules/operations/orders/${orderId}`);
