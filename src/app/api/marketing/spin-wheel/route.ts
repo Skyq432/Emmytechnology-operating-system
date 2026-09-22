@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { canAccessModule, isInternalRole } from "@/lib/auth/roles";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 const db = new Proxy(
   {} as ReturnType<typeof getSupabaseAdmin>,
@@ -20,6 +21,20 @@ const MAX_ROWS = 5000;
 
 type Row = Record<string, unknown>;
 type SafeRowsResult = { rows: Row[]; warning: string | null };
+
+// Every response in this route must go through this — this route's data is scoped by
+// a from/to date range, and Netlify's CDN caches GET responses by URL when no
+// Cache-Control is set, with no awareness that "this month" means something different
+// as time passes. Without this, the first request for a given date range gets cached
+// and every later identical request (including ones made after a real bug fix here)
+// silently keeps getting served that same stale snapshot forever.
+function json(body: unknown, init?: ResponseInit) {
+  const response = NextResponse.json(body, init);
+  response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+  response.headers.set("Netlify-CDN-Cache-Control", "no-store");
+  response.headers.set("Pragma", "no-cache");
+  return response;
+}
 
 async function authorized() {
   const supabase = await createServerClient();
@@ -45,7 +60,7 @@ async function authorized() {
 }
 
 function deny() {
-  return NextResponse.json(
+  return json(
     { ok: false, error: "Marketing workspace access is required." },
     { status: 401 }
   );
@@ -377,7 +392,7 @@ export async function GET(req: NextRequest) {
         null,
     }));
 
-  return NextResponse.json({
+  return json({
     ok: true,
     period: { from: fromIso, to: toIso },
     warnings,
@@ -426,7 +441,7 @@ export async function POST(req: NextRequest) {
   const action = textValue(body.action);
 
   if (!action) {
-    return NextResponse.json(
+    return json(
       { ok: false, error: "Action is required." },
       { status: 400 }
     );
@@ -440,9 +455,9 @@ export async function POST(req: NextRequest) {
       .eq("id", body.id);
 
     if (error) {
-      return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+      return json({ ok: false, error: error.message }, { status: 400 });
     }
-    return NextResponse.json({ ok: true });
+    return json({ ok: true });
   }
 
   if (action === "update_prize") {
@@ -452,9 +467,9 @@ export async function POST(req: NextRequest) {
       .eq("id", body.id);
 
     if (error) {
-      return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+      return json({ ok: false, error: error.message }, { status: 400 });
     }
-    return NextResponse.json({ ok: true });
+    return json({ ok: true });
   }
 
   if (action === "update_rule_group") {
@@ -464,9 +479,9 @@ export async function POST(req: NextRequest) {
       .eq("id", body.id);
 
     if (error) {
-      return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+      return json({ ok: false, error: error.message }, { status: 400 });
     }
-    return NextResponse.json({ ok: true });
+    return json({ ok: true });
   }
 
   if (action === "update_rule_item") {
@@ -476,12 +491,12 @@ export async function POST(req: NextRequest) {
       .eq("id", body.id);
 
     if (error) {
-      return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+      return json({ ok: false, error: error.message }, { status: 400 });
     }
-    return NextResponse.json({ ok: true });
+    return json({ ok: true });
   }
 
-  return NextResponse.json(
+  return json(
     { ok: false, error: "Unsupported action." },
     { status: 400 }
   );
