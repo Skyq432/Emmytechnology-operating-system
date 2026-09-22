@@ -88,24 +88,45 @@ function within(rows: Row[], fromIso: string, toIso: string) {
   });
 }
 
+const PAGE_SIZE = 1000;
+
+// Supabase/PostgREST caps every response at a server-side row limit (1000 here)
+// regardless of what .limit() requests — a single unordered `.select("*").limit(5000)`
+// silently came back with only 1000 rows, in no particular order. For a table that has
+// grown past 1000 rows (spin_logs, spin_players, spin_user_prizes all have), that meant
+// whichever arbitrary 1000 rows the database happened to return might not include the
+// current period at all — this is exactly why the Spin Wheel Console showed 0 spins for
+// a month that actually had 71. Paginate with .range() until every row up to `limit` is
+// collected, ordered by orderColumn (present on every one of these tables except
+// spin_game_settings, which never exceeds a handful of rows anyway).
 async function safeRows(
   table: string,
-  limit = MAX_ROWS
+  limit = MAX_ROWS,
+  orderColumn: string | null = "created_at"
 ): Promise<SafeRowsResult> {
   try {
-    const { data, error } = await db.from(table).select("*").limit(limit);
+    const rows: Row[] = [];
+    for (let offset = 0; offset < limit; offset += PAGE_SIZE) {
+      let query = db.from(table).select("*");
+      if (orderColumn) query = query.order(orderColumn, { ascending: true });
+      const { data, error } = await query.range(
+        offset,
+        Math.min(offset + PAGE_SIZE, limit) - 1
+      );
 
-    if (error) {
-      return {
-        rows: [],
-        warning: `${table}: ${error.message}`,
-      };
+      if (error) {
+        return {
+          rows: [],
+          warning: `${table}: ${error.message}`,
+        };
+      }
+
+      const page = Array.isArray(data) ? data : [];
+      rows.push(...page);
+      if (page.length < PAGE_SIZE) break;
     }
 
-    return {
-      rows: Array.isArray(data) ? data : [],
-      warning: null,
-    };
+    return { rows, warning: null };
   } catch (error) {
     return {
       rows: [],
@@ -154,8 +175,12 @@ function normalizeStatus(value: unknown) {
   return textValue(value).toLowerCase();
 }
 
-async function tableRows(table: string, limit = MAX_ROWS) {
-  return safeRows(table, limit);
+async function tableRows(
+  table: string,
+  limit = MAX_ROWS,
+  orderColumn: string | null = "created_at"
+) {
+  return safeRows(table, limit, orderColumn);
 }
 
 export async function GET(req: NextRequest) {
@@ -191,7 +216,7 @@ export async function GET(req: NextRequest) {
     tableRows("spin_referral_awards"),
     tableRows("spin_rule_groups"),
     tableRows("spin_rule_items"),
-    tableRows("spin_game_settings"),
+    tableRows("spin_game_settings", MAX_ROWS, null),
     tableRows("spin_letter_segments"),
   ]);
 

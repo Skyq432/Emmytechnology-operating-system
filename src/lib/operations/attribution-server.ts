@@ -1,7 +1,13 @@
 import { requireStaffCapability } from '@/lib/auth/capability-server';
 
 export async function getOperationsAmbassadors() {
-  const { supabase } = await requireStaffCapability('operations.order.manage');
+  // Read-only capability: this only lists ambassadors for a dropdown, it doesn't write
+  // attribution. Called for every order detail page, so it must not require more than
+  // operations.read — technician, sales_analyst and marketing_manager can all view an
+  // order but don't have operations.order.manage, and previously crashed the whole page
+  // (an uncaught "Not authorized" thrown inside an un-caught Promise.all). The actual
+  // write, updateDraftOrderAttribution, still independently requires operations.order.manage.
+  const { supabase } = await requireStaffCapability('operations.read');
   const { data, error } = await supabase
     .from('ambassadors')
     .select('id,display_name,ambassador_tag,user_id,users(name,email)')

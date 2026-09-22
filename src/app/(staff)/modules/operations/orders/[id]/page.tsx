@@ -26,7 +26,7 @@ export default async function OperationsOrderDetailPage({ params }: { params: Pr
   const { order, events, handoffs, reservations, users, locations, identity, ambassador } = detail;
   const solarItem = (order.items || []).find((item) => item.item_type === 'solar');
   const [ambassadors, payments, solarInstallation] = await Promise.all([
-    getOperationsAmbassadors(),
+    order.commercial_state === 'draft' ? getOperationsAmbassadors() : Promise.resolve([]),
     getOrderPayments(id),
     solarItem ? getSolarInstallation(solarItem.id) : Promise.resolve(null),
   ]);
