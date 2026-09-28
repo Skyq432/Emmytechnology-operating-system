@@ -1,4 +1,4 @@
-import { ArrowLeftRight, CreditCard, PlusCircle, Wrench } from 'lucide-react';
+import { ArrowLeftRight, CreditCard, PlusCircle, Share2, Wrench } from 'lucide-react';
 import { ActionGrid, ActionLauncher } from '@/components/ui/action-launcher';
 import { PageHeader } from '@/components/ui/page-header';
 import { OperationsPeriodBar } from '@/components/operations/operations-period-bar';
@@ -60,6 +60,13 @@ export async function FrontDeskHome({ role, name }: { role: InternalRole; name: 
                 tone="purple"
               />
             )}
+            <ActionLauncher
+              href="/modules/referral-tracker"
+              icon={<Share2 className="h-6 w-6" />}
+              title="Referral Tracker"
+              description="Record a referral, card holder or POS withdrawal"
+              tone="secondary"
+            />
           </ActionGrid>
         </div>
       </div>
