@@ -1,8 +1,11 @@
 import { requireStaffCapability } from '@/lib/auth/capability-server';
-import { hasCapability } from '@/lib/auth/roles';
+import { getCachedAuthContext } from '@/lib/auth/server';
+import { canAccessReferralTracker, hasCapability, isInternalRole, type InternalRole } from '@/lib/auth/roles';
 import type { OperationsIdentitySummary } from './types';
 import { buildOperationsIdentitySignals, normalizeOperationsPhone } from './identity-domain';
 export { buildOperationsIdentitySignals, normalizeOperationsPhone } from './identity-domain';
+
+type IdentitySupabaseClient = Awaited<ReturnType<typeof getCachedAuthContext>>['supabase'];
 
 const stageNames: Record<number, string> = {
   1: 'Awareness', 2: 'Interest', 3: 'Consideration', 4: 'Intent', 5: 'Purchase',
@@ -54,6 +57,24 @@ function safeSearch(value: string) {
 
 export async function searchOperationsIdentities(query: string): Promise<OperationsIdentitySummary[]> {
   const { supabase, role } = await requireCustomerAccess();
+  return searchIdentitiesCore(supabase, role, query);
+}
+
+// The Referral Tracker page needs this same search (front_desk and marketing_manager
+// need to autofill from known CRM identities), but its audience is front_desk +
+// marketing_manager + growth_lead + admins — no single existing capability covers all
+// of them (marketing_manager has zero StaffCapability entries at all). Gated by
+// canAccessReferralTracker instead of sales.read, same search logic underneath.
+export async function searchReferralTrackerIdentities(query: string): Promise<OperationsIdentitySummary[]> {
+  const { user, profile, supabase } = await getCachedAuthContext();
+  if (!user) throw new Error('Not authenticated');
+  if (!profile || !isInternalRole(profile.role) || !canAccessReferralTracker(profile.role)) {
+    throw new Error('Not authorized');
+  }
+  return searchIdentitiesCore(supabase, profile.role as InternalRole, query);
+}
+
+async function searchIdentitiesCore(supabase: IdentitySupabaseClient, role: InternalRole, query: string): Promise<OperationsIdentitySummary[]> {
   const raw = safeSearch(query);
   if (raw.length < 3) return [];
 

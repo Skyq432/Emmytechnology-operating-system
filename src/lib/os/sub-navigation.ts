@@ -19,6 +19,7 @@ import {
   Repeat2,
   RotateCcw,
   Settings,
+  Share2,
   ShoppingBag,
   Stethoscope,
   Target,
@@ -54,6 +55,7 @@ const SALES_ICONS: Record<(typeof SALES_NAV)[number]['key'], LucideIcon> = {
   team: HandCoins,
   reports: BarChart3,
   settings: Settings,
+  referralTracker: Share2,
 };
 
 const OPERATIONS_ICONS: Record<(typeof OPERATIONS_NAV)[number]['key'], LucideIcon> = {
@@ -103,6 +105,9 @@ const AMBASSADOR_MARKETING_NAV: ModuleSubNavItem[] = [
   { key: 'whatsapp-intake', href: '/modules/marketing/whatsapp-intake', label: 'WhatsApp Intake', icon: MessageSquareText },
   { key: 'products', href: '/modules/marketing/products', label: 'Products', icon: Package },
   { key: 'invite', href: '/modules/marketing/invite', label: 'Invitations', icon: Link2 },
+  // Same standalone page linked from the Sales sub-nav (see sales/navigation.ts) —
+  // marketing_manager reaches it here since they have no 'sales' module access.
+  { key: 'referral-tracker', href: '/modules/referral-tracker', label: 'Referral Tracker', icon: Share2 },
   { key: 'settings', href: '/modules/marketing/settings', label: 'Settings', icon: Settings },
 ];
 

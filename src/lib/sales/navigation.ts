@@ -11,4 +11,8 @@ export const SALES_NAV = [
   { key: 'team', label: 'Sales Team', href: '/modules/sales/team' },
   { key: 'reports', label: 'Reports', href: '/modules/sales/reports' },
   { key: 'settings', label: 'Settings', href: '/modules/sales/settings' },
+  // Lives outside /modules/sales on purpose — front_desk (sales-only) and
+  // marketing_manager (marketing-only) both need this page, and no single module's
+  // layout gate covers both, so it isn't nested under either module's route tree.
+  { key: 'referralTracker', label: 'Referral Tracker', href: '/modules/referral-tracker' },
 ] as const;

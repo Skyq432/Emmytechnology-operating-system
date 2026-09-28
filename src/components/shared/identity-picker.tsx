@@ -21,6 +21,19 @@ export interface IdentityPickerProps {
    */
   renderHiddenFields?: boolean;
 
+  /** Which identity-search API to call. Different pages sit behind different capability
+   * gates (e.g. the Referral Tracker page's audience — front_desk + marketing_manager —
+   * doesn't match any single existing StaffCapability), so this is configurable rather
+   * than hardcoded to Sales/Operations' endpoint. */
+  searchEndpoint?: string;
+
+  /** Shown under the search box when nothing matches. Defaults to the Sales/Operations
+   * copy ("a new Identity will be resolved when you save"), which is only true where the
+   * caller actually calls resolveOrCreate*Identity on submit — override this for any
+   * caller that uses the picker purely as an autofill convenience and never creates or
+   * links a Supabase Identity (e.g. the Referral Tracker sheet forms). */
+  noMatchHint?: string;
+
   // Self-contained mode
   title?: string;
   compact?: boolean;
@@ -47,6 +60,8 @@ export function IdentityPicker({
   onSelect,
   className,
   renderHiddenFields = true,
+  searchEndpoint = '/api/operations/identities',
+  noMatchHint = 'No CRM match yet. A new Identity will be resolved when you save.',
   title = 'Find customer',
   compact = false,
   defaultName = '',
@@ -107,7 +122,7 @@ export function IdentityPicker({
     const timer = window.setTimeout(async () => {
       setLoading(true);
       try {
-        const response = await fetch(`/api/operations/identities?q=${encodeURIComponent(query)}`, { signal: controller.signal });
+        const response = await fetch(`${searchEndpoint}?q=${encodeURIComponent(query)}`, { signal: controller.signal });
         const payload = await response.json();
         if (!response.ok) throw new Error(payload?.detail || payload?.error || 'Search failed');
         const nextResults = Array.isArray(payload.results) ? payload.results : [];
@@ -133,7 +148,7 @@ export function IdentityPicker({
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [query, selected]);
+  }, [query, selected, searchEndpoint]);
 
   function choose(identity: OperationsIdentitySummary) {
     if (renderHiddenFields) {
@@ -179,7 +194,7 @@ export function IdentityPicker({
         {loading && <p className="mt-2 text-xs text-slate-400">Checking EmmyTech identities...</p>}
         {!loading && searchError && <p className="mt-2 text-xs font-bold text-rose-600">Search failed: {searchError}. Try again.</p>}
         {!loading && !searchError && query.length >= 3 && effectiveResults.length === 0 && (
-          <p className="mt-2 text-xs text-slate-400">No CRM match yet. A new Identity will be resolved when you save.</p>
+          <p className="mt-2 text-xs text-slate-400">{noMatchHint}</p>
         )}
         {effectiveResults.length > 0 && (
           <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-72 overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg">
@@ -250,7 +265,7 @@ export function IdentityPicker({
                 </div>
               </button>
             ))}
-            {!loading && !searchError && !effectiveResults.length ? <div className="px-3 py-2 text-xs text-slate-400">No CRM match yet. A new Identity will be resolved when you save.</div> : null}
+            {!loading && !searchError && !effectiveResults.length ? <div className="px-3 py-2 text-xs text-slate-400">{noMatchHint}</div> : null}
           </div>
         ) : null}
       </div>

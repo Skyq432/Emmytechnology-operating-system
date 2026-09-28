@@ -60,6 +60,7 @@ export const SALES_NAV_KEYS = [
   'team',
   'reports',
   'settings',
+  'referralTracker',
 ] as const;
 
 export type SalesNavKey = (typeof SALES_NAV_KEYS)[number];
@@ -69,7 +70,7 @@ const SALES_ACCESS: Record<InternalRole, readonly SalesNavKey[]> = {
   admin: SALES_NAV_KEYS,
   growth_lead: SALES_NAV_KEYS,
   marketing_manager: [],
-  front_desk: ['direct', 'orders', 'payments', 'receipts', 'customers'],
+  front_desk: ['direct', 'orders', 'payments', 'receipts', 'customers', 'referralTracker'],
   operations_lead: ['overview', 'direct', 'orders', 'payments', 'receipts', 'customers'],
   technician: ['direct', 'receipts', 'customers'],
   sales_analyst: ['overview', 'quotations', 'orders', 'customers', 'reports'],
@@ -229,6 +230,21 @@ export function canCreateAmbassadorInvite(role: string | null | undefined): bool
 
 export function canAssignSuperAdmin(role: string | null | undefined): boolean {
   return role === 'super_admin';
+}
+
+// The Referral Tracker Google Sheet integration (referrals, cardholders, Free POS
+// Tracker) needs front_desk, who only has 'sales' MODULE_ACCESS, and marketing_manager,
+// who only has 'marketing' — no single existing module gate covers both, so this page
+// lives outside both module route trees and checks this list directly instead of
+// requireModuleAccess('sales'|'marketing').
+export function canAccessReferralTracker(role: string | null | undefined): boolean {
+  return (
+    role === 'super_admin' ||
+    role === 'admin' ||
+    role === 'front_desk' ||
+    role === 'marketing_manager' ||
+    role === 'growth_lead'
+  );
 }
 
 export function roleLabel(role: string | null | undefined): string {
