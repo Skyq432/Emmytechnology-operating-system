@@ -20,14 +20,14 @@ const specFields: Record<OrderItemType, readonly string[]> = {
     'bag_included',
   ],
   phone: [
+    'imei',
     'storage_capacity',
     'ram',
     'colour',
     'network_type',
-    'sim_type',
     'accessories_included',
   ],
-  accessory: ['category', 'subcategory', 'compatible_with', 'colour'],
+  accessory: ['category', 'compatible_with', 'colour'],
   solar: ['system_capacity', 'brand', 'model_spec'],
   other: [],
 };
@@ -52,9 +52,9 @@ export const ORDER_ITEM_SPEC_LABELS: Record<string, string> = {
   serial_number: 'Serial number', generation: 'Generation', processor_type: 'Processor type', processor_speed_ghz: 'Processor speed (GHz)',
   ram: 'RAM', storage_size: 'Storage size', storage_type: 'Storage type', screen_size: 'Screen size',
   touchscreen: 'Touchscreen?', colour: 'Colour', os_installed: 'OS installed', charger_included: 'Charger included?',
-  bag_included: 'Bag included?', storage_capacity: 'Storage capacity', network_type: 'Network type',
-  sim_type: 'SIM type', accessories_included: 'Accessories included', category: 'Sub-category',
-  subcategory: 'Sub-category', compatible_with: 'Compatible with', system_capacity: 'System capacity',
+  bag_included: 'Bag included?', storage_capacity: 'Storage capacity', network_type: 'Network type', imei: 'IMEI number',
+  accessories_included: 'Accessories included', category: 'Sub-category',
+  compatible_with: 'Compatible with', system_capacity: 'System capacity',
   brand: 'Brand', model_spec: 'Model / spec',
 };
 

@@ -23,6 +23,7 @@ type Order = {
   sales_staff_name: string | null; total_amount: number; amount_paid: number; balance_due: number; payment_status: string;
   handover_completed_at: string | null; created_at: string; items?: Array<{ id: string; item_name: string; quantity: number; unit_price: number | null; line_total: number }>;
   payments?: Array<{ id: string; amount: number; is_void: boolean }>;
+  deletion_status: 'none' | 'pending_deletion' | 'deleted';
 };
 
 function OrderActions({ order }: { order: Order }) {
@@ -105,7 +106,7 @@ export function OrdersWorkspace({ orders }: { orders: Order[] }) {
             <section key={order.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <div className="text-lg font-black text-slate-900">{order.order_code} · {order.customer_name || 'Customer'}</div>
+                  <div className="flex flex-wrap items-center gap-2"><div className="text-lg font-black text-slate-900">{order.order_code} · {order.customer_name || 'Customer'}</div>{order.deletion_status === 'pending_deletion' && <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-black text-amber-800">Pending deletion</span>}{order.deletion_status === 'deleted' && <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-[10px] font-black text-red-800">Deleted</span>}</div>
                   <div className="mt-1 text-xs text-slate-400">{order.sales_channel === 'direct_sale' ? 'Direct Sale' : 'Order'} · {order.commercial_state} · fulfilment {order.status} · {order.sales_staff_name || 'Unassigned salesperson'}</div>
                 </div>
                 <Link href={`/modules/operations/orders/${order.id}`} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-emmy-primary">Open fulfilment in Operations</Link>

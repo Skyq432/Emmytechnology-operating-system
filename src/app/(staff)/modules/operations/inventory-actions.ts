@@ -3,24 +3,21 @@
 import { revalidatePath } from 'next/cache';
 import { addInventoryStock, createInventoryItemWithOpeningStock } from '@/lib/operations/inventory-server';
 import { updateInventoryCommercialPricing } from '@/lib/operations/sales-server';
-import type { OrderItemType } from '@/lib/operations/sales-model';
+import { getRelevantSpecFields, ORDER_ITEM_BOOLEAN_SPEC_KEYS, type OrderItemType } from '@/lib/operations/sales-model';
 
 export type InventoryActionState = { success: boolean; message: string };
 const fail = (message: string): InventoryActionState => ({ success: false, message });
 
 function buildSpecs(formData: FormData, itemType: OrderItemType) {
   const specs: Record<string, unknown> = {};
-  const keysByType: Record<OrderItemType, string[]> = {
-    laptop: ['generation','processor_type','processor_speed_ghz','ram','storage_size','storage_type','screen_size','touchscreen','colour','os_installed','charger_included','bag_included'],
-    phone: ['storage_capacity','ram','colour','network_type','sim_type','accessories_included'],
-    accessory: ['subcategory','compatible_with','colour'],
-    solar: ['system_capacity'],
-    other: [],
-  };
-  for (const key of keysByType[itemType]) {
+  // Was a hand-maintained duplicate of sales-model.ts's field lists that had already
+  // drifted from it in three ways (missing serial_number/brand/model_spec, still had
+  // sim_type, used 'subcategory' instead of 'category') — now the same source Direct
+  // Sale, New Order and the "Sales details" panel all already use.
+  for (const key of getRelevantSpecFields(itemType)) {
     const raw = formData.get(key);
     if (raw === null) continue;
-    if (['touchscreen','charger_included','bag_included'].includes(key)) specs[key] = raw === 'on';
+    if (ORDER_ITEM_BOOLEAN_SPEC_KEYS.has(key)) specs[key] = raw === 'on';
     else if (String(raw).trim()) specs[key] = String(raw).trim();
   }
   return specs;

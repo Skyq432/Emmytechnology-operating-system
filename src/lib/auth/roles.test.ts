@@ -34,7 +34,7 @@ test('department access follows the approved role matrix', () => {
 });
 
 test('sales navigation is filtered by role', () => {
-  assert.deepEqual(salesNavKeys('front_desk'), ['direct','orders','payments','receipts','customers']);
+  assert.deepEqual(salesNavKeys('front_desk'), ['direct','orders','payments','receipts','customers','referralTracker']);
   assert.deepEqual(salesNavKeys('operations_lead'), ['overview','direct','orders','payments','receipts','customers']);
   assert.deepEqual(salesNavKeys('technician'), ['direct','receipts','customers']);
   assert.equal(salesNavKeys('technician').includes('overview'), false);

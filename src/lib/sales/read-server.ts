@@ -87,6 +87,7 @@ export async function getSalesOrders() {
   const { data, error } = await supabase
     .from('ops_orders')
     .select('*,items:ops_order_items(*),payments:ops_order_payments(*),credit:sales_credit_releases(*)')
+    .neq('deletion_status', 'deleted')
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
   return (data || []).map((row) => numeric(row, ['subtotal', 'discount_amount', 'total_amount', 'amount_paid', 'balance_due', 'commission_amount']));

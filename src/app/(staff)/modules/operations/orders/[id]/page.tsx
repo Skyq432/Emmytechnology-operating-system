@@ -5,6 +5,7 @@ import { DraftSalesDetails } from '@/components/operations/orders/draft-sales-de
 import { DraftFulfilmentSource } from '@/components/operations/orders/draft-fulfilment-source';
 import { DraftReviewPanel } from '@/components/operations/orders/draft-review-panel';
 import { HandoverPanel } from '@/components/operations/orders/handover-panel';
+import { OrderDeletionPanel } from '@/components/operations/orders/order-deletion-panel';
 import { OrderPayments } from '@/components/operations/orders/order-payments';
 import { SolarInstallationCard } from '@/components/operations/orders/solar-installation-card';
 import { FulfilmentControl } from '@/components/operations/orders/fulfilment-control';
@@ -19,7 +20,7 @@ const money = (value: number | null | undefined) => `₦${Number(value || 0).toL
 export default async function OperationsOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const detail = await getOperationsOrderDetail(id);
-  const { order, events, handoffs, reservations, users, locations, identity, ambassador } = detail;
+  const { order, events, handoffs, reservations, users, locations, identity, ambassador, viewerRole } = detail;
   const solarItem = (order.items || []).find((item) => item.item_type === 'solar');
   const [ambassadors, payments, solarInstallation] = await Promise.all([
     order.commercial_state === 'draft' ? getOperationsAmbassadors() : Promise.resolve([]),
@@ -40,7 +41,7 @@ export default async function OperationsOrderDetailPage({ params }: { params: Pr
       <Link href="/modules/operations/orders" className="mb-4 inline-flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-[#032489]"><ArrowLeft className="h-4 w-4" /> Back to orders</Link>
       <div className="mb-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-col justify-between gap-4 lg:flex-row">
-          <div><div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-black text-[#032489] md:text-3xl">{order.order_code}</h1><Badge text={order.commercial_state} blue={order.commercial_state === 'confirmed'} /><Badge text={getOrderStatusLabel(order.status)} blue /><Badge text={order.order_type || 'other'} /></div><p className="mt-2 text-sm font-black text-slate-900">{order.customer_name || order.reference_label || 'Internal order'}</p><p className="mt-1 text-xs text-slate-500">{order.customer_phone || 'No phone'}{order.customer_email ? ` · ${order.customer_email}` : ''}</p></div>
+          <div><div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-black text-[#032489] md:text-3xl">{order.order_code}</h1><Badge text={order.commercial_state} blue={order.commercial_state === 'confirmed'} /><Badge text={getOrderStatusLabel(order.status)} blue /><Badge text={order.order_type || 'other'} />{order.deletion_status === 'pending_deletion' && <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-800">Pending deletion</span>}{order.deletion_status === 'deleted' && <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-black text-red-800">Deleted</span>}</div><p className="mt-2 text-sm font-black text-slate-900">{order.customer_name || order.reference_label || 'Internal order'}</p><p className="mt-1 text-xs text-slate-500">{order.customer_phone || 'No phone'}{order.customer_email ? ` · ${order.customer_email}` : ''}</p></div>
           <div className="grid gap-2 sm:grid-cols-2 lg:min-w-[420px]"><Info label="Team" value={order.current_team || 'Unassigned'} /><Info label="Due" value={order.due_at ? formatDate(order.due_at) : 'No deadline'} /><Info label="Priority" value={order.priority} /><Info label="Updated" value={formatDate(order.updated_at)} /></div>
         </div>
       </div>
@@ -71,6 +72,7 @@ export default async function OperationsOrderDetailPage({ params }: { params: Pr
         <div className="space-y-5">
           {order.commercial_state === 'confirmed' && <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><h2 className="text-sm font-black">Move fulfilment forward</h2><p className="mt-1 text-xs text-slate-500">You can move directly to any later stage. Skipping stages requires a reason.</p><FulfilmentControl orderId={order.id} currentStatus={order.status} allowedStatuses={allowedStatuses} hasActiveReservations={activeReservations.length > 0} /></section>}
           <HandoverPanel orderId={order.id} users={users} handoffs={handoffs} />
+          <OrderDeletionPanel order={order} viewerRole={viewerRole} />
         </div>
       </div>
       <style>{`.input{width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;font-size:14px;outline:none;background:#fff}.input:focus{border-color:#032489;box-shadow:0 0 0 3px rgba(3,36,137,.08)}`}</style>

@@ -1,0 +1,40 @@
+-- Self-caught regression: the previous migration's CREATE OR REPLACE VIEW omitted
+-- WITH (security_invoker = true), which the original view (sales_financial_document_foundation)
+-- explicitly set. Omitting it on a replace resets it to the Postgres default (definer-style,
+-- running as the view owner rather than the querying user) — restoring it here.
+create or replace view public.sales_unified_payments
+with (security_invoker = true)
+as
+ SELECT 'order'::text AS source_type,
+    p.id AS source_payment_id,
+    p.order_id AS source_id,
+    o.order_code AS source_code,
+    o.identity_id,
+    p.amount,
+    p.payment_method,
+    p.reference,
+    p.paid_at,
+    p.is_void,
+    p.recorded_by,
+    p.created_at
+   FROM ops_order_payments p
+     JOIN ops_orders o ON o.id = p.order_id
+   WHERE o.deletion_status <> 'deleted'
+UNION ALL
+ SELECT 'repair'::text AS source_type,
+    p.id AS source_payment_id,
+    p.repair_id AS source_id,
+    r.repair_code AS source_code,
+    r.identity_id,
+    p.amount,
+    p.payment_method,
+    p.reference,
+    p.paid_at,
+    p.is_void,
+    p.recorded_by,
+    p.created_at
+   FROM ops_repair_payments p
+     JOIN ops_repairs r ON r.id = p.repair_id;
+
+revoke all on public.sales_unified_payments from anon;
+grant select on public.sales_unified_payments to authenticated;

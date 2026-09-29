@@ -24,6 +24,7 @@ export async function getOperationsOrdersForRange(range: ReportingRange): Promis
   const { data, error } = await supabase
     .from('ops_orders')
     .select('*, items:ops_order_items(*)')
+    .neq('deletion_status', 'deleted')
     .gte('created_at', range.startIso)
     .lt('created_at', range.endExclusiveIso)
     .order('updated_at', { ascending: false });
@@ -34,12 +35,12 @@ export async function getOperationsOrdersForRange(range: ReportingRange): Promis
 export async function getOperationsOverviewForRange(range: ReportingRange): Promise<OperationsOverview> {
   const { supabase } = await requireStaffCapability('operations.read');
   const [open, urgent, dispatch, inventory, links, orders, events, availability, totalRepairs, collectedRepairs, uncollectedRepairs] = await Promise.all([
-    supabase.from('ops_orders').select('id', { count: 'exact', head: true }).not('status', 'in', '(completed,cancelled)').gte('created_at', range.startIso).lt('created_at', range.endExclusiveIso),
-    supabase.from('ops_orders').select('id', { count: 'exact', head: true }).eq('priority', 'urgent').not('status', 'in', '(completed,cancelled)').gte('created_at', range.startIso).lt('created_at', range.endExclusiveIso),
-    supabase.from('ops_orders').select('id', { count: 'exact', head: true }).in('status', ['ready_dispatch', 'dispatched']).gte('created_at', range.startIso).lt('created_at', range.endExclusiveIso),
+    supabase.from('ops_orders').select('id', { count: 'exact', head: true }).not('status', 'in', '(completed,cancelled)').neq('deletion_status', 'deleted').gte('created_at', range.startIso).lt('created_at', range.endExclusiveIso),
+    supabase.from('ops_orders').select('id', { count: 'exact', head: true }).eq('priority', 'urgent').not('status', 'in', '(completed,cancelled)').neq('deletion_status', 'deleted').gte('created_at', range.startIso).lt('created_at', range.endExclusiveIso),
+    supabase.from('ops_orders').select('id', { count: 'exact', head: true }).in('status', ['ready_dispatch', 'dispatched']).neq('deletion_status', 'deleted').gte('created_at', range.startIso).lt('created_at', range.endExclusiveIso),
     supabase.from('ops_inventory_items').select('id', { count: 'exact', head: true }).eq('is_active', true),
     supabase.from('ops_website_product_links').select('id', { count: 'exact', head: true }).eq('is_active', true),
-    supabase.from('ops_orders').select('*').gte('created_at', range.startIso).lt('created_at', range.endExclusiveIso).order('updated_at', { ascending: false }).limit(6),
+    supabase.from('ops_orders').select('*').neq('deletion_status', 'deleted').gte('created_at', range.startIso).lt('created_at', range.endExclusiveIso).order('updated_at', { ascending: false }).limit(6),
     supabase.from('ops_order_events').select('*').gte('created_at', range.startIso).lt('created_at', range.endExclusiveIso).order('created_at', { ascending: false }).limit(8),
     supabase.from('ops_inventory_availability').select('inventory_item_id,reorder_level,available'),
     supabase.from('ops_repairs').select('id', { count: 'exact', head: true }).not('status', 'eq', 'cancelled').gte('received_at', range.startIso).lt('received_at', range.endExclusiveIso),
