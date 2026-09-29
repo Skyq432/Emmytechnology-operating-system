@@ -2,7 +2,7 @@
 
 import { useActionState, useMemo, useState } from 'react';
 import { saveDraftSalesDetailsAction, type SalesActionState } from '@/app/(staff)/modules/operations/sales-actions';
-import { getRelevantSpecFields, ORDER_ITEM_TYPES, type OrderItemType } from '@/lib/operations/sales-model';
+import { getRelevantSpecFields, ORDER_ITEM_SPEC_LABELS, ORDER_ITEM_TYPES, type OrderItemType } from '@/lib/operations/sales-model';
 import type { OperationsOrder, OperationsOrderItem } from '@/lib/operations/types';
 import { HelpTip } from '@/components/ui/help-tip';
 import { Input } from '@/components/ui/input';
@@ -11,7 +11,10 @@ import { Button } from '@/components/ui/button';
 import { ActionResult } from '@/components/ui/alert';
 
 const initialState:SalesActionState={success:false,message:''};
-const labels:Record<string,string>={generation:'Generation',processor_type:'Processor type',processor_speed_ghz:'Processor speed (GHz)',ram:'RAM',storage_size:'Storage size',storage_type:'Storage type',screen_size:'Screen size',touchscreen:'Touchscreen?',colour:'Colour',os_installed:'OS installed',charger_included:'Charger included?',bag_included:'Bag included?',storage_capacity:'Storage capacity',network_type:'Network type',sim_type:'SIM type',accessories_included:'Accessories included',category:'Category',subcategory:'Sub-category',compatible_with:'Compatible with',system_capacity:'System capacity',brand:'Brand',model_spec:'Model / spec'};
+// Was a hand-maintained copy of ORDER_ITEM_SPEC_LABELS that had already drifted from it
+// (e.g. labeled 'category' as "Category" here vs. "Sub-category" in sales-model.ts) —
+// now the same single source of truth every other spec-field UI in Sales/Operations uses.
+const labels = ORDER_ITEM_SPEC_LABELS;
 
 export function DraftSalesDetails({order,item,users}:{order:OperationsOrder;item:OperationsOrderItem;users:Array<{id:string;name:string|null;email:string|null}>}){
  const [state,action,pending]=useActionState(saveDraftSalesDetailsAction,initialState);

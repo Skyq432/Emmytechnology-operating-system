@@ -12,6 +12,8 @@ import {
 import {
   acknowledgeOperationsHandover,
   createOperationsHandover,
+  requestOrderDeletion,
+  resolveOrderDeletion,
 } from '@/lib/operations/tracking-server';
 import { updateDraftOrderAttribution } from '@/lib/operations/attribution-server';
 import {
@@ -114,6 +116,40 @@ export async function confirmOrderAction(
     revalidatePath(`/modules/operations/orders/${orderId}`);
   }
   return { success: result.success, message: result.message };
+}
+
+export async function requestOrderDeletionAction(
+  _previousState: OperationsActionState,
+  formData: FormData
+): Promise<OperationsActionState> {
+  const orderId = String(formData.get('order_id') || '');
+  const reason = String(formData.get('reason') || '').trim();
+  if (!orderId) return { success: false, message: 'Order is required.' };
+  if (!reason) return { success: false, message: 'A reason is required to flag this order for deletion.' };
+  const result = await requestOrderDeletion(orderId, reason);
+  if (result.success) {
+    revalidatePath('/modules/sales/orders');
+    revalidatePath('/modules/operations/orders');
+    revalidatePath(`/modules/operations/orders/${orderId}`);
+  }
+  return result;
+}
+
+export async function resolveOrderDeletionAction(
+  _previousState: OperationsActionState,
+  formData: FormData
+): Promise<OperationsActionState> {
+  const orderId = String(formData.get('order_id') || '');
+  const approve = String(formData.get('approve') || '') === 'true';
+  const note = String(formData.get('note') || '').trim();
+  if (!orderId) return { success: false, message: 'Order is required.' };
+  const result = await resolveOrderDeletion(orderId, approve, note || null);
+  if (result.success) {
+    revalidatePath('/modules/sales/orders');
+    revalidatePath('/modules/operations/orders');
+    revalidatePath(`/modules/operations/orders/${orderId}`);
+  }
+  return result;
 }
 
 export async function changeOrderStatusAction(

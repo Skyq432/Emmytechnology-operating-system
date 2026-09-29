@@ -41,6 +41,9 @@ export interface OperationsOrder {
   status: OrderStatus; priority: OperationsPriority; current_team: string | null; current_owner_id: string | null; due_at: string | null;
   created_at: string; updated_at: string; items?: OperationsOrderItem[];
   final_receipt_id?: string | null; final_receipt_number?: string | null;
+  deletion_status: 'none' | 'pending_deletion' | 'deleted';
+  deletion_requested_by: string | null; deletion_requested_at: string | null; deletion_reason: string | null;
+  deletion_resolved_by: string | null; deletion_resolved_at: string | null; deletion_resolution_note: string | null;
 }
 
 export interface OperationsOrderItem {
@@ -123,6 +126,10 @@ export interface OperationsOrderDetail {
   users: Array<{ id: string; name: string | null; email: string | null }>; locations: OperationsLocation[];
   identity: { id: string; identity_code: string; primary_name: string | null; primary_phone: string | null; primary_email: string | null; crm_stage: number } | null;
   ambassador: { id: string; name: string } | null;
+  /** Only admin/super_admin can resolve a deletion request — the detail page uses this
+   * to decide whether to show that action at all, rather than showing a button that
+   * would always fail for anyone else. */
+  viewerRole: string;
 }
 
 export interface RepairPartUsed {

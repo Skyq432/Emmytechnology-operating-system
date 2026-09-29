@@ -11,7 +11,7 @@ async function requireOperationsAccess() {
 }
 
 export async function getOperationsOrderDetail(orderId: string): Promise<OperationsOrderDetail> {
-  const { supabase } = await requireOperationsAccess();
+  const { supabase, role } = await requireOperationsAccess();
   const [orderResult, eventsResult, handoffsResult, usersResult, reservationsResult, locationsResult, finalReceiptResult] = await Promise.all([
     supabase.from('ops_orders').select('*, items:ops_order_items(*)').eq('id', orderId).single(),
     supabase.from('ops_order_events').select('*').eq('order_id', orderId).order('created_at', { ascending: false }),
@@ -71,6 +71,7 @@ export async function getOperationsOrderDetail(orderId: string): Promise<Operati
     locations: (locationsResult.data || []) as OperationsOrderDetail['locations'],
     identity,
     ambassador,
+    viewerRole: role,
   };
 }
 
@@ -105,4 +106,34 @@ export async function acknowledgeOperationsHandover(handoverId: string, note?: s
 
 export function getCrmStageName(stage: number) {
   return stageNames[stage] || 'Unknown';
+}
+
+// Soft-delete workflow, shared by Direct Sale and regular Orders (same ops_orders
+// table). App-layer gate here is deliberately loose (operations.read, same as every
+// other read in this file) — the real authority boundary is inside each RPC itself:
+// ops_request_order_deletion re-checks operations.order.manage, and
+// ops_resolve_order_deletion is hard-gated to admin/super_admin at the database level,
+// verified live against a real front_desk and a real super_admin user before this
+// was wired into the app.
+export async function requestOrderDeletion(orderId: string, reason: string) {
+  const { supabase } = await requireOperationsAccess();
+  const { error } = await supabase.rpc('ops_request_order_deletion', {
+    p_order_id: orderId,
+    p_reason: reason,
+  });
+  return error
+    ? { success: false as const, message: error.message }
+    : { success: true as const, message: 'Order flagged for deletion. An administrator will review it.' };
+}
+
+export async function resolveOrderDeletion(orderId: string, approve: boolean, note?: string | null) {
+  const { supabase } = await requireOperationsAccess();
+  const { error } = await supabase.rpc('ops_resolve_order_deletion', {
+    p_order_id: orderId,
+    p_approve: approve,
+    p_note: note ?? null,
+  });
+  return error
+    ? { success: false as const, message: error.message }
+    : { success: true as const, message: approve ? 'Order deleted.' : 'Deletion request rejected — order restored to normal.' };
 }

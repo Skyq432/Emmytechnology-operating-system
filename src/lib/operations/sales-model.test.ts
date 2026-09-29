@@ -1,4 +1,3 @@
-// @ts-nocheck
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -23,14 +22,15 @@ test('laptop and phone expose different workbook-aligned specification fields', 
   assert.ok(!laptop.includes('network_type'));
 
   assert.ok(phone.includes('network_type'));
-  assert.ok(phone.includes('sim_type'));
+  assert.ok(phone.includes('imei'));
+  assert.ok(!phone.includes('sim_type'));
   assert.ok(phone.includes('accessories_included'));
   assert.ok(!phone.includes('processor_type'));
 });
 
 test('solar and accessory fields stay focused instead of copying device fields', () => {
   assert.deepEqual(getRelevantSpecFields('accessory'), [
-    'category', 'subcategory', 'compatible_with', 'colour',
+    'category', 'compatible_with', 'colour',
   ]);
   assert.deepEqual(getRelevantSpecFields('solar'), [
     'system_capacity', 'brand', 'model_spec',
