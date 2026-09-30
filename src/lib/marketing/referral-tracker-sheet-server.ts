@@ -60,8 +60,17 @@ async function readSheet<T>(sheet: string): Promise<T> {
   url.searchParams.set('key', apiKey());
 
   const response = await fetch(url.toString(), { cache: 'no-store' });
-  const body = await response.json().catch(() => null) as { ok?: boolean; data?: T; error?: string } | null;
-  if (!body?.ok) throw new Error(body?.error || 'Referral Tracker sheet request failed.');
+  const rawText = await response.text();
+  let body: { ok?: boolean; data?: T; error?: string } | null = null;
+  try { body = JSON.parse(rawText); } catch { /* body stays null, logged below */ }
+  if (!body?.ok) {
+    // TEMP DEBUG — remove before committing. Shows up in Netlify's function logs.
+    console.error('[referral-tracker-sheet debug]', JSON.stringify({
+      sheet, status: response.status, redirected: response.redirected, finalUrl: response.url,
+      rawTextSample: rawText.slice(0, 500),
+    }));
+    throw new Error(body?.error || 'Referral Tracker sheet request failed.');
+  }
   return body.data as T;
 }
 
@@ -74,8 +83,17 @@ async function writeSheet<T>(action: string, payload: Record<string, unknown>): 
     headers: { 'Content-Type': 'text/plain' },
     body: JSON.stringify({ action, key: apiKey(), ...payload }),
   });
-  const body = await response.json().catch(() => null) as { ok?: boolean; data?: T; error?: string } | null;
-  if (!body?.ok) throw new Error(body?.error || 'Referral Tracker sheet write failed.');
+  const rawText = await response.text();
+  let body: { ok?: boolean; data?: T; error?: string } | null = null;
+  try { body = JSON.parse(rawText); } catch { /* body stays null, logged below */ }
+  if (!body?.ok) {
+    // TEMP DEBUG — remove before committing. Shows up in Netlify's function logs.
+    console.error('[referral-tracker-sheet debug]', JSON.stringify({
+      action, status: response.status, redirected: response.redirected, finalUrl: response.url,
+      rawTextSample: rawText.slice(0, 500),
+    }));
+    throw new Error(body?.error || 'Referral Tracker sheet write failed.');
+  }
   return body.data as T;
 }
 
