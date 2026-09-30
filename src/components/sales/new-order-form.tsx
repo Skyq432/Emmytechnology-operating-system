@@ -4,6 +4,7 @@ import { useActionState, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSalesOrderAction, type SalesActionState } from '@/app/(staff)/modules/sales/actions';
 import { IdentityPicker } from '@/components/shared/identity-picker';
+import { ProductPicker } from '@/components/shared/product-picker';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
@@ -182,7 +183,7 @@ export function NewOrderForm({ inventory, marginContext }: { inventory: Inventor
           />
 
           <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            {mode === 'product' ? <Select value={itemId} onChange={(event) => { setItemId(event.target.value); setPrice(''); }}><option value="">Choose product</option>{inventory.map((item) => <option key={item.id} value={item.id}>{item.sku} · {item.name}</option>)}</Select> : <>
+            {mode === 'product' ? <ProductPicker items={inventory} value={itemId} onChange={(id) => { setItemId(id); setPrice(''); }} placeholder="Search product by name or SKU..." /> : <>
               <Select value={customType} onChange={(event) => { setCustomType(event.target.value as OrderItemType); setCustomSpecs({}); }}>
                 {ORDER_ITEM_TYPES.map((type) => <option key={type} value={type}>{getOrderItemTypeLabel(type)}</option>)}
               </Select>

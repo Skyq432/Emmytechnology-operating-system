@@ -3,6 +3,7 @@
 import { useActionState, useMemo, useState } from 'react';
 import {
   addCardholderAction,
+  addDepositAction,
   addPosEntryAction,
   addReferralAction,
   updateCardholderStatusAction,
@@ -18,7 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { ActionResult } from '@/components/ui/alert';
 import { StatGrid, StatTile } from '@/components/ui/stat-tile';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import type { CardholderRow, PosRow, ReferralRow, ReferralTrackerSummary } from '@/lib/marketing/referral-tracker-sheet-server';
+import type { CardholderRow, DepositRow, PosRow, ReferralRow, ReferralTrackerSummary } from '@/lib/marketing/referral-tracker-sheet-server';
 import type { OperationsIdentitySummary } from '@/lib/operations/types';
 
 const initialState: ReferralTrackerActionState = { success: false, message: '' };
@@ -36,11 +37,13 @@ export function ReferralTrackerClient({
   referrals,
   cardholders,
   posEntries,
+  deposits,
   summary,
 }: {
   referrals: ReferralRow[];
   cardholders: CardholderRow[];
   posEntries: PosRow[];
+  deposits: DepositRow[];
   summary: ReferralTrackerSummary;
 }) {
   return (
@@ -48,7 +51,7 @@ export function ReferralTrackerClient({
       <div>
         <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">Second data store — lives in Google Sheets, not Supabase</p>
         <h1 className="mt-2 text-3xl font-black text-emmy-primary">Referral Tracker</h1>
-        <p className="mt-2 text-sm text-slate-500">Referral Card program, Card Holders and the Free POS Tracker. Every read and write here goes straight to the live sheet — there is no local copy.</p>
+        <p className="mt-2 text-sm text-slate-500">Referral Card program, Card Holders, the Free POS Tracker and POS Deposits. Every read and write here goes straight to the live sheet — there is no local copy.</p>
       </div>
 
       <StatGrid>
@@ -56,11 +59,18 @@ export function ReferralTrackerClient({
         <StatTile label="Total revenue" value={money(summary.total_revenue)} tone="success" />
         <StatTile label="Commission outstanding" value={money(summary.commission_outstanding)} tone="secondary" />
         <StatTile label="Free POS withdrawals" value={money(summary.pos_total_withdrawals)} description={`${summary.pos_transactions ?? 0} transactions`} tone="purple" />
+        <StatTile label="POS deposits / transfers" value={money(summary.deposit_total)} description={`${summary.deposit_transactions ?? 0} transactions`} tone="neutral" />
       </StatGrid>
 
       <ReferralsSection referrals={referrals} cardholders={cardholders} />
       <CardholdersSection cardholders={cardholders} />
-      <PosSection posEntries={posEntries} />
+      {/* Anchor target for the dedicated "POS" shortcut on the front-desk dashboard and
+          Sales sidebar — front desk uses withdrawals/deposits far more often than
+          referrals or card holders, so that link skips straight past those. */}
+      <div id="pos" className="space-y-5 scroll-mt-4">
+        <PosSection posEntries={posEntries} />
+        <DepositsSection deposits={deposits} />
+      </div>
     </div>
   );
 }
@@ -78,19 +88,21 @@ function ReferralsSection({ referrals, cardholders }: { referrals: ReferralRow[]
   const [state, action, pending] = useActionState(addReferralAction, initialState);
 
   const [referralCode, setReferralCode] = useState('');
-  const [referrerPhone, setReferrerPhone] = useState('');
+  const [referrerLookupPhone, setReferrerLookupPhone] = useState('');
   const [referredClientQuery, setReferredClientQuery] = useState('');
   const [referredClientSelected, setReferredClientSelected] = useState<OperationsIdentitySummary | null>(null);
   const [referredClient, setReferredClient] = useState('');
   const [clientPhone, setClientPhone] = useState('');
 
   // "or Excel": the referrer's own card (already in this sheet) already carries their
-  // referral code — no need to retype it if we can already see it.
+  // referral code — no need to retype it if we can already see it. Purely a lookup
+  // helper: the sheet computes Referrer Phone itself from referral_code, so this value
+  // is never actually submitted.
   const matchedCardholder = useMemo(() => {
-    const tail = phoneTail(referrerPhone);
+    const tail = phoneTail(referrerLookupPhone);
     if (tail.length < 7) return null;
     return cardholders.find((row) => phoneTail(row.phone_number) === tail) || null;
-  }, [referrerPhone, cardholders]);
+  }, [referrerLookupPhone, cardholders]);
 
   function chooseReferredClient(identity: OperationsIdentitySummary | null) {
     setReferredClientSelected(identity);
@@ -103,20 +115,25 @@ function ReferralsSection({ referrals, cardholders }: { referrals: ReferralRow[]
 
   return (
     <Card className="p-5">
-      <SectionHeader title="Referral Tracker" description="Commission rate and Commission are computed by the sheet itself — this form never sets them directly." />
+      <SectionHeader title="Referral Tracker" description="Referral code must already exist in Card Holders — the sheet fills in Referrer Phone and Commission itself and rejects an unknown code." />
 
       <details className="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
         <summary className="cursor-pointer text-sm font-bold text-emmy-primary">+ Record a new referral</summary>
-        <form action={action} onSubmit={() => { setReferralCode(''); setReferrerPhone(''); setReferredClientQuery(''); setReferredClientSelected(null); setReferredClient(''); setClientPhone(''); }} className="mt-4 grid gap-3 md:grid-cols-3">
-          <Field label="Referral code">
-            <Input name="referral_code" placeholder="e.g. EMM-104" value={referralCode} onChange={(e) => setReferralCode(e.target.value)} />
+        <form action={action} onSubmit={() => { setReferralCode(''); setReferrerLookupPhone(''); setReferredClientQuery(''); setReferredClientSelected(null); setReferredClient(''); setClientPhone(''); }} className="mt-4 grid gap-3 md:grid-cols-3">
+          <Field label="Referral code (must be an existing card holder)">
+            <Input name="referral_code" list="known-referral-codes" placeholder="e.g. EMM-104" value={referralCode} onChange={(e) => setReferralCode(e.target.value)} />
+            <datalist id="known-referral-codes">
+              {cardholders.filter((c) => c.referral_code).map((c) => <option key={c._row} value={c.referral_code ?? undefined} />)}
+            </datalist>
+          </Field>
+          <Field label="Look up a card holder by phone (optional)">
+            <Input placeholder="080... — finds their code below" value={referrerLookupPhone} onChange={(e) => setReferrerLookupPhone(e.target.value)} />
             {matchedCardholder && matchedCardholder.referral_code && matchedCardholder.referral_code !== referralCode ? (
               <button type="button" onClick={() => setReferralCode(matchedCardholder.referral_code || '')} className="mt-1 text-xs font-bold text-emmy-primary">
-                Known card holder — use code {matchedCardholder.referral_code}
+                Found: use code {matchedCardholder.referral_code}
               </button>
             ) : null}
           </Field>
-          <Field label="Referrer phone"><Input name="referrer_phone" placeholder="080..." value={referrerPhone} onChange={(e) => setReferrerPhone(e.target.value)} /></Field>
           <div className="relative md:col-span-1">
             <Field label="Referred client — search existing customers">
               <IdentityPicker
@@ -175,15 +192,19 @@ function ReferralRowItem({ row }: { row: ReferralRow }) {
       <TableCell>{row.referred_client || '—'}<div className="text-xs text-slate-400">{row.client_phone || ''}</div></TableCell>
       <TableCell>{money(row.revenue)}</TableCell>
       <TableCell>{money(row.commission)}{row.commission_rate != null ? <div className="text-xs text-slate-400">{(row.commission_rate * 100).toFixed(0)}% rate</div> : null}</TableCell>
-      <TableCell><Badge variant={paid ? 'success' : 'warning'}>{row.payment_status || 'Pending'}</Badge></TableCell>
+      <TableCell><Badge variant={paid ? 'success' : 'warning'}>{row.payment_status || 'Pending'}</Badge>{paid && <div className="mt-1 text-xs text-slate-400">{money(row.commission_paid)} paid</div>}</TableCell>
       <TableCell>
+        {/* match_* carries the values this row had when the page loaded — the sheet
+            refuses the write if they no longer match, so this can't silently land on
+            the wrong row if the sheet changed underneath it. */}
         <form action={action} className="flex flex-wrap items-center gap-2">
           <input type="hidden" name="row" value={row._row} />
+          <input type="hidden" name="match_referral_code" value={row.referral_code ?? ''} />
+          <input type="hidden" name="match_client_phone" value={row.client_phone ?? ''} />
           <Select name="payment_status" defaultValue={row.payment_status || 'Pending'} className="h-8 w-28 text-xs">
             <option value="Pending">Pending</option>
             <option value="Paid">Paid</option>
           </Select>
-          <Input name="commission_paid" type="number" min="0" step="0.01" defaultValue={row.commission_paid ?? ''} placeholder="₦ paid" className="h-8 w-24 text-xs" />
           <Button type="submit" size="sm" variant="outline" disabled={pending}>{pending ? '…' : 'Save'}</Button>
         </form>
         <ActionResult state={state} className="mt-1" />
@@ -211,7 +232,7 @@ function CardholdersSection({ cardholders }: { cardholders: CardholderRow[] }) {
 
   return (
     <Card className="p-5">
-      <SectionHeader title="Referral Card Holders" description="Everyone who has been given a physical Referral Card." />
+      <SectionHeader title="Referral Card Holders" description="Everyone who has been given a physical Referral Card. Referral codes must be unique." />
 
       <details className="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
         <summary className="cursor-pointer text-sm font-bold text-emmy-primary">+ Add a card holder</summary>
@@ -235,7 +256,6 @@ function CardholdersSection({ cardholders }: { cardholders: CardholderRow[] }) {
             <Select name="card_status" defaultValue="Active">
               <option value="Active">Active</option>
               <option value="Inactive">Inactive</option>
-              <option value="Lost">Lost</option>
             </Select>
           </Field>
           <div className="md:col-span-2"><Field label="Notes"><Input name="notes" placeholder="Optional" value={notes} onChange={(e) => setNotes(e.target.value)} /></Field></div>
@@ -280,10 +300,11 @@ function CardholderRowItem({ row }: { row: CardholderRow }) {
       <TableCell>
         <form action={action} className="flex flex-wrap items-center gap-2">
           <input type="hidden" name="row" value={row._row} />
+          <input type="hidden" name="match_referral_code" value={row.referral_code ?? ''} />
+          <input type="hidden" name="match_phone_number" value={row.phone_number ?? ''} />
           <Select name="card_status" defaultValue={row.card_status || 'Active'} className="h-8 w-28 text-xs">
             <option value="Active">Active</option>
             <option value="Inactive">Inactive</option>
-            <option value="Lost">Lost</option>
           </Select>
           <Button type="submit" size="sm" variant="outline" disabled={pending}>{pending ? '…' : 'Save'}</Button>
         </form>
@@ -360,6 +381,80 @@ function PosSection({ posEntries }: { posEntries: PosRow[] }) {
               </TableRow>
             ))}
             {!posEntries.length && <TableRow><TableCell colSpan={4} className="text-center text-slate-400">No POS withdrawals recorded yet.</TableCell></TableRow>}
+          </TableBody>
+        </Table>
+      </div>
+    </Card>
+  );
+}
+
+function DepositsSection({ deposits }: { deposits: DepositRow[] }) {
+  const [state, action, pending] = useActionState(addDepositAction, initialState);
+
+  const [query, setQuery] = useState('');
+  const [selected, setSelected] = useState<OperationsIdentitySummary | null>(null);
+  const [clientName, setClientName] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+
+  function choose(identity: OperationsIdentitySummary | null) {
+    setSelected(identity);
+    if (identity) {
+      setClientName(identity.primary_name || '');
+      setPhoneNumber(identity.primary_phone || '');
+      setQuery(identity.primary_name || identity.primary_phone || identity.identity_code);
+    }
+  }
+
+  return (
+    <Card className="p-5">
+      <SectionHeader title="POS Deposits" description="Cash deposits / transfers received through the POS service." />
+
+      <details className="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+        <summary className="cursor-pointer text-sm font-bold text-emmy-primary">+ Record a deposit</summary>
+        <form action={action} onSubmit={() => { setQuery(''); setSelected(null); setClientName(''); setPhoneNumber(''); }} className="mt-4 grid gap-3 md:grid-cols-4">
+          <Field label="Date"><Input name="date" type="date" /></Field>
+          <Field label="Search existing customers">
+            <IdentityPicker
+              renderHiddenFields={false}
+              searchEndpoint={REFERRAL_TRACKER_IDENTITY_ENDPOINT}
+              noMatchHint={REFERRAL_TRACKER_NO_MATCH_HINT}
+              query={query}
+              onQueryChange={(value) => { setSelected(null); setQuery(value); setClientName(value); }}
+              selected={selected}
+              onSelect={choose}
+              placeholder="Search name, phone or CRM code..."
+            />
+          </Field>
+          <Field label="Client name"><Input name="client_name" placeholder="Customer name" value={clientName} onChange={(e) => setClientName(e.target.value)} /></Field>
+          <Field label="Phone number"><Input name="phone_number" placeholder="080..." value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} /></Field>
+          <Field label="Amount deposited (₦)"><Input name="amount" type="number" min="0" step="0.01" /></Field>
+          <div className="md:col-span-4 flex items-center gap-3">
+            <Button type="submit" disabled={pending}>{pending ? 'Saving…' : 'Record deposit'}</Button>
+            <ActionResult state={state} />
+          </div>
+        </form>
+      </details>
+
+      <div className="mt-4">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Date</TableHead>
+              <TableHead>Client</TableHead>
+              <TableHead>Phone</TableHead>
+              <TableHead>Amount</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {deposits.map((row) => (
+              <TableRow key={row._row}>
+                <TableCell>{row.date || '—'}</TableCell>
+                <TableCell className="font-bold">{row.client_name || '—'}</TableCell>
+                <TableCell>{row.phone_number || '—'}</TableCell>
+                <TableCell>{money(row.amount)}</TableCell>
+              </TableRow>
+            ))}
+            {!deposits.length && <TableRow><TableCell colSpan={4} className="text-center text-slate-400">No deposits recorded yet.</TableCell></TableRow>}
           </TableBody>
         </Table>
       </div>

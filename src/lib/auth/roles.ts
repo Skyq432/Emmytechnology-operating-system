@@ -61,6 +61,7 @@ export const SALES_NAV_KEYS = [
   'reports',
   'settings',
   'referralTracker',
+  'pos',
 ] as const;
 
 export type SalesNavKey = (typeof SALES_NAV_KEYS)[number];
@@ -70,7 +71,7 @@ const SALES_ACCESS: Record<InternalRole, readonly SalesNavKey[]> = {
   admin: SALES_NAV_KEYS,
   growth_lead: SALES_NAV_KEYS,
   marketing_manager: [],
-  front_desk: ['direct', 'orders', 'payments', 'receipts', 'customers', 'referralTracker'],
+  front_desk: ['direct', 'orders', 'payments', 'receipts', 'customers', 'referralTracker', 'pos'],
   operations_lead: ['overview', 'direct', 'orders', 'payments', 'receipts', 'customers'],
   technician: ['direct', 'receipts', 'customers'],
   sales_analyst: ['overview', 'quotations', 'orders', 'customers', 'reports'],

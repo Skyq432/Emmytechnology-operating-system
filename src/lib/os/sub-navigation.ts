@@ -25,6 +25,7 @@ import {
   Target,
   Users,
   UsersRound,
+  Wallet,
   WalletCards,
   type LucideIcon,
 } from 'lucide-react';
@@ -56,6 +57,7 @@ const SALES_ICONS: Record<(typeof SALES_NAV)[number]['key'], LucideIcon> = {
   reports: BarChart3,
   settings: Settings,
   referralTracker: Share2,
+  pos: Wallet,
 };
 
 const OPERATIONS_ICONS: Record<(typeof OPERATIONS_NAV)[number]['key'], LucideIcon> = {
