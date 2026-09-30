@@ -3,6 +3,7 @@ import { requireInternalUser } from '@/lib/auth/server';
 import { canAccessReferralTracker } from '@/lib/auth/roles';
 import {
   getCardholders,
+  getDeposits,
   getPosEntries,
   getReferrals,
   getReferralTrackerSummary,
@@ -46,17 +47,19 @@ export default async function ReferralTrackerPage() {
       referrals={data.referrals}
       cardholders={data.cardholders}
       posEntries={data.posEntries}
+      deposits={data.deposits}
       summary={data.summary}
     />
   );
 }
 
 async function loadData() {
-  const [referrals, cardholders, posEntries, summary] = await Promise.all([
+  const [referrals, cardholders, posEntries, deposits, summary] = await Promise.all([
     getReferrals(),
     getCardholders(),
     getPosEntries(),
+    getDeposits(),
     getReferralTrackerSummary(),
   ]);
-  return { referrals, cardholders, posEntries, summary };
+  return { referrals, cardholders, posEntries, deposits, summary };
 }

@@ -15,4 +15,7 @@ export const SALES_NAV = [
   // marketing_manager (marketing-only) both need this page, and no single module's
   // layout gate covers both, so it isn't nested under either module's route tree.
   { key: 'referralTracker', label: 'Referral Tracker', href: '/modules/referral-tracker' },
+  // Same page, deep-linked to the POS section — front desk uses withdrawals/deposits
+  // far more often than referrals/card holders, so this skips straight past those.
+  { key: 'pos', label: 'POS Withdrawal / Deposit', href: '/modules/referral-tracker#pos' },
 ] as const;

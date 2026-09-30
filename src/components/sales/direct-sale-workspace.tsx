@@ -12,6 +12,7 @@ import {
 import type { DirectSaleCheckoutSnapshot } from '@/lib/sales/direct-sale-server';
 import type { OperationsIdentitySummary } from '@/lib/operations/types';
 import { IdentityPicker } from '@/components/shared/identity-picker';
+import { ProductPicker } from '@/components/shared/product-picker';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -278,7 +279,7 @@ export function DirectSaleWorkspace({ inventory, availability, units, actor }: {
           <SegmentedControl className="mt-4" size="sm" value={mode} onChange={setMode} options={[{ value: 'stock', label: 'Physical stock' }, { value: 'service', label: 'Service / non-stock' }]} />
 
           {mode === 'stock' ? <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <Select value={selectedItemId} onChange={(e) => { setSelectedItemId(e.target.value); setSelectedUnitId(''); setSelectedLocationId(''); setPrice(''); }}><option value="">Choose inventory item</option>{inventory.map((item) => <option key={item.id} value={item.id}>{item.sku} · {item.name}</option>)}</Select>
+            <ProductPicker items={inventory} value={selectedItemId} onChange={(id) => { setSelectedItemId(id); setSelectedUnitId(''); setSelectedLocationId(''); setPrice(''); }} placeholder="Search product by name or SKU..." />
             {selectedItem?.serial_tracking ? <Select value={selectedUnitId} onChange={(e) => setSelectedUnitId(e.target.value)}><option value="">Choose Serial / IMEI</option>{itemUnits.map((unit) => <option key={unit.id} value={unit.id}>{unit.serial_number || unit.imei_1 || unit.imei_2 || unit.id}</option>)}</Select> : <Select value={selectedLocationId} onChange={(e) => setSelectedLocationId(e.target.value)}><option value="">Stock location</option>{itemAvailability.map((row) => <option key={row.location_id} value={row.location_id}>{row.location_name} · {row.available} available</option>)}</Select>}
             <Input type="number" min="1" value={selectedItem?.serial_tracking ? 1 : qty} disabled={selectedItem?.serial_tracking} onChange={(e) => setQty(Number(e.target.value))} placeholder="Quantity" />
             <Input value={price} onChange={(e) => setPrice(e.target.value)} className={needsApproval ? 'border-amber-400 bg-amber-50' : ''} placeholder={selectedItem ? (standardPrice > 0 ? `Agreed price · standard ${money(standardPrice)}` : 'Standard price not configured') : 'Agreed selling price'} />
