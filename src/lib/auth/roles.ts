@@ -233,10 +233,10 @@ export function canAssignSuperAdmin(role: string | null | undefined): boolean {
   return role === 'super_admin';
 }
 
-// The Referral Tracker Google Sheet integration (referrals, cardholders, Free POS
-// Tracker) needs front_desk, who only has 'sales' MODULE_ACCESS, and marketing_manager,
-// who only has 'marketing' — no single existing module gate covers both, so this page
-// lives outside both module route trees and checks this list directly instead of
+// The Referral Tracker (referrals, cardholders, Free POS Tracker, POS Deposits) needs
+// front_desk, who only has 'sales' MODULE_ACCESS, and marketing_manager, who only has
+// 'marketing' — no single existing module gate covers both, so this page lives outside
+// both module route trees and checks this list directly instead of
 // requireModuleAccess('sales'|'marketing').
 export function canAccessReferralTracker(role: string | null | undefined): boolean {
   return (

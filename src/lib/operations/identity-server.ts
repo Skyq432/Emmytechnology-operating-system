@@ -26,15 +26,37 @@ async function requireCustomerAccess() {
   return requireStaffCapability('sales.read');
 }
 
-export async function resolveOrCreateOperationsIdentity(input: {
+type IdentitySource = 'operations_order' | 'operations_repair' | 'referral_tracker_pos';
+
+type ResolveIdentityInput = {
   existingIdentityId?: string | null;
   name?: string | null;
   phone?: string | null;
   email?: string | null;
   address?: string | null;
-  source: 'operations_order' | 'operations_repair';
-}) {
+  source: IdentitySource;
+};
+
+export async function resolveOrCreateOperationsIdentity(input: ResolveIdentityInput) {
   const { supabase } = await requireCustomerAccess();
+  return resolveOrCreateIdentityCore(supabase, input);
+}
+
+// The Referral Tracker's POS/Deposit forms need this too (so a name/phone typed there
+// becomes a real, searchable CRM Identity instead of just sitting in a spreadsheet cell)
+// but its audience — front_desk + marketing_manager — doesn't match the sales.read
+// capability requireCustomerAccess checks (marketing_manager has zero StaffCapability
+// entries). Same pattern as searchReferralTrackerIdentities below.
+export async function resolveReferralTrackerIdentity(input: ResolveIdentityInput) {
+  const { user, profile, supabase } = await getCachedAuthContext();
+  if (!user) throw new Error('Not authenticated');
+  if (!profile || !isInternalRole(profile.role) || !canAccessReferralTracker(profile.role)) {
+    throw new Error('Not authorized');
+  }
+  return resolveOrCreateIdentityCore(supabase, input);
+}
+
+async function resolveOrCreateIdentityCore(supabase: IdentitySupabaseClient, input: ResolveIdentityInput) {
   if (input.existingIdentityId) return input.existingIdentityId;
 
   const signals = buildOperationsIdentitySignals(input);
@@ -64,17 +86,22 @@ export async function searchOperationsIdentities(query: string): Promise<Operati
 // need to autofill from known CRM identities), but its audience is front_desk +
 // marketing_manager + growth_lead + admins — no single existing capability covers all
 // of them (marketing_manager has zero StaffCapability entries at all). Gated by
-// canAccessReferralTracker instead of sales.read, same search logic underneath.
+// canAccessReferralTracker instead of sales.read, same name/phone/email matching
+// underneath — but `lite: true`, since none of its forms show or need the ambassador
+// attribution, CRM funnel stage or cash-off balance Sales/Operations' picker displays.
+// That enrichment alone was 5-6 extra sequential round trips on every keystroke for data
+// this page throws away — the exact kind of avoidable latency this feature just got
+// rid of on its main page load, so no reason to leave it in the search box too.
 export async function searchReferralTrackerIdentities(query: string): Promise<OperationsIdentitySummary[]> {
   const { user, profile, supabase } = await getCachedAuthContext();
   if (!user) throw new Error('Not authenticated');
   if (!profile || !isInternalRole(profile.role) || !canAccessReferralTracker(profile.role)) {
     throw new Error('Not authorized');
   }
-  return searchIdentitiesCore(supabase, profile.role as InternalRole, query);
+  return searchIdentitiesCore(supabase, profile.role as InternalRole, query, { lite: true });
 }
 
-async function searchIdentitiesCore(supabase: IdentitySupabaseClient, role: InternalRole, query: string): Promise<OperationsIdentitySummary[]> {
+async function searchIdentitiesCore(supabase: IdentitySupabaseClient, role: InternalRole, query: string, options?: { lite?: boolean }): Promise<OperationsIdentitySummary[]> {
   const raw = safeSearch(query);
   if (raw.length < 3) return [];
 
@@ -118,6 +145,24 @@ async function searchIdentitiesCore(supabase: IdentitySupabaseClient, role: Inte
     }
   }
   if (!matchedIdentities.length) return [];
+
+  if (options?.lite) {
+    return matchedIdentities.map((identity) => ({
+      id: identity.id,
+      identity_code: identity.identity_code,
+      primary_name: identity.primary_name,
+      primary_phone: identity.primary_phone,
+      primary_email: identity.primary_email,
+      primary_address: null,
+      crm_stage: 0,
+      crm_stage_name: '',
+      lead_id: null,
+      ambassador_id: null,
+      ambassador_name: null,
+      acquisition_source: null,
+      cash_off_balance: 0,
+    } satisfies OperationsIdentitySummary));
+  }
 
   const ids = matchedIdentities.map((row) => row.id);
   const canSeeCashOff = hasCapability(role, 'sales.payment.record');

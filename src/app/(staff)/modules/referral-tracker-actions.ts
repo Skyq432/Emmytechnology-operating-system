@@ -6,13 +6,32 @@ import {
   addDeposit,
   addPosEntry,
   addReferral,
-  updateCardholder,
-  updateReferral,
-} from '@/lib/marketing/referral-tracker-sheet-server';
+  updateCardholderStatus,
+  updateReferralPayment,
+} from '@/lib/marketing/referral-tracker-server';
+import { resolveReferralTrackerIdentity } from '@/lib/operations/identity-server';
 
 export type ReferralTrackerActionState = { success: boolean; message: string };
 const fail = (message: string): ReferralTrackerActionState => ({ success: false, message });
 const REVALIDATE_PATH = '/modules/referral-tracker';
+
+// POS withdrawals/deposits: the person typing a name/phone in should become a real,
+// searchable Supabase Identity, linked directly on the record (identity_id). Best-effort
+// on purpose — recording the withdrawal/deposit itself must never fail just because
+// identity resolution hit a transient error or a role without access; on failure this
+// just returns null and the record is saved with no identity_id.
+async function linkPosIdentity(input: { existingIdentityId: string; name: string; phone: string }): Promise<string | null> {
+  try {
+    return await resolveReferralTrackerIdentity({
+      existingIdentityId: input.existingIdentityId || null,
+      name: input.name || null,
+      phone: input.phone || null,
+      source: 'referral_tracker_pos',
+    });
+  } catch {
+    return null;
+  }
+}
 
 function str(formData: FormData, key: string): string {
   return String(formData.get(key) || '').trim();
@@ -32,9 +51,8 @@ export async function addReferralAction(_prev: ReferralTrackerActionState, formD
     return fail('Referral code, referred client or client phone is required.');
   }
   try {
-    // referrer_phone is a sheet formula (looked up from referral_code in Card Holders) —
-    // never sent. The sheet also requires referral_code to already exist as a card
-    // holder; if it doesn't, this throws a clear message the form shows inline.
+    // referral_code must already exist as a card holder — the RPC checks this and
+    // throws a clear message if it doesn't. commission is computed by Postgres.
     await addReferral({
       referral_code: referralCode || null,
       referred_client: referredClient || null,
@@ -51,15 +69,10 @@ export async function addReferralAction(_prev: ReferralTrackerActionState, formD
 }
 
 export async function updateReferralPaymentAction(_prev: ReferralTrackerActionState, formData: FormData): Promise<ReferralTrackerActionState> {
-  const row = num(formData, 'row');
-  if (!row) return fail('Referral row is required.');
+  const id = str(formData, 'id');
+  if (!id) return fail('Referral id is required.');
   try {
-    // commission_paid is now a sheet formula (computed from payment_status) — never sent.
-    await updateReferral(
-      row,
-      { referral_code: str(formData, 'match_referral_code'), client_phone: str(formData, 'match_client_phone') },
-      { payment_status: str(formData, 'payment_status') || null, notes: str(formData, 'notes') || null }
-    );
+    await updateReferralPayment(id, str(formData, 'payment_status') || 'Pending', str(formData, 'notes') || null);
     revalidatePath(REVALIDATE_PATH);
     return { success: true, message: 'Referral payment updated.' };
   } catch (error) {
@@ -87,14 +100,10 @@ export async function addCardholderAction(_prev: ReferralTrackerActionState, for
 }
 
 export async function updateCardholderStatusAction(_prev: ReferralTrackerActionState, formData: FormData): Promise<ReferralTrackerActionState> {
-  const row = num(formData, 'row');
-  if (!row) return fail('Card holder row is required.');
+  const id = str(formData, 'id');
+  if (!id) return fail('Card holder id is required.');
   try {
-    await updateCardholder(
-      row,
-      { referral_code: str(formData, 'match_referral_code'), phone_number: str(formData, 'match_phone_number') },
-      { card_status: str(formData, 'card_status') || null, notes: str(formData, 'notes') || null }
-    );
+    await updateCardholderStatus(id, str(formData, 'card_status') || 'Active', str(formData, 'notes') || null);
     revalidatePath(REVALIDATE_PATH);
     return { success: true, message: 'Card status updated.' };
   } catch (error) {
@@ -108,11 +117,13 @@ export async function addPosEntryAction(_prev: ReferralTrackerActionState, formD
   const amount = num(formData, 'amount_withdrawn');
   if (!clientName && !phoneNumber && !amount) return fail('Client name, phone number or amount withdrawn is required.');
   try {
+    const identityId = await linkPosIdentity({ existingIdentityId: str(formData, 'identity_id'), name: clientName, phone: phoneNumber });
     await addPosEntry({
       date: str(formData, 'date') || null,
       client_name: clientName || null,
       phone_number: phoneNumber || null,
       amount_withdrawn: amount ?? null,
+      identity_id: identityId,
     });
     revalidatePath(REVALIDATE_PATH);
     return { success: true, message: 'POS withdrawal recorded.' };
@@ -127,11 +138,13 @@ export async function addDepositAction(_prev: ReferralTrackerActionState, formDa
   const amount = num(formData, 'amount');
   if (!clientName && !phoneNumber && !amount) return fail('Client name, phone number or amount is required.');
   try {
+    const identityId = await linkPosIdentity({ existingIdentityId: str(formData, 'identity_id'), name: clientName, phone: phoneNumber });
     await addDeposit({
       date: str(formData, 'date') || null,
       client_name: clientName || null,
       phone_number: phoneNumber || null,
       amount: amount ?? null,
+      identity_id: identityId,
     });
     revalidatePath(REVALIDATE_PATH);
     return { success: true, message: 'Deposit recorded.' };
