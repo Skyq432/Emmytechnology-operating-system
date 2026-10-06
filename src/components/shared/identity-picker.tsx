@@ -34,6 +34,12 @@ export interface IdentityPickerProps {
    * links a Supabase Identity (e.g. the Referral Tracker's Referrals/Card Holders forms). */
   noMatchHint?: string;
 
+  /** Controlled-mode-only: shows the CRM funnel-stage badge on each result. Default
+   * `true` for Sales/Operations' own search, which computes it; pass `false` for any
+   * caller backed by a `lite` search (e.g. Referral Tracker) that doesn't — those always
+   * return stage 0, so the badge would render a meaningless "Stage 0" on every row. */
+  showCrmStage?: boolean;
+
   // Self-contained mode
   title?: string;
   compact?: boolean;
@@ -62,6 +68,7 @@ export function IdentityPicker({
   renderHiddenFields = true,
   searchEndpoint = '/api/operations/identities',
   noMatchHint = 'No CRM match yet. A new Identity will be resolved when you save.',
+  showCrmStage = true,
   title = 'Find customer',
   compact = false,
   defaultName = '',
@@ -209,7 +216,7 @@ export function IdentityPicker({
                   <p className="text-sm font-bold text-slate-800">{identity.primary_name || identity.primary_phone || identity.identity_code}</p>
                   <p className="mt-1 text-xs text-slate-500">{identity.primary_phone || 'No phone'} · {identity.primary_email || 'No email'}</p>
                 </div>
-                <span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-black text-emmy-primary">Stage {identity.crm_stage ?? '—'} {identity.crm_stage_name}</span>
+                {showCrmStage ? <span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-black text-emmy-primary">Stage {identity.crm_stage ?? '—'} {identity.crm_stage_name}</span> : null}
               </button>
             ))}
           </div>

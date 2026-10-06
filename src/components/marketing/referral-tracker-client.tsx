@@ -140,6 +140,7 @@ function ReferralsSection({ referrals, cardholders }: { referrals: ReferralRow[]
             <Field label="Referred client — search existing customers">
               <IdentityPicker
                 renderHiddenFields={false}
+                showCrmStage={false}
                 searchEndpoint={REFERRAL_TRACKER_IDENTITY_ENDPOINT}
                 noMatchHint={REFERRAL_TRACKER_NO_MATCH_HINT}
                 query={referredClientQuery}
@@ -238,6 +239,7 @@ function CardholdersSection({ cardholders }: { cardholders: CardholderRow[] }) {
           <Field label="Search existing customers">
             <IdentityPicker
               renderHiddenFields={false}
+              showCrmStage={false}
               searchEndpoint={REFERRAL_TRACKER_IDENTITY_ENDPOINT}
               noMatchHint={REFERRAL_TRACKER_NO_MATCH_HINT}
               query={query}
@@ -338,6 +340,7 @@ function PosSection({ posEntries }: { posEntries: PosRow[] }) {
           <Field label="Search existing customers">
             <IdentityPicker
               renderHiddenFields={false}
+              showCrmStage={false}
               searchEndpoint={REFERRAL_TRACKER_IDENTITY_ENDPOINT}
               noMatchHint={POS_NO_MATCH_HINT}
               query={query}
@@ -413,6 +416,7 @@ function DepositsSection({ deposits }: { deposits: DepositRow[] }) {
           <Field label="Search existing customers">
             <IdentityPicker
               renderHiddenFields={false}
+              showCrmStage={false}
               searchEndpoint={REFERRAL_TRACKER_IDENTITY_ENDPOINT}
               noMatchHint={POS_NO_MATCH_HINT}
               query={query}
