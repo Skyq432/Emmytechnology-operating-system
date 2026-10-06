@@ -19,19 +19,22 @@ import { Badge } from '@/components/ui/badge';
 import { ActionResult } from '@/components/ui/alert';
 import { StatGrid, StatTile } from '@/components/ui/stat-tile';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import type { CardholderRow, DepositRow, PosRow, ReferralRow, ReferralTrackerSummary } from '@/lib/marketing/referral-tracker-sheet-server';
+import type { CardholderRow, DepositRow, PosRow, ReferralRow, ReferralTrackerSummary } from '@/lib/marketing/referral-tracker-server';
 import type { OperationsIdentitySummary } from '@/lib/operations/types';
 
 const initialState: ReferralTrackerActionState = { success: false, message: '' };
 const money = (value: number | null | undefined) => `₦${Number(value || 0).toLocaleString('en-NG', { maximumFractionDigits: 0 })}`;
-// Sheet phone numbers can be stored with or without the leading 0 (see normalizePhone_
-// in the Apps Script), so cross-matching compares the last 10 digits, not exact strings.
+// Phone numbers can be stored with or without the leading 0, so cross-matching compares
+// the last 10 digits, not exact strings.
 const phoneTail = (value: string | null | undefined) => String(value || '').replace(/\D/g, '').slice(-10);
 const REFERRAL_TRACKER_IDENTITY_ENDPOINT = '/api/referral-tracker/identities';
-// Unlike Sales/Operations' own use of IdentityPicker, nothing on this page ever calls
-// resolveOrCreate*Identity — this search is pure autofill convenience, so the default
-// "a new Identity will be resolved when you save" copy would be a flat-out lie here.
-const REFERRAL_TRACKER_NO_MATCH_HINT = 'No existing CRM match. This name/phone is saved as typed, in the sheet only — nothing is created in Supabase from this page.';
+// Referrals and Card Holders are pure autofill convenience — nothing here ever calls
+// resolveOrCreate*Identity, so the default "a new Identity will be resolved when you
+// save" copy would be a flat-out lie.
+const REFERRAL_TRACKER_NO_MATCH_HINT = 'No existing CRM match. This name/phone is saved as typed on this record only — nothing is created in the CRM from this page.';
+// POS/Deposits are the opposite: the person is deliberately also resolved into a real,
+// searchable Supabase Identity, linked directly on the record (see resolveReferralTrackerIdentity).
+const POS_NO_MATCH_HINT = 'No existing CRM match. A new Identity will be created from this name/phone so this person can be found again later.';
 
 export function ReferralTrackerClient({
   referrals,
@@ -49,9 +52,9 @@ export function ReferralTrackerClient({
   return (
     <div className="mx-auto max-w-[1400px] space-y-5">
       <div>
-        <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">Second data store — lives in Google Sheets, not Supabase</p>
+        <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">Referral Card program · Card Holders · Free POS · Deposits</p>
         <h1 className="mt-2 text-3xl font-black text-emmy-primary">Referral Tracker</h1>
-        <p className="mt-2 text-sm text-slate-500">Referral Card program, Card Holders, the Free POS Tracker and POS Deposits. Every read and write here goes straight to the live sheet — there is no local copy.</p>
+        <p className="mt-2 text-sm text-slate-500">Referral Card program, Card Holders, the Free POS Tracker and POS Deposits — stored natively in Supabase.</p>
       </div>
 
       <StatGrid>
@@ -94,10 +97,9 @@ function ReferralsSection({ referrals, cardholders }: { referrals: ReferralRow[]
   const [referredClient, setReferredClient] = useState('');
   const [clientPhone, setClientPhone] = useState('');
 
-  // "or Excel": the referrer's own card (already in this sheet) already carries their
-  // referral code — no need to retype it if we can already see it. Purely a lookup
-  // helper: the sheet computes Referrer Phone itself from referral_code, so this value
-  // is never actually submitted.
+  // The referrer's own card (already in Card Holders) already carries their referral
+  // code — no need to retype it if we can already see it. Purely a lookup helper; the
+  // matched code is just used to fill the field above, nothing extra is submitted.
   const matchedCardholder = useMemo(() => {
     const tail = phoneTail(referrerLookupPhone);
     if (tail.length < 7) return null;
@@ -115,7 +117,7 @@ function ReferralsSection({ referrals, cardholders }: { referrals: ReferralRow[]
 
   return (
     <Card className="p-5">
-      <SectionHeader title="Referral Tracker" description="Referral code must already exist in Card Holders — the sheet fills in Referrer Phone and Commission itself and rejects an unknown code." />
+      <SectionHeader title="Referral Tracker" description="Referral code must already exist in Card Holders — commission is computed automatically and an unknown code is rejected." />
 
       <details className="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
         <summary className="cursor-pointer text-sm font-bold text-emmy-primary">+ Record a new referral</summary>
@@ -123,7 +125,7 @@ function ReferralsSection({ referrals, cardholders }: { referrals: ReferralRow[]
           <Field label="Referral code (must be an existing card holder)">
             <Input name="referral_code" list="known-referral-codes" placeholder="e.g. EMM-104" value={referralCode} onChange={(e) => setReferralCode(e.target.value)} />
             <datalist id="known-referral-codes">
-              {cardholders.filter((c) => c.referral_code).map((c) => <option key={c._row} value={c.referral_code ?? undefined} />)}
+              {cardholders.filter((c) => c.referral_code).map((c) => <option key={c.id} value={c.referral_code ?? undefined} />)}
             </datalist>
           </Field>
           <Field label="Look up a card holder by phone (optional)">
@@ -173,7 +175,7 @@ function ReferralsSection({ referrals, cardholders }: { referrals: ReferralRow[]
             </TableRow>
           </TableHeader>
           <TableBody>
-            {referrals.map((row) => <ReferralRowItem key={row._row} row={row} />)}
+            {referrals.map((row) => <ReferralRowItem key={row.id} row={row} />)}
             {!referrals.length && <TableRow><TableCell colSpan={6} className="text-center text-slate-400">No referrals recorded yet.</TableCell></TableRow>}
           </TableBody>
         </Table>
@@ -194,13 +196,8 @@ function ReferralRowItem({ row }: { row: ReferralRow }) {
       <TableCell>{money(row.commission)}{row.commission_rate != null ? <div className="text-xs text-slate-400">{(row.commission_rate * 100).toFixed(0)}% rate</div> : null}</TableCell>
       <TableCell><Badge variant={paid ? 'success' : 'warning'}>{row.payment_status || 'Pending'}</Badge>{paid && <div className="mt-1 text-xs text-slate-400">{money(row.commission_paid)} paid</div>}</TableCell>
       <TableCell>
-        {/* match_* carries the values this row had when the page loaded — the sheet
-            refuses the write if they no longer match, so this can't silently land on
-            the wrong row if the sheet changed underneath it. */}
         <form action={action} className="flex flex-wrap items-center gap-2">
-          <input type="hidden" name="row" value={row._row} />
-          <input type="hidden" name="match_referral_code" value={row.referral_code ?? ''} />
-          <input type="hidden" name="match_client_phone" value={row.client_phone ?? ''} />
+          <input type="hidden" name="id" value={row.id} />
           <Select name="payment_status" defaultValue={row.payment_status || 'Pending'} className="h-8 w-28 text-xs">
             <option value="Pending">Pending</option>
             <option value="Paid">Paid</option>
@@ -278,7 +275,7 @@ function CardholdersSection({ cardholders }: { cardholders: CardholderRow[] }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {cardholders.map((row) => <CardholderRowItem key={row._row} row={row} />)}
+            {cardholders.map((row) => <CardholderRowItem key={row.id} row={row} />)}
             {!cardholders.length && <TableRow><TableCell colSpan={5} className="text-center text-slate-400">No card holders recorded yet.</TableCell></TableRow>}
           </TableBody>
         </Table>
@@ -299,9 +296,7 @@ function CardholderRowItem({ row }: { row: CardholderRow }) {
       <TableCell><Badge variant={active ? 'success' : 'outline'}>{row.card_status || 'Unknown'}</Badge></TableCell>
       <TableCell>
         <form action={action} className="flex flex-wrap items-center gap-2">
-          <input type="hidden" name="row" value={row._row} />
-          <input type="hidden" name="match_referral_code" value={row.referral_code ?? ''} />
-          <input type="hidden" name="match_phone_number" value={row.phone_number ?? ''} />
+          <input type="hidden" name="id" value={row.id} />
           <Select name="card_status" defaultValue={row.card_status || 'Active'} className="h-8 w-28 text-xs">
             <option value="Active">Active</option>
             <option value="Inactive">Inactive</option>
@@ -333,17 +328,18 @@ function PosSection({ posEntries }: { posEntries: PosRow[] }) {
 
   return (
     <Card className="p-5">
-      <SectionHeader title="Free POS Tracker" description="Cash withdrawals through the free POS service." />
+      <SectionHeader title="Free POS Tracker" description="Cash withdrawals through the free POS service. The client is also recorded as a CRM Identity, linked directly on this record, so this person can be found again later." />
 
       <details className="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
         <summary className="cursor-pointer text-sm font-bold text-emmy-primary">+ Record a withdrawal</summary>
         <form action={action} onSubmit={() => { setQuery(''); setSelected(null); setClientName(''); setPhoneNumber(''); }} className="mt-4 grid gap-3 md:grid-cols-4">
+          <input type="hidden" name="identity_id" value={selected?.id ?? ''} />
           <Field label="Date"><Input name="date" type="date" /></Field>
           <Field label="Search existing customers">
             <IdentityPicker
               renderHiddenFields={false}
               searchEndpoint={REFERRAL_TRACKER_IDENTITY_ENDPOINT}
-              noMatchHint={REFERRAL_TRACKER_NO_MATCH_HINT}
+              noMatchHint={POS_NO_MATCH_HINT}
               query={query}
               onQueryChange={(value) => { setSelected(null); setQuery(value); setClientName(value); }}
               selected={selected}
@@ -373,7 +369,7 @@ function PosSection({ posEntries }: { posEntries: PosRow[] }) {
           </TableHeader>
           <TableBody>
             {posEntries.map((row) => (
-              <TableRow key={row._row}>
+              <TableRow key={row.id}>
                 <TableCell>{row.date || '—'}</TableCell>
                 <TableCell className="font-bold">{row.client_name || '—'}</TableCell>
                 <TableCell>{row.phone_number || '—'}</TableCell>
@@ -407,17 +403,18 @@ function DepositsSection({ deposits }: { deposits: DepositRow[] }) {
 
   return (
     <Card className="p-5">
-      <SectionHeader title="POS Deposits" description="Cash deposits / transfers received through the POS service." />
+      <SectionHeader title="POS Deposits" description="Cash deposits / transfers received through the POS service. The client is also recorded as a CRM Identity, linked directly on this record, so this person can be found again later." />
 
       <details className="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
         <summary className="cursor-pointer text-sm font-bold text-emmy-primary">+ Record a deposit</summary>
         <form action={action} onSubmit={() => { setQuery(''); setSelected(null); setClientName(''); setPhoneNumber(''); }} className="mt-4 grid gap-3 md:grid-cols-4">
+          <input type="hidden" name="identity_id" value={selected?.id ?? ''} />
           <Field label="Date"><Input name="date" type="date" /></Field>
           <Field label="Search existing customers">
             <IdentityPicker
               renderHiddenFields={false}
               searchEndpoint={REFERRAL_TRACKER_IDENTITY_ENDPOINT}
-              noMatchHint={REFERRAL_TRACKER_NO_MATCH_HINT}
+              noMatchHint={POS_NO_MATCH_HINT}
               query={query}
               onQueryChange={(value) => { setSelected(null); setQuery(value); setClientName(value); }}
               selected={selected}
@@ -447,7 +444,7 @@ function DepositsSection({ deposits }: { deposits: DepositRow[] }) {
           </TableHeader>
           <TableBody>
             {deposits.map((row) => (
-              <TableRow key={row._row}>
+              <TableRow key={row.id}>
                 <TableCell>{row.date || '—'}</TableCell>
                 <TableCell className="font-bold">{row.client_name || '—'}</TableCell>
                 <TableCell>{row.phone_number || '—'}</TableCell>

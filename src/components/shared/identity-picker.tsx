@@ -31,7 +31,7 @@ export interface IdentityPickerProps {
    * copy ("a new Identity will be resolved when you save"), which is only true where the
    * caller actually calls resolveOrCreate*Identity on submit — override this for any
    * caller that uses the picker purely as an autofill convenience and never creates or
-   * links a Supabase Identity (e.g. the Referral Tracker sheet forms). */
+   * links a Supabase Identity (e.g. the Referral Tracker's Referrals/Card Holders forms). */
   noMatchHint?: string;
 
   // Self-contained mode

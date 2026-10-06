@@ -26,15 +26,37 @@ async function requireCustomerAccess() {
   return requireStaffCapability('sales.read');
 }
 
-export async function resolveOrCreateOperationsIdentity(input: {
+type IdentitySource = 'operations_order' | 'operations_repair' | 'referral_tracker_pos';
+
+type ResolveIdentityInput = {
   existingIdentityId?: string | null;
   name?: string | null;
   phone?: string | null;
   email?: string | null;
   address?: string | null;
-  source: 'operations_order' | 'operations_repair';
-}) {
+  source: IdentitySource;
+};
+
+export async function resolveOrCreateOperationsIdentity(input: ResolveIdentityInput) {
   const { supabase } = await requireCustomerAccess();
+  return resolveOrCreateIdentityCore(supabase, input);
+}
+
+// The Referral Tracker's POS/Deposit forms need this too (so a name/phone typed there
+// becomes a real, searchable CRM Identity instead of just sitting in a spreadsheet cell)
+// but its audience — front_desk + marketing_manager — doesn't match the sales.read
+// capability requireCustomerAccess checks (marketing_manager has zero StaffCapability
+// entries). Same pattern as searchReferralTrackerIdentities below.
+export async function resolveReferralTrackerIdentity(input: ResolveIdentityInput) {
+  const { user, profile, supabase } = await getCachedAuthContext();
+  if (!user) throw new Error('Not authenticated');
+  if (!profile || !isInternalRole(profile.role) || !canAccessReferralTracker(profile.role)) {
+    throw new Error('Not authorized');
+  }
+  return resolveOrCreateIdentityCore(supabase, input);
+}
+
+async function resolveOrCreateIdentityCore(supabase: IdentitySupabaseClient, input: ResolveIdentityInput) {
   if (input.existingIdentityId) return input.existingIdentityId;
 
   const signals = buildOperationsIdentitySignals(input);
