@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
+import { Download } from 'lucide-react';
 import {
   runAnalyticsQueryAction,
   type AnalyticsQueryActionState,
@@ -17,6 +18,37 @@ function formatCell(value: unknown): string {
   if (value === null || value === undefined) return '—';
   if (typeof value === 'object') return JSON.stringify(value);
   return String(value);
+}
+
+// CSV, not the same formatting as the on-screen table: no "—" placeholder (blank reads
+// better once this is opened in a spreadsheet), and every field is quoted so a value
+// containing a comma, quote or newline can't corrupt the column structure.
+function csvCell(value: unknown): string {
+  const text = value === null || value === undefined
+    ? ''
+    : typeof value === 'object'
+      ? JSON.stringify(value)
+      : String(value);
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function downloadCsv(columns: string[], rows: Record<string, unknown>[]) {
+  const header = columns.map(csvCell).join(',');
+  const body = rows.map((row) => columns.map((column) => csvCell(row[column])).join(',')).join('\r\n');
+  // Leading UTF-8 BOM so Excel renders ₦ and other non-ASCII characters correctly
+  // instead of mojibake — this app's data is Naira-denominated throughout. Built via
+  // fromCharCode rather than a literal escape to avoid any editor/tool re-encoding it.
+  const bom = String.fromCharCode(0xfeff);
+  const blob = new Blob([bom + header + '\r\n' + body], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `sql-console-${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 export function SqlConsoleClient() {
@@ -54,25 +86,44 @@ export function SqlConsoleClient() {
           {state.rows.length === 0 ? (
             <p className="text-center text-sm text-slate-400">Query ran successfully — no rows returned.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    {state.columns?.map((column) => <TableHead key={column}>{column}</TableHead>)}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {state.rows.map((row, index) => (
-                    <TableRow key={index}>
-                      {state.columns?.map((column) => (
-                        <TableCell key={column} className="whitespace-nowrap font-mono text-xs">
-                          {formatCell(row[column])}
-                        </TableCell>
-                      ))}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                  {state.rowCount?.toLocaleString()} row{state.rowCount === 1 ? '' : 's'}
+                  {state.truncated ? ' · showing first 1,000' : ''}
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => downloadCsv(state.columns!, state.rows!)}
+                >
+                  <Download className="h-4 w-4" />
+                  Download CSV
+                </Button>
+              </div>
+
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      {state.columns?.map((column) => <TableHead key={column}>{column}</TableHead>)}
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {state.rows.map((row, index) => (
+                      <TableRow key={index}>
+                        {state.columns?.map((column) => (
+                          <TableCell key={column} className="whitespace-nowrap font-mono text-xs">
+                            {formatCell(row[column])}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           )}
         </Card>
