@@ -37,7 +37,7 @@ export function SqlConsoleClient() {
         <form action={action} className="space-y-3">
           <Textarea
             name="sql"
-            placeholder="select * from orders order by created_at desc limit 20"
+            placeholder="select * from ops_orders order by created_at desc limit 20"
             rows={8}
             className="font-mono text-sm"
             spellCheck={false}
