@@ -62,6 +62,7 @@ export const SALES_NAV_KEYS = [
   'settings',
   'referralTracker',
   'pos',
+  'sqlConsole',
 ] as const;
 
 export type SalesNavKey = (typeof SALES_NAV_KEYS)[number];
@@ -69,12 +70,15 @@ export type SalesNavKey = (typeof SALES_NAV_KEYS)[number];
 const SALES_ACCESS: Record<InternalRole, readonly SalesNavKey[]> = {
   super_admin: SALES_NAV_KEYS,
   admin: SALES_NAV_KEYS,
-  growth_lead: SALES_NAV_KEYS,
+  // Explicit exclusion rather than the SALES_NAV_KEYS shorthand: growth_lead otherwise
+  // sees the full sales nav, but sqlConsole has its own narrower gate
+  // (canAccessSalesAnalyticsConsole) that doesn't include this role.
+  growth_lead: SALES_NAV_KEYS.filter((key) => key !== 'sqlConsole'),
   marketing_manager: [],
   front_desk: ['direct', 'orders', 'payments', 'receipts', 'customers', 'referralTracker', 'pos'],
   operations_lead: ['overview', 'direct', 'orders', 'payments', 'receipts', 'customers'],
   technician: ['direct', 'receipts', 'customers'],
-  sales_analyst: ['overview', 'quotations', 'orders', 'customers', 'reports'],
+  sales_analyst: ['overview', 'quotations', 'orders', 'customers', 'reports', 'sqlConsole'],
 };
 
 export const OPERATIONS_NAV_KEYS = [
@@ -246,6 +250,15 @@ export function canAccessReferralTracker(role: string | null | undefined): boole
     role === 'marketing_manager' ||
     role === 'growth_lead'
   );
+}
+
+// The SQL Console needs its own gate, not just 'sales' module access — front_desk,
+// operations_lead and technician all have that module too, but shouldn't get a raw
+// query console. Mirrors sales_analytics_has_access() in
+// supabase/migrations/20261016180849_sales_analytics_sql_console.sql exactly — keep
+// both in sync.
+export function canAccessSalesAnalyticsConsole(role: string | null | undefined): boolean {
+  return role === 'super_admin' || role === 'admin' || role === 'sales_analyst';
 }
 
 export function roleLabel(role: string | null | undefined): string {

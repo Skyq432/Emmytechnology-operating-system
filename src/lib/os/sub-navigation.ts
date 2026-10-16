@@ -23,6 +23,7 @@ import {
   ShoppingBag,
   Stethoscope,
   Target,
+  Terminal,
   Users,
   UsersRound,
   Wallet,
@@ -58,6 +59,7 @@ const SALES_ICONS: Record<(typeof SALES_NAV)[number]['key'], LucideIcon> = {
   settings: Settings,
   referralTracker: Share2,
   pos: Wallet,
+  sqlConsole: Terminal,
 };
 
 const OPERATIONS_ICONS: Record<(typeof OPERATIONS_NAV)[number]['key'], LucideIcon> = {
