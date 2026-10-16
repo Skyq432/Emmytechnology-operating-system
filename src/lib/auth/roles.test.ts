@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   accessibleModules,
   canAccessModule,
+  canAccessSalesAnalyticsConsole,
   canCreateAmbassadorInvite,
   canCreateStaffInvite,
   isInternalRole,
@@ -38,7 +39,17 @@ test('sales navigation is filtered by role', () => {
   assert.deepEqual(salesNavKeys('operations_lead'), ['overview','direct','orders','payments','receipts','customers']);
   assert.deepEqual(salesNavKeys('technician'), ['direct','receipts','customers']);
   assert.equal(salesNavKeys('technician').includes('overview'), false);
-  assert.deepEqual(salesNavKeys('sales_analyst'), ['overview','quotations','orders','customers','reports']);
+  assert.deepEqual(salesNavKeys('sales_analyst'), ['overview','quotations','orders','customers','reports','sqlConsole']);
+  assert.equal(salesNavKeys('growth_lead').includes('sqlConsole'), false);
+});
+
+test('SQL console access is narrower than sales module access', () => {
+  assert.equal(canAccessSalesAnalyticsConsole('super_admin'), true);
+  assert.equal(canAccessSalesAnalyticsConsole('admin'), true);
+  assert.equal(canAccessSalesAnalyticsConsole('sales_analyst'), true);
+  assert.equal(canAccessSalesAnalyticsConsole('growth_lead'), false);
+  assert.equal(canAccessSalesAnalyticsConsole('front_desk'), false);
+  assert.equal(canAccessSalesAnalyticsConsole('technician'), false);
 });
 
 test('operations navigation is filtered by role', () => {

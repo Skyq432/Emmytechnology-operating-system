@@ -18,4 +18,5 @@ export const SALES_NAV = [
   // Same page, deep-linked to the POS section — front desk uses withdrawals/deposits
   // far more often than referrals/card holders, so this skips straight past those.
   { key: 'pos', label: 'POS Withdrawal / Deposit', href: '/modules/referral-tracker#pos' },
+  { key: 'sqlConsole', label: 'SQL Console', href: '/modules/sales/sql-console' },
 ] as const;
