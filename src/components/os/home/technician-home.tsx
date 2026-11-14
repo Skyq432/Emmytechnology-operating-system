@@ -1,4 +1,4 @@
-import { Boxes, ClipboardList, Stethoscope } from 'lucide-react';
+import { Boxes, ClipboardList, ReceiptText, Stethoscope } from 'lucide-react';
 import { ActionGrid, ActionLauncher } from '@/components/ui/action-launcher';
 import { PageHeader } from '@/components/ui/page-header';
 import { OperationsPeriodBar } from '@/components/operations/operations-period-bar';
@@ -51,6 +51,13 @@ export async function TechnicianHome({ role, name }: { role: InternalRole; name:
                 tone="secondary"
               />
             )}
+            <ActionLauncher
+              href="/modules/finance/petty-cash"
+              icon={<ReceiptText className="h-6 w-6" />}
+              title="Petty Cash"
+              description="Log money spent from the branch cash drawer"
+              tone="secondary"
+            />
           </ActionGrid>
         </div>
       </div>

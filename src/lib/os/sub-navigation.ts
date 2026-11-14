@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { operationsNavKeys, salesNavKeys, type ModuleSlug } from '@/lib/auth/roles';
 import { OPERATIONS_NAV } from '@/lib/operations/help';
+import { canLogPettyCash, canViewFinance, FINANCE_NAV, financeNavKeys, type FinanceNavKey } from '@/lib/finance/permissions';
 import { SALES_NAV } from '@/lib/sales/navigation';
 
 export interface ModuleSubNavItem {
@@ -73,6 +74,30 @@ const OPERATIONS_ICONS: Record<(typeof OPERATIONS_NAV)[number]['key'], LucideIco
   websiteLinks: Link2,
 };
 
+const FINANCE_ICONS: Record<FinanceNavKey, LucideIcon> = {
+  overview: Gauge,
+  moneyIn: Banknote,
+  accounts: Wallet,
+  expenses: ReceiptText,
+  receivables: HandCoins,
+  payables: WalletCards,
+  payroll: Users,
+  budgets: Target,
+  reports: BarChart3,
+  pettyCash: Wallet,
+};
+
+function buildFinanceNav(role: string | null | undefined): ModuleSubNavItem[] {
+  return financeNavKeys(role).map((key) => ({
+    key,
+    href: FINANCE_NAV[key].href,
+    label: FINANCE_NAV[key].label,
+    icon: FINANCE_ICONS[key],
+    help: FINANCE_NAV[key].description,
+    exact: FINANCE_NAV[key].href === '/modules/finance',
+  }));
+}
+
 function buildSalesNav(role: string | null | undefined): ModuleSubNavItem[] {
   const allowed = salesNavKeys(role);
   return SALES_NAV.filter((item) => allowed.includes(item.key)).map((item) => ({
@@ -86,7 +111,7 @@ function buildSalesNav(role: string | null | undefined): ModuleSubNavItem[] {
 
 function buildOperationsNav(role: string | null | undefined): ModuleSubNavItem[] {
   const allowed = operationsNavKeys(role);
-  return OPERATIONS_NAV.filter((item) => allowed.includes(item.key)).map((item) => ({
+  const items: ModuleSubNavItem[] = OPERATIONS_NAV.filter((item) => allowed.includes(item.key)).map((item) => ({
     key: item.key,
     href: item.href,
     label: item.label,
@@ -94,6 +119,12 @@ function buildOperationsNav(role: string | null | undefined): ModuleSubNavItem[]
     help: item.help,
     exact: item.href === '/modules/operations',
   }));
+  // Branch staff (Front Desk, Technician, Operations Lead) have no Finance module,
+  // so their one Finance page, Petty cash, is reached from here.
+  if (canLogPettyCash(role) && !canViewFinance(role)) {
+    items.push({ key: 'pettyCash', href: FINANCE_NAV.pettyCash.href, label: FINANCE_NAV.pettyCash.label, icon: FINANCE_ICONS.pettyCash, help: FINANCE_NAV.pettyCash.description });
+  }
+  return items;
 }
 
 // Marketing has no single flat section list — which sections apply depends on which
@@ -145,7 +176,7 @@ const CRM_NAV: ModuleSubNavItem[] = [
 /**
  * The AppShell sidebar's second segment: whichever module is active gets its section
  * list rendered here, filtered to what the role can see. Empty array means the module
- * has no sections of its own (Finance, Reports, Administration today) — the sidebar
+ * has no sections of its own (Reports, Administration today) — the sidebar
  * simply renders nothing for that segment rather than an empty card.
  */
 export function getModuleSubNav(slug: ModuleSlug, role: string | null | undefined, pathname: string): ModuleSubNavItem[] {
@@ -153,5 +184,6 @@ export function getModuleSubNav(slug: ModuleSlug, role: string | null | undefine
   if (slug === 'operations') return buildOperationsNav(role);
   if (slug === 'marketing') return buildMarketingNav(pathname);
   if (slug === 'crm') return CRM_NAV;
+  if (slug === 'finance') return buildFinanceNav(role);
   return [];
 }

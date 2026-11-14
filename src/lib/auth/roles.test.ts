@@ -21,12 +21,12 @@ test('internal staff roles exclude ambassadors and unknown roles', () => {
 
 test('department access follows the approved role matrix', () => {
   assert.deepEqual(accessibleModules('super_admin'), ['crm','marketing','sales','operations','finance','reports','administration']);
-  assert.deepEqual(accessibleModules('growth_lead'), ['crm','marketing','sales','operations','reports']);
+  assert.deepEqual(accessibleModules('growth_lead'), ['crm','marketing','sales','operations','finance','reports']);
   assert.deepEqual(accessibleModules('marketing_manager'), ['crm','marketing']);
   assert.deepEqual(accessibleModules('front_desk'), ['sales','operations']);
   assert.deepEqual(accessibleModules('operations_lead'), ['crm','sales','operations']);
   assert.deepEqual(accessibleModules('technician'), ['sales','operations']);
-  assert.deepEqual(accessibleModules('sales_analyst'), ['crm','sales','reports']);
+  assert.deepEqual(accessibleModules('sales_analyst'), ['crm','sales','finance','reports']);
   assert.deepEqual(accessibleModules('ambassador'), []);
   assert.equal(canAccessModule('marketing_manager', 'sales'), false);
   assert.equal(canAccessModule('front_desk', 'operations'), true);

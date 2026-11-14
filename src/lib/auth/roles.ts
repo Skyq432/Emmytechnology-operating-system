@@ -39,12 +39,12 @@ export const ROLE_LABELS: Record<EmmyRole, string> = {
 const MODULE_ACCESS: Record<InternalRole, readonly ModuleSlug[]> = {
   super_admin: MODULE_SLUGS,
   admin: MODULE_SLUGS,
-  growth_lead: ['crm', 'marketing', 'sales', 'operations', 'reports'],
+  growth_lead: ['crm', 'marketing', 'sales', 'operations', 'finance', 'reports'],
   marketing_manager: ['crm', 'marketing'],
   front_desk: ['sales', 'operations'],
   operations_lead: ['crm', 'sales', 'operations'],
   technician: ['sales', 'operations'],
-  sales_analyst: ['crm', 'sales', 'reports'],
+  sales_analyst: ['crm', 'sales', 'finance', 'reports'],
 };
 
 export const SALES_NAV_KEYS = [
