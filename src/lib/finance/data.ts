@@ -4,7 +4,7 @@ import { financeRpc } from './rpc.ts';
 import { moneyInArgs, type MoneyInFilters } from './filters.ts';
 import type { Period } from './dates.ts';
 import type {
-  AccountStatement, AccountsOverview, Budgets, CashCounts, ExpensesResult, FinanceBranch, FinanceOverview, FinancePosition,
+  AccountStatement, AccountsOverview, Budgets, CashCounts, CostStatus, ExpensesResult, InventoryRealCost, ProductCosts, FinanceBranch, FinanceOverview, FinancePosition,
   FinanceReference, MoneyInResult, MyPettyCash, Payables, Payroll, ProfitAndLoss, Receivables,
 } from './types.ts';
 
@@ -34,3 +34,9 @@ export const getPayables = () => financeRpc<Payables>('finance_payables');
 export const getPayroll = (month: string | null) => financeRpc<Payroll>('finance_payroll', { p_month: month });
 export const getBudgets = (month: string) => financeRpc<Budgets>('finance_budgets', { p_month: month });
 export const getProfitAndLoss = (month: string) => financeRpc<ProfitAndLoss>('finance_profit_and_loss', { p_month: month });
+
+// ── Real product cost (private: see canSeeCost) ─────────────────────
+export const getCostStatus = () => financeRpc<CostStatus>('finance_cost_status');
+export const getProductCosts = (period: Period) => financeRpc<ProductCosts>('finance_product_costs', { p_from: period.from, p_to: period.to });
+export const getInventoryRealCost = (inventoryItemId: string) =>
+  financeRpc<InventoryRealCost>('finance_inventory_real_cost', { p_inventory_item_id: inventoryItemId });

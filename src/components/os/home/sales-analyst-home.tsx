@@ -29,7 +29,7 @@ export async function SalesAnalystHome({ name }: { role: InternalRole; name: str
           <StatTile label="Sales Value" value={money(data.salesValue)} icon={<ShoppingBag className="h-[15px] w-[15px]" />} tone="primary" />
           <StatTile label="Cash Collected" value={money(data.cashCollected)} icon={<TrendingUp className="h-[15px] w-[15px]" />} tone="success" />
           <StatTile label="Outstanding" value={money(data.outstanding)} icon={<BadgeCheck className="h-[15px] w-[15px]" />} tone="secondary" />
-          <StatTile label="Gross Margin" value={`${Number(data.grossMargin || 0).toFixed(1)}%`} icon={<FileText className="h-[15px] w-[15px]" />} tone="neutral" />
+          <StatTile label="Base-price margin %" value={`${Number(data.grossMargin || 0).toFixed(1)}%`} icon={<FileText className="h-[15px] w-[15px]" />} tone="neutral" />
         </StatGrid>
 
         <StatGrid>

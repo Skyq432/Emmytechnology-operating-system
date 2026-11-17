@@ -68,3 +68,6 @@ export function csvCell(value: unknown): string {
   if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
   return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
+
+/** Item rows on the supplier bill form are numbered 1..BILL_LINE_ROWS; empty rows are skipped. */
+export const BILL_LINE_ROWS = 8;

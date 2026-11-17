@@ -11,8 +11,8 @@ export function SalesOverview({ data }: { data: SalesOverviewData }) {
     { label: 'Sales Value', value: money(data.salesValue), note: 'Confirmed commercial value' },
     { label: 'Cash Collected', value: money(data.cashCollected), note: 'Money actually received' },
     { label: 'Outstanding', value: money(data.outstanding), note: 'Customer balances still due' },
-    { label: 'Gross Profit', value: money(data.grossProfit), note: 'Frozen selling value minus cost basis' },
-    { label: 'Gross Margin', value: `${Number(data.grossMargin || 0).toFixed(1)}%`, note: 'Gross profit ÷ sales value' },
+    { label: 'Margin over base price', value: money(data.grossProfit), note: 'Selling price minus the staff base price. Real profit is in Finance → Reports.' },
+    { label: 'Base-price margin %', value: `${Number(data.grossMargin || 0).toFixed(1)}%`, note: 'Margin over base price ÷ sales value. Not real profit.' },
   ];
 
   return (

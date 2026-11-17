@@ -176,11 +176,68 @@ export interface Payables {
   overdue: number;
   open_count: number;
   other_total: number;
-  bills: Array<{ id: string; supplier_id: string; supplier_name: string; ref: string; bill_date: string; due_date: string; amount: number; paid: number; left: number; status: 'paid' | 'overdue' | 'part_paid' | 'unpaid'; days_late: number; note: string | null }>;
+  bills: Array<{
+    id: string; supplier_id: string; supplier_name: string; ref: string; bill_date: string; due_date: string; amount: number; paid: number; left: number;
+    status: 'paid' | 'overdue' | 'part_paid' | 'unpaid'; days_late: number; note: string | null;
+    /** Item lines; only for people who may see real cost (null otherwise or for bills saved before lines existed). */
+    lines: Array<{ product_name: string; quantity: number; unit_cost: number }> | null;
+  }>;
   by_supplier: Array<{ supplier_name: string; owed: number; open: number; overdue: boolean }>;
   payments: Array<{ id: string; date: string; amount: number; supplier_name: string; ref: string; account_name: string }>;
   suppliers: Array<{ id: string; name: string }>;
+  can_add_bill: boolean;
+  cost_products: Array<{ id: string; name: string }>;
   other: Record<'ambassador_payouts' | 'commissions_earned' | 'spin_cashouts', AmountCount>;
+}
+
+/** Overview task and Reports: counts only, no cost figures. Since the Finance start date. */
+export interface CostStatus {
+  from: string;
+  total: number;
+  missing: number;
+  missing_value: number;
+  missing_products: number;
+  can_see_cost: boolean;
+  can_edit: boolean;
+}
+
+export type CostSource = 'manual' | 'inventory' | 'supplier_bill';
+
+export interface ProductCosts {
+  from: string;
+  to: string;
+  today: string;
+  start_date: string;
+  can_edit: boolean;
+  summary: { lines: number; costed: number; missing: number; sold_value: number; costed_value: number; cost: number; missing_value: number };
+  /** Products (or not-yet-listed spellings) with at least one sale that has no real cost, all time. */
+  waiting: Array<{
+    key: string; product_id: string | null; name: string; spellings: string[]; lines: number; lines_since_start: number;
+    quantity: number; avg_price: number; last_sold: string;
+  }>;
+  lines: Array<{
+    order_item_id: string; order_code: string; sold_on: string; branch_name: string | null; item_name: string; product_name: string | null;
+    quantity: number; line_total: number; unit_price: number; unit_cost: number | null; list_cost: number | null;
+    source: 'exact' | 'list' | null; profit: number | null;
+  }>;
+  products: Array<{
+    id: string; name: string; inventory_item_id: string | null; inventory_name: string | null; spellings: string[];
+    unit_cost: number | null; effective_from: string | null; source: CostSource | null; price_count: number; sold_qty: number;
+  }>;
+  history: Array<{
+    product_id: string; unit_cost: number; effective_from: string; source: CostSource; note: string | null; by: string | null; at: string;
+    bill_ref: string | null; supplier_name: string | null; void: boolean;
+  }>;
+}
+
+export interface InventoryRealCost {
+  product_id: string | null;
+  product_name: string | null;
+  unit_cost: number | null;
+  effective_from: string | null;
+  source: CostSource | null;
+  can_edit: boolean;
+  today: string;
 }
 
 export interface PayRunTotals {
@@ -215,6 +272,8 @@ export interface ProfitAndLoss {
   columns: Array<{ key: string; name: string }>;
   lines: Array<{ line: 'sales' | 'repairs' | 'refunds' | 'cogs' | 'expense' | 'salaries'; label: string; values: Record<string, number> }>;
   payroll_status: 'draft' | 'approved' | 'paid' | null;
+  /** Sold items in the month with no real cost yet. While count > 0 the month is not final. */
+  cost_missing?: { count: number; value: number };
 }
 
 export interface FinancePosition {

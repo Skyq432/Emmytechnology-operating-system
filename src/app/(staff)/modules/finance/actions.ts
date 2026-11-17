@@ -5,13 +5,15 @@
 import { redirect } from 'next/navigation';
 import { financeRpc, FinanceDataError } from '@/lib/finance/rpc';
 import { ReceiptError, saveReceipt } from '@/lib/finance/receipts';
+import { BILL_LINE_ROWS } from '@/lib/finance/format';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 function backTo(fd: FormData): string {
   const back = String(fd.get('_back') ?? '');
-  return back.startsWith('/modules/finance') && !back.includes('//') ? back : '/modules/finance';
+  const allowed = back.startsWith('/modules/finance') || back.startsWith('/modules/operations/inventory/');
+  return allowed && !back.includes('//') ? back : '/modules/finance';
 }
 
 function withMessage(path: string, kind: 'ok' | 'error', text: string): string {
@@ -126,10 +128,19 @@ export async function addCategoryAction(fd: FormData) {
 }
 
 // ── Payables ────────────────────────────────────────────────────────
+function billLines(fd: FormData) {
+  const lines: Array<{ product_id: string | null; name: string | null; quantity: number | null; unit_cost: number | null }> = [];
+  for (let i = 1; i <= BILL_LINE_ROWS; i += 1) {
+    const line = { product_id: uuid(fd, `line_product_${i}`), name: text(fd, `line_name_${i}`), quantity: money(fd, `line_qty_${i}`), unit_cost: money(fd, `line_cost_${i}`) };
+    if (line.product_id || line.name || line.quantity !== null || line.unit_cost !== null) lines.push(line);
+  }
+  return lines;
+}
+
 export async function addSupplierBillAction(fd: FormData) {
-  await run(fd, 'Supplier bill saved', () => financeRpc('finance_add_supplier_bill', {
+  await run(fd, 'Supplier bill saved. Its item costs are now on the cost list.', () => financeRpc('finance_add_supplier_bill', {
     p_supplier_id: uuid(fd, 'supplier'), p_new_supplier_name: text(fd, 'new_supplier'), p_ref: text(fd, 'ref'),
-    p_bill_date: day(fd, 'bill_date'), p_due_date: day(fd, 'due_date'), p_amount: money(fd, 'amount'), p_note: text(fd, 'note'),
+    p_bill_date: day(fd, 'bill_date'), p_due_date: day(fd, 'due_date'), p_lines: JSON.stringify(billLines(fd)), p_note: text(fd, 'note'),
   }));
 }
 
@@ -181,4 +192,30 @@ export async function deleteBudgetAction(fd: FormData) {
 
 export async function copyBudgetsAction(fd: FormData) {
   await run(fd, 'Budgets copied to next month', () => financeRpc('finance_copy_budgets', { p_month: month(fd, 'month') }));
+}
+
+// ── Real product cost (Supreme Administrator only; enforced in the database) ──
+export async function setProductCostAction(fd: FormData) {
+  await run(fd, 'Real cost saved. Sales of this product now use it.', () => financeRpc('finance_set_product_cost', {
+    p_product_id: uuid(fd, 'product'), p_name: text(fd, 'name'), p_unit_cost: money(fd, 'cost'), p_from: day(fd, 'from'), p_note: text(fd, 'note'),
+  }));
+}
+
+export async function setSaleCostAction(fd: FormData) {
+  const clear = text(fd, 'clear') === '1';
+  await run(fd, clear ? 'This sale uses the cost list again' : 'Exact cost saved for this sale', () => financeRpc('finance_set_sale_cost', {
+    p_order_item_id: uuid(fd, 'item'), p_unit_cost: clear ? null : money(fd, 'cost'), p_note: text(fd, 'note'),
+  }));
+}
+
+export async function joinCostProductAction(fd: FormData) {
+  await run(fd, 'Joined: they now count as one product', () => financeRpc('finance_join_cost_product', {
+    p_into: uuid(fd, 'into'), p_from_product: uuid(fd, 'from_product'), p_name: text(fd, 'name'),
+  }));
+}
+
+export async function setInventoryRealCostAction(fd: FormData) {
+  await run(fd, 'Real cost saved', () => financeRpc('finance_set_inventory_real_cost', {
+    p_inventory_item_id: uuid(fd, 'inventory_item'), p_unit_cost: money(fd, 'cost'), p_from: day(fd, 'from'),
+  }));
 }

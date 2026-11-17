@@ -1,4 +1,5 @@
 // [MERGE] Finance · Reports: profit and loss by branch for one month.
+import Link from 'next/link';
 import { StatGrid, StatTile } from '@/components/ui/stat-tile';
 import { financeFieldClass, financeLabelClass } from '@/components/finance/styles';
 import { Note, Notice, PageHead, Section } from '@/components/finance/ui';
@@ -7,6 +8,7 @@ import { getFinanceReference, getProfitAndLoss } from '@/lib/finance/data';
 import { first, type SearchParams } from '@/lib/finance/filters';
 import { naira } from '@/lib/finance/format';
 import { buildPnl } from '@/lib/finance/pnl';
+import { canSeeCost } from '@/lib/finance/permissions';
 
 const monthName = (m: string) => new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${m.slice(0, 7)}-01T00:00:00Z`));
 
@@ -22,7 +24,7 @@ function monthsFrom(start: string, today: string): string[] {
 }
 
 export default async function FinanceReportsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  await requireFinancePage('reports');
+  const viewer = await requireFinancePage('reports');
   const params = await searchParams;
   const ref = await getFinanceReference();
   const months = monthsFrom(ref.start_date, ref.today);
@@ -31,6 +33,8 @@ export default async function FinanceReportsPage({ searchParams }: { searchParam
   const pnl = buildPnl(raw);
   const payrollIn = raw.payroll_status === 'approved' || raw.payroll_status === 'paid';
   const soFar = month === ref.today.slice(0, 7);
+  const missing = pnl.costMissing;
+  const notFinal = missing.count > 0;
 
   return (
     <div className="space-y-6">
@@ -54,8 +58,14 @@ export default async function FinanceReportsPage({ searchParams }: { searchParam
         <StatTile label="Revenue" value={naira(pnl.revenue)} tone="success" description="Sales and finished repairs, less refunds." />
         <StatTile label="Gross profit" value={naira(pnl.grossProfit)} tone="primary" description={`${pnl.revenue ? Math.round((pnl.grossProfit / pnl.revenue) * 100) : 0}% of revenue.`} />
         <StatTile label="Expenses and salaries" value={naira(pnl.expenses + pnl.salaries)} tone="danger" description={payrollIn ? 'Salaries included.' : 'Salaries not yet approved for this month.'} />
-        <StatTile label="Net profit" value={<span className={pnl.netProfit < 0 ? 'text-red-600' : ''}>{naira(pnl.netProfit)}</span>} tone={pnl.netProfit < 0 ? 'danger' : 'success'} description={`${monthName(month)}${soFar ? ' so far' : ''}.`} />
+        <StatTile label="Net profit" value={<span className={pnl.netProfit < 0 ? 'text-red-600' : ''}>{naira(pnl.netProfit)}</span>} tone={pnl.netProfit < 0 ? 'danger' : 'success'} description={notFinal ? `Not final: ${missing.count} ${missing.count === 1 ? 'sale has' : 'sales have'} no real cost yet.` : `${monthName(month)}${soFar ? ' so far' : ''}.`} />
       </StatGrid>
+      {notFinal ? (
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <strong>Not final.</strong> {missing.count} {missing.count === 1 ? 'sale' : 'sales'} in {monthName(month)} ({naira(missing.value)} sold) {missing.count === 1 ? 'has' : 'have'} no real cost, so cost of goods is too low and profit is too high.
+          {canSeeCost(viewer.role) ? <> <Link href="/modules/finance/costs?view=missing" className="font-bold text-red-800 underline">Add the real costs</Link></> : ' The Supreme Administrator adds them in Product costs.'}
+        </div>
+      ) : null}
       {!payrollIn ? <Note tone="amber">{monthName(month)} salaries are not approved yet, so they are not in this report. Approve them in Payroll to include them.</Note> : null}
       <Section title={monthName(month)}>
         <div className="w-full overflow-auto rounded-2xl border border-border bg-white">
@@ -75,7 +85,7 @@ export default async function FinanceReportsPage({ searchParams }: { searchParam
           </table>
         </div>
       </Section>
-      <Note>Sales count when confirmed, repairs when ready or collected. Company-wide holds sales with no branch and costs not tied to a branch. Free POS and transfers between accounts are not income or costs.</Note>
+      <Note>Sales count when confirmed, repairs when ready or collected. Company-wide holds sales with no branch and costs not tied to a branch. Free POS and transfers between accounts are not income or costs. Cost of goods uses real product cost only (Product costs), never staff base prices.</Note>
     </div>
   );
 }

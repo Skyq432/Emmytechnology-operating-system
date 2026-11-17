@@ -18,13 +18,15 @@ const initialSales: SalesActionState = { success: false, message: '' };
 const initialInventory: InventoryActionState = { success: false, message: '' };
 const money = (value: number | null | undefined) => value == null ? '—' : `₦${Number(value).toLocaleString('en-NG', { maximumFractionDigits: 0 })}`;
 
-export function InventoryDetail({ item, units, locations, suppliers, minimumGrossMarginPercent, websiteProduct }: {
+export function InventoryDetail({ item, units, locations, suppliers, minimumGrossMarginPercent, websiteProduct, realCost }: {
   item: OperationsInventoryItem;
   units: OperationsInventoryUnit[];
   locations: OperationsLocation[];
   suppliers: OperationsSupplier[];
   minimumGrossMarginPercent: number;
   websiteProduct: { id: string; name: string; price: number | null; sale_price: number | null; status: string | null } | null;
+  /** Finance Real cost box, rendered on the server only for people who may see real cost. */
+  realCost?: React.ReactNode;
 }) {
   const [unitState, unitAction, unitPending] = useActionState(createInventoryUnitAction, initialSales);
   const [stockState, stockAction, stockPending] = useActionState(addInventoryStockAction, initialInventory);
@@ -47,10 +49,12 @@ export function InventoryDetail({ item, units, locations, suppliers, minimumGros
     <div className="mb-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
         <div><div className="flex items-center gap-2"><h1 className="text-2xl font-black text-emmy-primary">{item.name}</h1><HelpTip text="SKU identifies the item type. Serial/IMEI is only for items you choose to track one physical unit at a time." label="About inventory identity" /></div><p className="mt-1 text-sm font-bold text-slate-500">{item.sku}{item.brand ? ` · ${item.brand}` : ''}{item.model ? ` · ${item.model}` : ''}</p><p className="mt-2 text-sm capitalize text-slate-500">{item.item_type || 'other'} · {item.serial_tracking ? 'Serial / IMEI tracking' : 'Quantity tracking'}</p></div>
-        <div className="grid gap-2 sm:grid-cols-3"><Info label="Condition" value={item.default_condition || '—'} /><Info label="Default cost" value={money(item.default_unit_cost)} /><Info label="Selling price" value={money(item.default_selling_price)} /></div>
+        <div className="grid gap-2 sm:grid-cols-3"><Info label="Condition" value={item.default_condition || '—'} /><Info label="Base price" value={money(item.default_unit_cost)} /><Info label="Selling price" value={money(item.default_selling_price)} /></div>
       </div>
       {specEntries.length > 0 && <div className="mt-5 border-t border-slate-100 pt-4"><p className="mb-3 text-xs font-black uppercase tracking-wide text-slate-400">Technical details</p><div className="flex flex-wrap gap-2">{specEntries.map(([key,value]) => <span key={key} className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600"><strong className="capitalize text-slate-800">{key.replaceAll('_',' ')}:</strong> {String(value)}</span>)}</div></div>}
     </div>
+
+    {realCost}
 
     <form action={pricingAction} className="mb-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <input type="hidden" name="inventory_item_id" value={item.id} />
@@ -61,7 +65,7 @@ export function InventoryDetail({ item, units, locations, suppliers, minimumGros
         <Field label="Salesperson max discount (%)"><Input name="salesperson_discount_limit_percent" type="number" min="0" max="100" step="0.01" required value={discountPercent} onChange={(e) => setDiscountPercent(Number(e.target.value || 0))} /><p className="mt-1 text-[11px] font-bold text-slate-500">{discountPercent}% = {money(discountAmount)} off · floor {money(discountFloor)}</p></Field>
         <Field label="Minimum gross margin (%)"><Input name="minimum_gross_margin_percent" type="number" min="0" max="99.99" step="0.01" required value={minimumMarginPercent} onChange={(e) => setMinimumMarginPercent(Number(e.target.value || 0))} /><p className="mt-1 text-[11px] font-bold text-slate-500">{minimumMarginPercent}% gross margin requires {money(marginFloor)} selling price · {money(marginAmount)} gross profit</p></Field>
       </div>
-      <div className="mt-4 grid gap-3 sm:grid-cols-3"><Info label="Discount floor" value={standardPrice > 0 ? money(discountFloor) : '—'} /><Info label="Margin floor" value={cost > 0 ? money(marginFloor) : 'Set cost price'} /><Info label="Lowest allowed price" value={standardPrice > 0 ? money(lowestPrice) : '—'} /></div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-3"><Info label="Discount floor" value={standardPrice > 0 ? money(discountFloor) : '—'} /><Info label="Margin floor" value={cost > 0 ? money(marginFloor) : 'Set base price'} /><Info label="Lowest allowed price" value={standardPrice > 0 ? money(lowestPrice) : '—'} /></div>
       <ActionResult state={pricingState} className="mt-3" />
       <Button type="submit" disabled={pricingPending} className="mt-4">{pricingPending ? 'Saving...' : 'Save commercial pricing'}</Button>
     </form>
@@ -72,7 +76,7 @@ export function InventoryDetail({ item, units, locations, suppliers, minimumGros
         <input type="hidden" name="inventory_item_id" value={item.id} />
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <Field label="Serial number"><Input name="serial_number" /></Field><Field label="IMEI 1"><Input name="imei_1" /></Field><Field label="IMEI 2"><Input name="imei_2" /></Field><Field label="Condition"><Input name="condition" defaultValue={item.default_condition || ''} /></Field>
-          <Field label="Acquisition date"><Input name="acquisition_date" type="date" /></Field><Field label="Unit cost"><Input name="unit_cost" type="number" min="0" defaultValue={item.default_unit_cost ?? ''} /></Field>
+          <Field label="Acquisition date"><Input name="acquisition_date" type="date" /></Field><Field label="Unit base price"><Input name="unit_cost" type="number" min="0" defaultValue={item.default_unit_cost ?? ''} /></Field>
           <Field label="Supplier"><Select name="supplier_id" defaultValue={item.preferred_supplier_id || ''}><option value="">No supplier selected</option>{suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</Select></Field>
           <Field label="Location"><Select name="location_id" defaultValue=""><option value="">Choose location</option>{locations.filter((l) => l.code !== 'TRANSIT').map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</Select></Field>
           <div className="md:col-span-2 xl:col-span-4"><Field label="Note"><Input name="note" /></Field></div>
@@ -86,7 +90,7 @@ export function InventoryDetail({ item, units, locations, suppliers, minimumGros
         {units.length === 0 ? <div className="py-14 text-center"><Smartphone className="mx-auto h-8 w-8 text-slate-300" /><p className="mt-3 text-sm font-bold text-slate-700">No serial or IMEI recorded yet</p></div> : (
           <Table>
             <TableHeader>
-              <TableRow><TableHead>Serial / IMEI</TableHead><TableHead>Condition</TableHead><TableHead>Location</TableHead><TableHead>Status</TableHead><TableHead>Supplier</TableHead><TableHead>Cost</TableHead></TableRow>
+              <TableRow><TableHead>Serial / IMEI</TableHead><TableHead>Condition</TableHead><TableHead>Location</TableHead><TableHead>Status</TableHead><TableHead>Supplier</TableHead><TableHead>Base price</TableHead></TableRow>
             </TableHeader>
             <TableBody>
               {units.map((u) => (
@@ -109,7 +113,7 @@ export function InventoryDetail({ item, units, locations, suppliers, minimumGros
       <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Field label="Location"><Select name="location_id" required defaultValue=""><option value="">Choose location</option>{locations.filter((l) => l.code !== 'TRANSIT').map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</Select></Field>
         <Field label="Quantity"><Input name="quantity" type="number" min="1" required /></Field>
-        <Field label="Unit cost"><Input name="unit_cost" type="number" min="0" defaultValue={item.default_unit_cost ?? ''} /></Field>
+        <Field label="Unit base price"><Input name="unit_cost" type="number" min="0" defaultValue={item.default_unit_cost ?? ''} /></Field>
         <Field label="Supplier"><Select name="supplier_id" defaultValue={item.preferred_supplier_id || ''}><option value="">No supplier selected</option>{suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</Select></Field>
         <div className="md:col-span-2 xl:col-span-4"><Field label="Reason / note"><Input name="note" placeholder="New stock received" /></Field></div>
       </div>

@@ -113,7 +113,8 @@ describe('Roles', () => {
   });
 
   test('pages per role', () => {
-    assert.deepEqual(financeNavKeys('sales_analyst'), ['overview', 'moneyIn', 'accounts', 'expenses', 'receivables', 'payables', 'payroll', 'budgets', 'reports']);
+    assert.deepEqual(financeNavKeys('sales_analyst'), ['overview', 'moneyIn', 'accounts', 'expenses', 'receivables', 'payables', 'payroll', 'budgets', 'reports', 'costs']);
+    assert.equal(financeNavKeys('admin').includes('costs'), false, 'real cost is not for Administrators');
     assert.deepEqual(financeNavKeys('front_desk'), ['pettyCash']);
     assert.deepEqual(financeNavKeys('technician'), ['pettyCash']);
     assert.deepEqual(financeNavKeys('marketing_manager'), []);

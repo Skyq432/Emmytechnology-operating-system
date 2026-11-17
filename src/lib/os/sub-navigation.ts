@@ -22,6 +22,7 @@ import {
   Share2,
   ShoppingBag,
   Stethoscope,
+  Tags,
   Target,
   Terminal,
   Users,
@@ -84,6 +85,7 @@ const FINANCE_ICONS: Record<FinanceNavKey, LucideIcon> = {
   payroll: Users,
   budgets: Target,
   reports: BarChart3,
+  costs: Tags,
   pettyCash: Wallet,
 };
 

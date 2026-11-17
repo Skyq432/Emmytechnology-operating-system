@@ -10,7 +10,8 @@ import { requireFinancePage } from '@/lib/finance/access';
 import { getFinanceReference, getPayables } from '@/lib/finance/data';
 import { addDays, formatDay } from '@/lib/finance/dates';
 import type { SearchParams } from '@/lib/finance/filters';
-import { naira } from '@/lib/finance/format';
+import { BILL_LINE_ROWS, naira } from '@/lib/finance/format';
+import { financeFieldClass } from '@/components/finance/styles';
 
 export default async function FinancePayablesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   await requireFinancePage('payables');
@@ -29,6 +30,7 @@ export default async function FinancePayablesPage({ searchParams }: { searchPara
       <PageHead title="Payables" sub="Who EmmyTech owes right now" />
       <Notice params={params} />
       {!manage ? <Note>View only. Administrators add supplier bills and record payments.</Note> : null}
+      {manage && !data.can_add_bill ? <Note>Supplier bills carry real product costs, so only the Supreme Administrator adds them. You can record payments.</Note> : null}
       <StatGrid className="lg:grid-cols-3">
         <StatTile label="We owe suppliers" value={naira(data.owed)} tone="secondary" description={`${data.open_count} open ${data.open_count === 1 ? 'bill' : 'bills'}.`} />
         <StatTile label="Overdue" value={naira(data.overdue)} tone="danger" description="Past the agreed payment date." />
@@ -61,21 +63,23 @@ export default async function FinancePayablesPage({ searchParams }: { searchPara
 
       {manage ? (
         <Forms>
-          <FormCard title="Add a supplier bill" hint="Stock taken now, paid later. In EmmyTech OS, Operations can create this when stock arrives on credit." action={addSupplierBillAction} back={back} submit="Save bill">
+          {data.can_add_bill ? (
+          <div className="md:col-span-2">
+          <FormCard title="Add a supplier bill" hint="Stock taken now, paid later. List every item: the bill total is worked out from them, and the cost of each item goes on the cost list from the bill date." action={addSupplierBillAction} back={back} submit="Save bill">
             <Two>
               <Select name="supplier" defaultValue=""><option value="">Choose supplier…</option>{data.suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</Select>
               <Input name="new_supplier" placeholder="…or type a new supplier" maxLength={120} />
             </Two>
-            <Two>
-              <Input name="ref" placeholder="Invoice number" required maxLength={60} />
-              <Input name="amount" type="number" min="1" step="0.01" placeholder="Amount ₦" required />
-            </Two>
+            <Input name="ref" placeholder="Invoice number" required maxLength={60} />
             <Two>
               <Field label="Bill date"><Input name="bill_date" type="date" defaultValue={ref.today} required /></Field>
               <Field label="Pay by"><Input name="due_date" type="date" defaultValue={addDays(ref.today, 30)} required /></Field>
             </Two>
-            <Input name="note" placeholder="What was supplied? (optional)" />
+            <BillItems products={data.cost_products} />
+            <Input name="note" placeholder="Note (optional)" />
           </FormCard>
+          </div>
+          ) : null}
           {open.length > 0 ? (
             <FormCard title="Pay a supplier" hint="Part payments are fine. Money leaves the account you choose." action={paySupplierBillAction} back={back} submit="Save payment">
               <Select name="bill" required>{open.map((b) => <option key={b.id} value={b.id}>{b.supplier_name} · {b.ref} · owes {naira(b.left)}</option>)}</Select>
@@ -96,7 +100,9 @@ export default async function FinancePayablesPage({ searchParams }: { searchPara
             {data.bills.map((b) => (
               <TableRow key={b.id} className={b.status === 'paid' ? 'opacity-60' : undefined}>
                 <TableCell>{b.supplier_name}</TableCell>
-                <TableCell className="whitespace-nowrap font-bold">{b.ref}<span className="block text-xs font-normal text-slate-400">{b.note}</span></TableCell>
+                <TableCell className="font-bold"><span className="whitespace-nowrap">{b.ref}</span><span className="block text-xs font-normal text-slate-400">{b.note}</span>
+                  {b.lines?.length ? <span className="block text-xs font-normal text-slate-500">{b.lines.map((l) => `${Number(l.quantity)} × ${l.product_name} @ ${naira(l.unit_cost)}`).join(' · ')}</span> : null}
+                </TableCell>
                 <TableCell className="whitespace-nowrap">{formatDay(b.bill_date)}</TableCell>
                 <TableCell className="whitespace-nowrap">{formatDay(b.due_date)}</TableCell>
                 <TableCell className="text-right font-[family-name:var(--font-mono)]">{naira(b.amount)}</TableCell>
@@ -127,6 +133,33 @@ export default async function FinancePayablesPage({ searchParams }: { searchPara
           </TableBody>
         </Table>
       </Section>
+    </div>
+  );
+}
+
+/** Item rows for a supplier bill. Three show; the rest open under "More items". No client JS. */
+function BillItems({ products }: { products: Array<{ id: string; name: string }> }) {
+  const cell = `${financeFieldClass} w-full`;
+  const row = (i: number) => (
+    <div key={i} className="grid grid-cols-2 gap-2 sm:grid-cols-[1fr_1fr_5rem_8rem]">
+        <select name={`line_product_${i}`} defaultValue="" className={cell} aria-label={`Item ${i} product`}>
+          <option value="">{i === 1 ? 'Product…' : `Item ${i}: product…`}</option>
+          {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
+        <input name={`line_name_${i}`} placeholder="…or type a new product" maxLength={160} className={cell} aria-label={`Item ${i} new product name`} />
+      <input name={`line_qty_${i}`} type="number" min="0.01" step="0.01" placeholder="Qty" className={cell} aria-label={`Item ${i} quantity`} />
+      <input name={`line_cost_${i}`} type="number" min="0" step="0.01" placeholder="Cost each ₦" className={cell} aria-label={`Item ${i} cost of each`} />
+    </div>
+  );
+  const rows = Array.from({ length: BILL_LINE_ROWS }, (_, n) => n + 1);
+  return (
+    <div className="grid gap-2 rounded-xl border border-slate-200 p-3">
+      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Items on the bill</p>
+      {rows.slice(0, 3).map(row)}
+      <details>
+        <summary className="cursor-pointer text-xs font-semibold text-emmy-primary">More items</summary>
+        <div className="mt-2 grid gap-2">{rows.slice(3).map(row)}</div>
+      </details>
     </div>
   );
 }

@@ -7,8 +7,8 @@ import { BreakdownCard, DailyBars, type BreakdownRow } from '@/components/financ
 import { PeriodFields } from '@/components/finance/period-fields';
 import { financeFieldClass, financeLabelClass } from '@/components/finance/styles';
 import { requireFinancePage } from '@/lib/finance/access';
-import { getFinanceBranches, getFinanceOverview, getFinancePosition } from '@/lib/finance/data';
-import { eachDay, type Period } from '@/lib/finance/dates';
+import { getCostStatus, getFinanceBranches, getFinanceOverview, getFinancePosition } from '@/lib/finance/data';
+import { eachDay, formatDay, type Period } from '@/lib/finance/dates';
 import { parseOverviewFilters, type SearchParams } from '@/lib/finance/filters';
 import { getFinancePeriod, PERIOD_FROM_PAGE } from '@/lib/finance/period-source';
 import { branchLabel, methodLabel, naira, sourceLabel } from '@/lib/finance/format';
@@ -30,7 +30,9 @@ export default async function FinanceOverviewPage({ searchParams }: { searchPara
   const params = await searchParams;
   const filters = parseOverviewFilters(params, new Date(), await getFinancePeriod(params));
   const { period, branch } = filters;
-  const [branches, overview, position] = await Promise.all([getFinanceBranches(), getFinanceOverview(period, branch.branchId), getFinancePosition(period)]);
+  const [branches, overview, position, costStatus] = await Promise.all([
+    getFinanceBranches(), getFinanceOverview(period, branch.branchId), getFinancePosition(period), getCostStatus(),
+  ]);
 
   const branchName = branch.branchId ? branches.find((item) => item.id === branch.branchId)?.name ?? 'Selected branch' : 'All branches';
   const total = overview.money_in.amount;
@@ -75,6 +77,23 @@ export default async function FinanceOverviewPage({ searchParams }: { searchPara
           {period.label} · {branchName}
         </p>
       </div>
+
+      {costStatus.missing > 0 ? (
+        <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3">
+          <div className="text-sm text-red-900">
+            <p className="font-extrabold">Required: {costStatus.missing} {costStatus.missing === 1 ? 'sale needs' : 'sales need'} a real cost</p>
+            <p className="mt-0.5 text-xs text-red-800/80">
+              {costStatus.missing_products} {costStatus.missing_products === 1 ? 'product' : 'products'} with no real cost, {naira(costStatus.missing_value)} sold since {formatDay(costStatus.from)}.
+              Profit is not final until these are costed.{costStatus.can_see_cost ? '' : ' The Supreme Administrator adds them.'}
+            </p>
+          </div>
+          {costStatus.can_see_cost ? (
+            <Link href="/modules/finance/costs?view=missing" className="inline-flex h-9 items-center rounded-xl bg-red-600 px-4 text-sm font-semibold text-white no-underline hover:bg-red-700">
+              {costStatus.can_edit ? 'Add real costs' : 'See which'}
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
 
       <form method="get" className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-[0_8px_26px_rgba(15,23,42,0.045)]">
         {PERIOD_FROM_PAGE ? <PeriodFields period={period} /> : null}

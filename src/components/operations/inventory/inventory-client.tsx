@@ -72,7 +72,7 @@ export function InventoryClient({ items, locations, suppliers }: { items: Operat
             <Field label="Model / variant"><Input name="model" placeholder="840 G8 / Galaxy A15" /></Field>
             <Field label="Category"><Input name="category" placeholder="Laptop / Phone / Charger" /></Field>
             <Field label="Condition"><Input name="condition" placeholder="Brand New / Grade A" /></Field>
-            <Field label="Default cost"><Input name="default_unit_cost" type="number" min="0" placeholder="0" /></Field>
+            <Field label="Base price"><Input name="default_unit_cost" type="number" min="0" placeholder="0" /></Field>
             <Field label="Selling price"><Input name="default_selling_price" type="number" min="0" placeholder="0" /></Field>
             <Field label="Preferred supplier"><Select name="preferred_supplier_id" defaultValue=""><option value="">None</option>{suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}</Select></Field>
             <Field label="Unit"><Input name="unit" defaultValue="item" /></Field>

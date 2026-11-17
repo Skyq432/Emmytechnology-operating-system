@@ -16,6 +16,9 @@ export async function GET(request: NextRequest) {
     const pnl = buildPnl(await getProfitAndLoss(`${month}-01`));
     const header = ['', ...pnl.columns.map((c) => c.name), 'Total'];
     const lines = pnl.rows.map((r) => [r.label, ...pnl.columns.map((c) => r.values[c.key] ?? 0), r.total]);
+    if (pnl.costMissing.count > 0) {
+      lines.push([], [`NOT FINAL: ${pnl.costMissing.count} sale(s) worth ${pnl.costMissing.value} have no real cost yet, so profit is too high.`]);
+    }
     const csv = `﻿${[header, ...lines].map((row) => row.map(csvCell).join(',')).join('\r\n')}\r\n`;
     return new NextResponse(csv, {
       headers: {

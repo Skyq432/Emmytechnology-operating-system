@@ -21,6 +21,8 @@ export interface PnlTable {
   salaries: number;
   netProfit: number;
   byColumn: { net: Record<string, number> };
+  /** Sold items with no real cost yet; the month is not final while count > 0. */
+  costMissing: { count: number; value: number };
 }
 
 export function buildPnl(raw: ProfitAndLoss): PnlTable {
@@ -73,5 +75,6 @@ export function buildPnl(raw: ProfitAndLoss): PnlTable {
     salaries: sum(salaries),
     netProfit: sum(net),
     byColumn: { net },
+    costMissing: { count: Number(raw.cost_missing?.count ?? 0), value: Number(raw.cost_missing?.value ?? 0) },
   };
 }
