@@ -40,6 +40,7 @@ export interface OperationsOrder {
   commission_rate: number; commission_amount: number; commission_status: CommissionStatus; confirmed_at: string | null;
   status: OrderStatus; priority: OperationsPriority; current_team: string | null; current_owner_id: string | null; due_at: string | null;
   created_at: string; updated_at: string; items?: OperationsOrderItem[];
+  sales_channel?: 'order' | 'direct_sale' | null;
   final_receipt_id?: string | null; final_receipt_number?: string | null;
   deletion_status: 'none' | 'pending_deletion' | 'deleted';
   deletion_requested_by: string | null; deletion_requested_at: string | null; deletion_reason: string | null;

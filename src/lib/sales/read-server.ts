@@ -102,12 +102,92 @@ export async function getSalesPayments() {
 
 export async function getSalesDocuments() {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('sales_documents')
-    .select('*,deliveries:sales_document_deliveries(*)')
-    .order('issued_at', { ascending: false });
+  const [documentsResult, deletedOrdersResult] = await Promise.all([
+    supabase
+      .from('sales_documents')
+      .select('*,deliveries:sales_document_deliveries(*)')
+      .order('issued_at', { ascending: false }),
+    supabase.from('ops_orders').select('id').eq('deletion_status', 'deleted'),
+  ]);
+  if (documentsResult.error) throw new Error(documentsResult.error.message);
+  if (deletedOrdersResult.error) throw new Error(deletedOrdersResult.error.message);
+  // A deleted sale's receipts leave the Receipts page with it (they stay in the
+  // database, so an undone deletion brings them back).
+  const deletedOrderIds = new Set((deletedOrdersResult.data || []).map((row) => row.id));
+  return (documentsResult.data || []).filter((doc) => !doc.order_id || !deletedOrderIds.has(doc.order_id));
+}
+
+export type OutstandingRow = {
+  sourceType: 'order' | 'repair';
+  id: string;
+  code: string;
+  customerName: string | null;
+  customerPhone: string | null;
+  staffName: string | null;
+  salesChannel: string | null;
+  since: string | null;
+  /** Whole days since the sale/repair was confirmed (computed once, server-side). */
+  daysOwing: number | null;
+  total: number;
+  paid: number;
+  outstanding: number;
+  credit: { amount: number; dueAt: string; overdue: boolean } | null;
+};
+
+type PersonRow = { id: string; customer_name: string | null; customer_phone: string | null; technician_name?: string | null };
+
+/**
+ * Everything customers still owe: confirmed, not-deleted sales and repairs with a
+ * balance, from the same sales_revenue_balances view the Sales Overview uses, so this
+ * page and the "Outstanding" tile always agree. Any active Admin credit is attached.
+ */
+export async function getSalesOutstanding(): Promise<OutstandingRow[]> {
+  const supabase = await createClient();
+  const { data: balances, error } = await supabase
+    .from('sales_revenue_balances')
+    .select('source_type,source_id,source_code,sales_channel,sales_staff_name,commercial_at,sales_value,cash_collected,outstanding')
+    .gt('outstanding', 0);
   if (error) throw new Error(error.message);
-  return data || [];
+  const rows = balances || [];
+  const orderIds = rows.filter((row) => row.source_type === 'order').map((row) => row.source_id as string);
+  const repairIds = rows.filter((row) => row.source_type === 'repair').map((row) => row.source_id as string);
+  const empty = { data: [], error: null };
+  const [ordersResult, repairsResult, creditResult] = await Promise.all([
+    orderIds.length ? supabase.from('ops_orders').select('id,customer_name,customer_phone').in('id', orderIds) : Promise.resolve(empty),
+    repairIds.length ? supabase.from('ops_repairs').select('id,customer_name,customer_phone,technician_name').in('id', repairIds) : Promise.resolve(empty),
+    orderIds.length ? supabase.from('sales_credit_releases').select('order_id,approved_outstanding_amount,due_at,status').eq('status', 'active').in('order_id', orderIds) : Promise.resolve(empty),
+  ]);
+  const errors = [ordersResult.error, repairsResult.error, creditResult.error].filter(Boolean);
+  if (errors.length) throw new Error(errors[0]!.message);
+  const people = new Map<string, PersonRow>();
+  for (const row of [...(ordersResult.data || []), ...(repairsResult.data || [])] as PersonRow[]) people.set(row.id, row);
+  const credits = new Map(((creditResult.data || []) as Array<{ order_id: string; approved_outstanding_amount: number; due_at: string }>).map((row) => [row.order_id, row]));
+  const now = Date.now();
+  return rows
+    .map((row): OutstandingRow => {
+      const person = people.get(row.source_id);
+      const credit = credits.get(row.source_id);
+      return {
+        sourceType: row.source_type === 'repair' ? 'repair' : 'order',
+        id: row.source_id,
+        code: row.source_code,
+        customerName: person?.customer_name ?? null,
+        customerPhone: person?.customer_phone ?? null,
+        staffName: row.sales_staff_name ?? person?.technician_name ?? null,
+        salesChannel: row.sales_channel,
+        since: row.commercial_at,
+        daysOwing: row.commercial_at ? Math.max(Math.floor((now - new Date(row.commercial_at).getTime()) / 86_400_000), 0) : null,
+        total: Number(row.sales_value || 0),
+        paid: Number(row.cash_collected || 0),
+        outstanding: Number(row.outstanding || 0),
+        credit: credit ? {
+          amount: Number(credit.approved_outstanding_amount || 0),
+          dueAt: credit.due_at,
+          overdue: new Date(credit.due_at).getTime() < now,
+        } : null,
+      };
+    })
+    .sort((a, b) => String(a.since || '').localeCompare(String(b.since || '')));
 }
 
 export async function getSalesCustomers() {
@@ -148,13 +228,17 @@ export async function getSalesCredit() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('sales_credit_releases')
-    .select('*,order:ops_orders(order_code,customer_name,customer_phone,identity_id,total_amount,balance_due)')
+    .select('*,order:ops_orders(order_code,customer_name,customer_phone,identity_id,total_amount,balance_due,deletion_status)')
     .order('due_at');
   if (error) throw new Error(error.message);
   // Compute "overdue" here (once, server-side) rather than in the page component's
   // render body, which would call Date.now() impurely on every render.
   const now = Date.now();
-  return (data || []).map((row) => {
+  const isDeleted = (row: { order?: unknown }) => {
+    const order = (Array.isArray(row.order) ? row.order[0] : row.order) as { deletion_status?: string } | null | undefined;
+    return order?.deletion_status === 'deleted';
+  };
+  return (data || []).filter((row) => !isDeleted(row)).map((row) => {
     const withNumbers = numeric(row, ['approved_outstanding_amount']);
     return { ...withNumbers, overdue: withNumbers.status === 'active' && new Date(withNumbers.due_at).getTime() < now };
   });

@@ -16,6 +16,8 @@ import { OPERATIONS_HELP } from '@/lib/operations/help';
 import { createOrderAction, type OperationsActionState } from '@/app/(staff)/modules/operations/actions';
 import { getOrderStatusLabel } from '@/lib/operations/domain';
 import { calculateOrderTotals } from '@/lib/operations/commercial';
+import { computeOrderStats } from '@/lib/operations/order-stats';
+import { StatGrid, StatTile } from '@/components/ui/stat-tile';
 import type { OperationsIdentitySummary, OperationsInventoryItem, OperationsLocation, OperationsOrder } from '@/lib/operations/types';
 
 const initialState: OperationsActionState = { success: false, message: '' };
@@ -76,6 +78,10 @@ export function OrdersClient({ orders, inventory, locations, websiteProducts, am
       return matchesCommercial && matchesStatus && (!q || haystack.includes(q));
     });
   }, [orders, search, commercialFilter, statusFilter]);
+
+  const stats = useMemo(() => computeOrderStats(filtered), [filtered]);
+  // Every order in the selected period before search/filters (deleted ones are never loaded).
+  const periodTotal = orders.length;
 
   function chooseIdentity(identity: OperationsIdentitySummary | null) {
     if (!identity) {
@@ -179,6 +185,16 @@ export function OrdersClient({ orders, inventory, locations, websiteProducts, am
           <Button type="submit" size="lg" disabled={pending}>{pending ? 'Creating draft...' : 'Create draft order'}</Button>
         </form>
       )}
+
+      {/* Follows the period bar and the search/filters below, so the numbers always
+          describe the list underneath. Deleted orders are never in this list. */}
+      <StatGrid className="mb-4 sm:grid-cols-2 xl:grid-cols-5">
+        <StatTile label="Total orders" value={stats.orders} description={`${stats.directSales} direct sale${stats.directSales === 1 ? '' : 's'} · ${stats.otherOrders} other${stats.orders !== periodTotal ? ` · of ${periodTotal} in this period` : ''}`} tone="primary" />
+        <StatTile label="Sales value" value={money(stats.salesValue)} description="Confirmed orders only" tone="neutral" />
+        <StatTile label="Collected" value={money(stats.collected)} description="Paid on confirmed orders" tone="success" />
+        <StatTile label="Outstanding" value={money(stats.outstanding)} description="Balance still due" tone="secondary" />
+        <StatTile label="In progress" value={stats.inProgress} description={`${stats.completed} completed · ${stats.drafts} draft${stats.drafts === 1 ? '' : 's'}${stats.flaggedForDeletion ? ` · ${stats.flaggedForDeletion} flagged for deletion` : ''}`} tone="purple" />
+      </StatGrid>
 
       <div className="mb-3 flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:flex-row sm:flex-wrap sm:items-center">
         <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-slate-200 px-3"><Search className="h-4 w-4 shrink-0 text-slate-400" /><input value={search} onChange={(e) => setSearch(e.target.value)} className="w-full min-w-0 bg-transparent py-2.5 text-sm outline-none" placeholder="Search order, customer, team or reference..." /></div>

@@ -122,10 +122,10 @@ function ReferralsSection({ referrals, cardholders }: { referrals: ReferralRow[]
       <details className="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
         <summary className="cursor-pointer text-sm font-bold text-emmy-primary">+ Record a new referral</summary>
         <form action={action} onSubmit={() => { setReferralCode(''); setReferrerLookupPhone(''); setReferredClientQuery(''); setReferredClientSelected(null); setReferredClient(''); setClientPhone(''); }} className="mt-4 grid gap-3 md:grid-cols-3">
-          <Field label="Referral code (must be an existing card holder)">
-            <Input name="referral_code" list="known-referral-codes" placeholder="e.g. EMM-104" value={referralCode} onChange={(e) => setReferralCode(e.target.value)} />
+          <Field label="Referrer — card holder name (must be an existing card holder)">
+            <Input name="referral_code" list="known-referral-codes" placeholder="Start typing the referrer's name" value={referralCode} onChange={(e) => setReferralCode(e.target.value)} />
             <datalist id="known-referral-codes">
-              {cardholders.filter((c) => c.referral_code).map((c) => <option key={c.id} value={c.referral_code ?? undefined} />)}
+              {cardholders.filter((c) => c.referral_code).map((c) => <option key={c.id} value={c.referral_code ?? undefined}>{c.phone_number || ''}</option>)}
             </datalist>
           </Field>
           <Field label="Look up a card holder by phone (optional)">
@@ -230,7 +230,7 @@ function CardholdersSection({ cardholders }: { cardholders: CardholderRow[] }) {
 
   return (
     <Card className="p-5">
-      <SectionHeader title="Referral Card Holders" description="Everyone who has been given a physical Referral Card. Referral codes must be unique." />
+      <SectionHeader title="Referral Card Holders" description="Everyone who can refer customers. Every Direct Sale buyer is added here automatically when the sale is confirmed. Referral codes must be unique." />
 
       <details className="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
         <summary className="cursor-pointer text-sm font-bold text-emmy-primary">+ Add a card holder</summary>
@@ -292,7 +292,7 @@ function CardholderRowItem({ row }: { row: CardholderRow }) {
 
   return (
     <TableRow>
-      <TableCell className="font-bold">{row.referral_code || '—'}</TableCell>
+      <TableCell className="font-bold">{row.referral_code || '—'}{row.notes?.startsWith('Auto-added from Direct Sale') ? <div className="text-xs font-semibold text-slate-400">Added from Direct Sale</div> : null}</TableCell>
       <TableCell>{row.phone_number || '—'}</TableCell>
       <TableCell>{row.date_card_given || '—'}</TableCell>
       <TableCell><Badge variant={active ? 'success' : 'outline'}>{row.card_status || 'Unknown'}</Badge></TableCell>
